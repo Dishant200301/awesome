@@ -213,13 +213,13 @@ export const CustomerReviewsSection: React.FC = () => {
   });
 
   return (
-    <section className="w-full py-10 md:py-12 px-4 md:px-8 max-w-[1400px] mx-auto space-y-6 md:space-y-8 font-sans">
+    <section className="w-full py-10 md:py-12 px-4 md:px-8 max-w-[1500px] mx-auto space-y-6 md:space-y-8 font-sans">
       {/* Section Title matching Home Page */}
       <div className="space-y-2">
         <h2 className="text-2xl md:text-4xl font-800 text-zinc-900 tracking-tight">
           Customer Reviews & Ratings
         </h2>
-        <div className="w-16 h-1 bg-[#80a17d] rounded-full" />
+        <div className="w-16 h-1 bg-gradient-to-r from-[#F7E7B4] via-[#D8B458] to-[#B38728] rounded-full" />
       </div>
 
       {/* Overall Rating Box & Filters Row (Full width & stacked filters on mobile, Left-Right on Laptop/Tablet) */}

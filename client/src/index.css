@@ -4,10 +4,14 @@
 
 @theme {
   --font-sans: "Plus Jakarta Sans", "Montserrat", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", Georgia, serif;
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --font-heading: "Cinzel", "Playfair Display", Georgia, serif;
   --font-cinzel: "Cinzel", Georgia, serif;
   --font-garamond: "Cormorant Garamond", Georgia, serif;
+  --font-cormorant: "Cormorant Garamond", Georgia, serif;
+  --font-dm-serif: "DM Serif Display", Georgia, serif;
+  --font-allura: "Allura", cursive;
+  --font-poppins: "Poppins", sans-serif;
   --font-montserrat: "Montserrat", sans-serif;
   --color-brand-ink: #1A1A1A;
   --color-brand-maroon: #520618;
@@ -17,7 +21,10 @@
 
 .font-heading { font-family: "Cinzel", "Playfair Display", Georgia, serif; }
 .font-cinzel { font-family: "Cinzel", Georgia, serif; }
-.font-garamond { font-family: "Cormorant Garamond", Georgia, serif; }
+.font-garamond, .font-cormorant { font-family: "Cormorant Garamond", Georgia, serif; }
+.font-dm-serif { font-family: "DM Serif Display", Georgia, serif; }
+.font-allura { font-family: "Allura", cursive; }
+.font-poppins { font-family: "Poppins", sans-serif; }
 .font-montserrat { font-family: "Montserrat", sans-serif; }
 
 html, body { font-family: var(--font-sans); background: #fff; color: #000; }
@@ -261,7 +268,7 @@ html, body { font-family: var(--font-sans); background: #fff; color: #000; }
 }
 
 .reels-bullet-active {
-  background: #520618 !important;
+  background: linear-gradient(135deg, #F7E7B4 0%, #D8B458 50%, #B38728 100%) !important;
   opacity: 1 !important;
   width: 28px !important;
   border-radius: 9999px !important;
@@ -270,5 +277,17 @@ html, body { font-family: var(--font-sans); background: #fff; color: #000; }
 .reels-bullet-active-main {
   opacity: 0.85 !important;
 }
+
+/* Gold Gradient Utilities */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #F7E7B4 0%, #D8B458 50%, #B38728 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #F7E7B4 0%, #D8B458 50%, #B38728 100%);
+}
+
 
 

@@ -45,7 +45,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="mt-8 bg-white font-sans border-t border-[#EDE5DA]">
+    <footer className="mt-8 bg-white font-sans">
       <NewsletterCTA />
       
       <div className="mx-auto grid max-w-[1500px] gap-10 px-5 py-16 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:px-8">
@@ -59,7 +59,7 @@ export default function Footer() {
           </p>
           <div className="mt-6 flex items-center gap-3">
             <a
-              href="https://facebook.com"
+              href="https://www.facebook.com/awesomehandmade1#"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Facebook"
@@ -147,7 +147,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-[#EDE5DA] bg-[#FAF8F4] py-4">
+      <div className="py-4">
         <div className="mx-auto flex max-w-[1500px] flex-col sm:flex-row items-center justify-between px-5 text-xs text-brand-ink/60 gap-2">
           <p>© {new Date().getFullYear()} Awesome Handmade. All rights reserved.</p>
           <p className="text-[11px]">Crafted with love in Surat, Gujarat</p>

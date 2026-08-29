@@ -10,6 +10,7 @@ import {
   FiZoomIn,
 } from "react-icons/fi";
 import { ProductImage } from "../types/product";
+import { PaginationDots } from "@/modules/core/components/PaginationDots";
 
 interface VerticalGalleryProps {
   images: ProductImage[];
@@ -120,7 +121,7 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
                 key={img.id || idx}
                 onClick={() => handleSelectImage(idx)}
                 onMouseEnter={() => handleSelectImage(idx)}
-                className={`relative w-18 h-24 rounded-md overflow-hidden border-2 transition-all duration-200 shrink-0 group cursor-pointer ${
+                className={`relative w-18 h-18 rounded-lg overflow-hidden border-2 transition-all duration-200 shrink-0 group cursor-pointer ${
                   isActive
                     ? "border-zinc-900 shadow-sm"
                     : "border-zinc-300 opacity-80 hover:opacity-100 hover:border-zinc-500"
@@ -129,7 +130,7 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
                 <img
                   src={img.url}
                   alt={img.alt}
-                  className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                  className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
                   loading="lazy"
                 />
               </button>
@@ -152,7 +153,7 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
       </div>
 
       {/* LARGE PRODUCT PREVIEW (Right of thumbnails / Main Container matching reference image) */}
-      <div className="relative flex-1 bg-[#f5f2ee] rounded-none overflow-hidden aspect-[3/4.2] max-h-[660px] group">
+      <div className="relative flex-1 bg-[#FAF8F5] rounded-2xl overflow-hidden aspect-square max-h-[660px] group border border-[#EDE5DA]">
         {/* Animated Image Container */}
         <div
           className="w-full h-full relative cursor-zoom-in overflow-hidden"
@@ -177,7 +178,7 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
                 opacity: 0,
               }}
               transition={{ duration: 0.35, ease: [0.25, 1, 0.5, 1] }}
-              className={`w-full h-full object-cover object-top ${
+              className={`w-full h-full object-cover object-center ${
                 isZoomActive ? "opacity-0" : "opacity-100"
               }`}
             />
@@ -221,18 +222,12 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
         </button>
 
         {/* Pagination indicators on mobile */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 lg:hidden bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
-          {images.map((_, idx) => (
-            <span
-              key={idx}
-              className={`block rounded-full transition-all ${
-                idx === selectedIndex
-                  ? "w-5 h-2 bg-white"
-                  : "w-2 h-2 bg-white/50"
-              }`}
-            />
-          ))}
-        </div>
+        <PaginationDots
+          total={images.length}
+          current={selectedIndex}
+          onChange={(idx) => handleSelectImage(idx)}
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 lg:hidden bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full z-10 pointer-events-auto"
+        />
       </div>
 
       {/* MOBILE HORIZONTAL THUMBNAILS SLIDER (< 1024px) */}
@@ -241,7 +236,7 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
           <button
             key={img.id || idx}
             onClick={() => handleSelectImage(idx)}
-            className={`w-16 h-22 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+            className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
               idx === selectedIndex
                 ? "border-black scale-105 shadow-sm"
                 : "border-neutral-200 opacity-60"
@@ -250,7 +245,7 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
             <img
               src={img.url}
               alt={img.alt}
-              className="w-full h-full object-cover object-top"
+              className="w-full h-full object-cover object-center"
               loading="lazy"
             />
           </button>

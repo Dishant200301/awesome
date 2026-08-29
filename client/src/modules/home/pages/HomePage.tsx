@@ -27,6 +27,18 @@ export default function HomePage() {
     };
     raf = requestAnimationFrame(loop);
     lenis.on("scroll", ScrollTrigger.update);
+
+    // Smooth scroll to target hash section if present in URL
+    if (window.location.hash) {
+      const id = window.location.hash.replace("#", "");
+      const el = document.getElementById(id);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth" });
+        }, 300);
+      }
+    }
+
     return () => {
       cancelAnimationFrame(raf);
       lenis.destroy();

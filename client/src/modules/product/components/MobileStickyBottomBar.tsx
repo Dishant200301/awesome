@@ -58,7 +58,7 @@ export const MobileStickyBottomBar: React.FC<MobileStickyBottomBarProps> = ({
     <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-zinc-200 p-3 flex items-center justify-between gap-3 md:hidden shadow-2xl font-sans">
       {/* Price info */}
       <div className="flex flex-col shrink-0">
-        <span className="text-[10px] font-bold text-[#80a17d] tracking-wider">
+        <span className="text-[10px] font-extrabold bg-gradient-to-r from-[#E859B1] to-[#F7D85E] bg-clip-text text-transparent tracking-wider">
           -{activeVariation.discountPercentage}% OFF
         </span>
         <div className="flex items-baseline gap-1">

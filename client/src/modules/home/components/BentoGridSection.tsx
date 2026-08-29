@@ -1,64 +1,6 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, Autoplay } from "swiper/modules";
-import type { Swiper as SwiperClass } from "swiper";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
-
-interface BentoItem {
-  id: string;
-  image: string;
-  slug: string;
-  alt: string;
-}
-
-const BENTO_ITEMS: BentoItem[] = [
-  {
-    id: "choli",
-    image: "/images/home/Bento Grid/Choli.png",
-    slug: "choli",
-    alt: "Handmade Choli",
-  },
-  {
-    id: "jewellery",
-    image: "/images/home/Bento Grid/Jewellery.png",
-    slug: "necklace",
-    alt: "Handmade Jewellery",
-  },
-  {
-    id: "latkan",
-    image: "/images/home/Bento Grid/Latkan.png",
-    slug: "latkan",
-    alt: "Handmade Latkan",
-  },
-  {
-    id: "tassel",
-    image: "/images/home/Bento Grid/Tassel.png",
-    slug: "tassel",
-    alt: "Handmade Tassel",
-  },
-  {
-    id: "watch",
-    image: "/images/home/Bento Grid/Watch.png",
-    slug: "watch",
-    alt: "Handmade Watch",
-  },
-  {
-    id: "hair-accessories",
-    image: "/images/home/Bento Grid/Hair Accessories.png",
-    slug: "hair-accessories",
-    alt: "Handmade Hair Accessories",
-  },
-];
 
 export default function BentoGridSection() {
-  const [swiperInstance, setSwiperInstance] = useState<SwiperClass | null>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-
   return (
     <section className="w-full py-6 sm:py-10 md:py-12 lg:py-16">
       <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -168,78 +110,101 @@ export default function BentoGridSection() {
         </div>
 
         {/* ========================================================================= */}
-        {/* MOBILE VIEW: 1 Slide Carousel with Navigation Arrows & Pagination Dots   */}
+        {/* MOBILE VIEW: Exact Bento Grid matching reference image                   */}
         {/* ========================================================================= */}
-        <div className="block md:hidden relative w-full">
-          <div className="relative">
-            {/* Swiper Slider: 1 Slide per View */}
-            <Swiper
-              modules={[Navigation, Pagination, Autoplay]}
-              onSwiper={setSwiperInstance}
-              slidesPerView={1}
-              spaceBetween={16}
-              loop={true}
-              autoplay={{
-                delay: 4500,
-                disableOnInteraction: false,
-                pauseOnMouseEnter: true,
-              }}
-              onSlideChange={(swiper) => setActiveIndex(swiper.realIndex)}
-              className="w-full"
+        <div className="flex flex-col gap-2.5 sm:gap-3.5 md:hidden w-full">
+          {/* Top Section: Choli (Left, ~62%) + Latkan & Tassel (Right, ~38%) */}
+          <div className="grid grid-cols-[1.63fr_1fr] gap-2.5 sm:gap-3.5 items-stretch w-full">
+            {/* Choli Card (Tall) */}
+            <Link
+              to="/shop?category=choli"
+              className="group relative w-full h-full aspect-[1348/1740] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
-              {BENTO_ITEMS.map((item) => (
-                <SwiperSlide key={item.id}>
-                  {/* Uniform Same Card Ratio across all slides in mobile */}
-                  <Link
-                    to={`/shop?category=${item.slug}`}
-                    className="relative w-full aspect-[4/4.4] sm:aspect-square max-h-[380px] rounded-2xl overflow-hidden shadow-md block active:scale-[0.99] transition-transform duration-200 isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.alt}
-                      className="w-full h-full object-cover object-center rounded-2xl pointer-events-none"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
-                  </Link>
-                </SwiperSlide>
-              ))}
-            </Swiper>
-
-            {/* Left Navigation Arrow Button - Vertically Centered on Left */}
-            <button
-              onClick={() => swiperInstance?.slidePrev()}
-              aria-label="Previous category"
-              className="absolute left-3 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/90 backdrop-blur-md shadow-md text-brand-maroon flex items-center justify-center hover:bg-white active:scale-95 transition-all duration-200 border border-black/10 cursor-pointer"
-            >
-              <ChevronLeft size={22} strokeWidth={2.5} />
-            </button>
-
-            {/* Right Navigation Arrow Button - Vertically Centered on Right */}
-            <button
-              onClick={() => swiperInstance?.slideNext()}
-              aria-label="Next category"
-              className="absolute right-3 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/90 backdrop-blur-md shadow-md text-brand-maroon flex items-center justify-center hover:bg-white active:scale-95 transition-all duration-200 border border-black/10 cursor-pointer"
-            >
-              <ChevronRight size={22} strokeWidth={2.5} />
-            </button>
-          </div>
-
-          {/* Bottom Pagination Dots - Horizontally Centered */}
-          <div className="flex justify-center items-center gap-2 mt-5">
-            {BENTO_ITEMS.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => swiperInstance?.slideToLoop(idx)}
-                aria-label={`Go to slide ${idx + 1}`}
-                className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                  activeIndex === idx
-                    ? "w-7 bg-brand-maroon"
-                    : "w-2.5 bg-neutral-300 hover:bg-neutral-400"
-                }`}
+              <img
+                src="/images/home/Bento Grid/mobile/Choli.png"
+                alt="Handmade Choli"
+                className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
+                loading="lazy"
               />
-            ))}
+              <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
+            </Link>
+
+            {/* Right Column: Latkan (Top) + Tassel (Bottom) */}
+            <div className="flex flex-col gap-2.5 sm:gap-3.5 justify-between">
+              {/* Latkan Card */}
+              <Link
+                to="/shop?category=latkan"
+                className="group relative w-full aspect-[826/830] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
+              >
+                <img
+                  src="/images/home/Bento Grid/mobile/Latkan.png"
+                  alt="Handmade Latkan"
+                  className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
+              </Link>
+
+              {/* Tassel Card */}
+              <Link
+                to="/shop?category=tassel"
+                className="group relative w-full aspect-[826/830] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
+              >
+                <img
+                  src="/images/home/Bento Grid/mobile/Tassel.png"
+                  alt="Handmade Tassel"
+                  className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
+              </Link>
+            </div>
           </div>
+
+          {/* Middle Section: Watch (Left, ~38%) + Jewellery (Right, ~62%) */}
+          <div className="grid grid-cols-[1fr_1.63fr] gap-2.5 sm:gap-3.5 items-stretch w-full">
+            {/* Watch Card */}
+            <Link
+              to="/shop?category=watch"
+              className="group relative w-full aspect-[826/832] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
+            >
+              <img
+                src="/images/home/Bento Grid/mobile/Watch.png"
+                alt="Handmade Watch"
+                className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
+            </Link>
+
+            {/* Jewellery Card */}
+            <Link
+              to="/shop?category=necklace"
+              className="group relative w-full aspect-[1348/830] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
+            >
+              <img
+                src="/images/home/Bento Grid/mobile/Jewellery.png"
+                alt="Handmade Jewellery"
+                className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
+            </Link>
+          </div>
+
+          {/* Bottom Section: Hair Accessories (Full Width) */}
+          <Link
+            to="/shop?category=hair-accessories"
+            className="group relative w-full aspect-[2254/832] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
+          >
+            <img
+              src="/images/home/Bento Grid/mobile/Hair Accessories.png"
+              alt="Handmade Hair Accessories"
+              className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
+          </Link>
         </div>
       </div>
     </section>

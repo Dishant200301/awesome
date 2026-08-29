@@ -110,7 +110,7 @@ export function ContactPage() {
      
           {/* Banner Title & Subtitle */}
           <div className="text-center max-w-4xl mx-auto px-2 py-6 md:py-6">
-            <span className="text-[11px] md:text-[12px] font-extrabold uppercase tracking-[0.25em] text-[#80a17d] block mb-3">
+            <span className="text-[11px] md:text-[12px] font-extrabold uppercase tracking-[0.25em] text-[#520618] block mb-3">
               CONTACT US
             </span>
             <h1 className="font-sans text-4xl sm:text-5xl md:text-6xl text-zinc-900 font-normal leading-tight">
@@ -132,7 +132,7 @@ export function ContactPage() {
             <div className="order-2 lg:order-1 lg:col-span-7 w-full">
               {isSubmitted ? (
                 <div className="border border-zinc-200 bg-zinc-50/50 p-8 sm:p-12 text-center rounded-2xl space-y-4">
-                  <CheckCircle2 className="w-12 h-12 text-[#80a17d] mx-auto animate-bounce" />
+                  <CheckCircle2 className="w-12 h-12 text-[#520618] mx-auto animate-bounce" />
                   <h3 className="text-2xl font-heading text-brand-maroon">Message Received!</h3>
                   <p className="text-sm text-zinc-600 max-w-md mx-auto">
                     Thank you for reaching out to Awesome Handmade. Your inquiry has been forwarded directly to our artisan support team.

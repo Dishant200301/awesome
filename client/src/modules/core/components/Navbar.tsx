@@ -77,7 +77,6 @@ export function AwesomeLogo({ className = "h-9 w-9" }: { className?: string }) {
         <span className="block font-heading text-base sm:text-lg font-bold tracking-tight text-brand-ink">
           Awesome <span className="text-brand-maroon">Handmade</span>
         </span>
-        <span className="text-[9px] tracking-widest text-brand-gold uppercase font-medium">Surat, India</span>
       </div>
     </Link>
   );
@@ -163,14 +162,9 @@ export default function Navbar() {
       const targetId = href.replace("#", "");
       const targetElement = document.getElementById(targetId);
       if (targetElement) {
-        const headerOffset = 90;
-        const elementPosition = targetElement.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth",
-        });
+        targetElement.scrollIntoView({ behavior: "smooth" });
+      } else {
+        navigate(`/${href}`);
       }
     } else {
       e.preventDefault();
@@ -246,10 +240,10 @@ export default function Navbar() {
                     <a
                       href={link.href || "#"}
                       onClick={(e) => handleNavClick(e, link.href)}
-                      className={`inline-flex items-center gap-1.5 py-1 transition ${
+                      className={`relative inline-flex items-center gap-1.5 py-1 text-sm font-medium transition-colors after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out ${
                         openMega === link.key
-                          ? "text-brand-maroon font-semibold border-b-2 border-brand-maroon pb-0.5"
-                          : "hover:text-brand-maroon"
+                          ? "text-brand-maroon font-semibold after:scale-x-100 after:origin-left"
+                          : "text-brand-ink hover:text-brand-maroon after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left"
                       }`}
                     >
                       <span>{link.label}</span>
@@ -293,32 +287,32 @@ export default function Navbar() {
                     <div className="col-span-7 grid grid-cols-3 gap-8">
                       {/* Col 1: Jewellery */}
                       <div className="space-y-2.5">
-                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-brand-gold" /> Jewellery
+                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight">
+                          Jewellery
                         </h4>
                         <ul className="space-y-2 text-xs text-brand-ink/80">
                           <li>
-                            <Link to="/shop?category=earrings" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=earrings" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Earrings & Jhumkas
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=jewellery-set" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=jewellery-set" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Bridal Jewellery Set
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=necklace" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=necklace" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Mirror Necklaces
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=bracelet" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=bracelet" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Handmade Bracelets
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=anklet" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=anklet" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Anklets & Payal
                             </Link>
                           </li>
@@ -327,32 +321,32 @@ export default function Navbar() {
 
                       {/* Col 2: Festive & Latkans */}
                       <div className="space-y-2.5">
-                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-brand-gold" /> Festive & Latkans
+                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight">
+                          Festive & Latkans
                         </h4>
                         <ul className="space-y-2 text-xs text-brand-ink/80">
                           <li>
-                            <Link to="/shop?category=choli" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=choli" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Navratri Choli Set
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=latkan" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=latkan" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Bridal Mirror Latkans
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=latkan" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=latkan" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Blouse & Lehenga Latkans
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=tassel" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=tassel" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Colourful Long Tassels
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=krishna-outfit" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=krishna-outfit" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Krishna Outfits
                             </Link>
                           </li>
@@ -361,27 +355,27 @@ export default function Navbar() {
 
                       {/* Col 3: Gifts & Accessories */}
                       <div className="space-y-2.5">
-                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-brand-gold" /> Gifts & More
+                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight">
+                          Gifts & More
                         </h4>
                         <ul className="space-y-2 text-xs text-brand-ink/80">
                           <li>
-                            <Link to="/shop?category=gift-hamper" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=gift-hamper" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Gift Hampers & Boxes
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=gift-hamper" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=gift-hamper" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Macrame Keychains
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=hair-accessories" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=hair-accessories" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Hair Bows & Clips
                             </Link>
                           </li>
                           <li>
-                            <Link to="/shop?category=waist-belt" onClick={() => setOpenMega(null)} className="hover:text-brand-maroon hover:translate-x-1 inline-block transition-transform">
+                            <Link to="/shop?category=waist-belt" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
                               Mirror Waist Belts
                             </Link>
                           </li>
@@ -389,21 +383,21 @@ export default function Navbar() {
                       </div>
                     </div>
 
-                    {/* Right: 3 Visual Highlight Cards (Col Span 5) */}
-                    <div className="col-span-5 grid grid-cols-3 gap-4">
+                    {/* Right: 3 Visual Highlight Cards (Col Span 5) - Full Aspect Square (No Cropping) */}
+                    <div className="col-span-5 grid grid-cols-3 gap-3.5 items-center">
                       <Link
                         to="/shop?category=earrings"
                         onClick={() => setOpenMega(null)}
-                        className="group relative overflow-hidden rounded-2xl aspect-[3/4] block shadow-md hover:shadow-xl transition-all duration-300 bg-brand-cream border border-gray-100"
+                        className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
                       >
                         <img
                           src="/images/category/Earrings.webp"
                           alt="Earrings"
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute bottom-3 left-2 right-2">
-                          <div className="w-full py-2 px-1 bg-white text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-xl shadow-md border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                        <div className="absolute bottom-2 left-2 right-2">
+                          <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
                             Earrings
                           </div>
                         </div>
@@ -412,16 +406,16 @@ export default function Navbar() {
                       <Link
                         to="/shop?category=choli"
                         onClick={() => setOpenMega(null)}
-                        className="group relative overflow-hidden rounded-2xl aspect-[3/4] block shadow-md hover:shadow-xl transition-all duration-300 bg-brand-cream border border-gray-100"
+                        className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
                       >
                         <img
                           src="/images/category/Choli.webp"
                           alt="Navratri Choli"
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute bottom-3 left-2 right-2">
-                          <div className="w-full py-2 px-1 bg-white text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-xl shadow-md border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                        <div className="absolute bottom-2 left-2 right-2">
+                          <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
                             Choli Set
                           </div>
                         </div>
@@ -430,16 +424,16 @@ export default function Navbar() {
                       <Link
                         to="/shop?category=latkan"
                         onClick={() => setOpenMega(null)}
-                        className="group relative overflow-hidden rounded-2xl aspect-[3/4] block shadow-md hover:shadow-xl transition-all duration-300 bg-brand-cream border border-gray-100"
+                        className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
                       >
                         <img
                           src="/images/category/Latkan.webp"
                           alt="Latkan"
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute bottom-3 left-2 right-2">
-                          <div className="w-full py-2 px-1 bg-white text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-xl shadow-md border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                        <div className="absolute bottom-2 left-2 right-2">
+                          <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
                             Latkans
                           </div>
                         </div>

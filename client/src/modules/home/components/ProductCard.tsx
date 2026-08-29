@@ -92,7 +92,7 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
         <ProductHoverSlider
           product={p}
           alt={p.name}
-          className="relative aspect-[3/3.8] w-full overflow-hidden rounded-[18px] bg-[#f5f2ee]"
+          className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-[#f5f2ee]"
         >
           {/* Wishlist Heart Icon */}
           <button
@@ -107,12 +107,28 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
           >
             <FiHeart size={14} className={`stroke-[2.5] ${wishlisted ? "fill-current" : ""}`} />
           </button>
+
+          {/* Quick View Button (Mobile View Only) */}
+          <div className="md:hidden absolute inset-x-2.5 bottom-2.5 z-20 transition-all duration-300 ease-out translate-y-3 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-active:translate-y-0 group-active:opacity-100 flex">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openQuickView(p.id);
+              }}
+              className="w-full bg-white/95 hover:bg-black hover:text-white text-zinc-900 font-extrabold text-[11px] tracking-wider uppercase py-2 px-3 rounded-md shadow-lg border border-white/50 backdrop-blur-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <FiEye className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Quick View</span>
+            </button>
+          </div>
         </ProductHoverSlider>
       </div>
 
       {/* Info Content */}
       <div className="flex flex-1 flex-col pt-3 px-0.5">
-        <Link to={`/product/${p.id}`} className="hover:text-[#80a17d] transition-colors">
+        <Link to={`/product/${p.id}`} className="hover:text-[#520618] transition-colors">
           {/* SKU Number */}
           <p className="text-[11px] font-bold text-zinc-400 tracking-wider uppercase">{sku}</p>
 

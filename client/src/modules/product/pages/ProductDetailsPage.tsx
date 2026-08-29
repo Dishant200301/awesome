@@ -93,9 +93,9 @@ export const ProductDetailsPage: React.FC = () => {
     const exactMatch = (product.variations || []).find(
       (v) =>
         v &&
-        (v.colorName || (v as any).color || "").toLowerCase() === (selectedColor || "").toLowerCase() &&
-        (((v.size || "").toLowerCase() === (selectedSize || "").toLowerCase()) ||
-          ((v.sizeName || "").toLowerCase() === (selectedSize || "").toLowerCase()))
+        (v.colorName || (v as any).color || "").trim().toLowerCase() === (selectedColor || "").trim().toLowerCase() &&
+        (((v.size || "").trim().toLowerCase() === (selectedSize || "").trim().toLowerCase()) ||
+          ((v.sizeName || "").trim().toLowerCase() === (selectedSize || "").trim().toLowerCase()))
     );
 
     if (exactMatch) {
@@ -105,6 +105,7 @@ export const ProductDetailsPage: React.FC = () => {
 
       return {
         ...exactMatch,
+        colorName: selectedColor || exactMatch.colorName,
         size: selectedSize,
         images: finalImages
       };
@@ -112,7 +113,7 @@ export const ProductDetailsPage: React.FC = () => {
 
     // 2. Fallback to Color match
     const colorMatch = (product.variations || []).find(
-      (v) => v && (v.colorName || (v as any).color || "").toLowerCase() === (selectedColor || "").toLowerCase()
+      (v) => v && (v.colorName || (v as any).color || "").trim().toLowerCase() === (selectedColor || "").trim().toLowerCase()
     );
 
     if (colorMatch) {
@@ -122,18 +123,28 @@ export const ProductDetailsPage: React.FC = () => {
 
       return {
         ...colorMatch,
+        colorName: selectedColor || colorMatch.colorName,
         size: selectedSize,
         images: finalImages
       };
     }
 
-    // 3. Default to first variation with full gallery fallback
-    const firstVar = product.variations[0];
+    // 3. Synthesize variation matching selectedColor from colorObj/colorMedia/firstVar
+    const firstVar = product.variations[0] || {};
     return {
-      ...firstVar,
-      images: (firstVar.images && firstVar.images.length > 1) ? firstVar.images : (colorImages.length > 0 ? colorImages : (firstVar.images || []))
+      id: `v-${(selectedColor || "std").toLowerCase()}`,
+      colorName: selectedColor || "Standard",
+      colorHex: colorObj?.colorHex || colorMedia?.colorCode || (firstVar as any).colorHex || "#C89B3C",
+      size: selectedSize || (firstVar as any).size || "Standard Pair",
+      thumbnail: colorMain || (firstVar as any).thumbnail || "/images/category/Latkan.webp",
+      price: (firstVar as any).price || prodAny.price || 799,
+      originalPrice: (firstVar as any).originalPrice || prodAny.originalPrice || 1299,
+      discountPercentage: (firstVar as any).discountPercentage || 38,
+      sku: (firstVar as any).sku || product.defaultSku || `AH-${(selectedColor || "STD").toUpperCase()}`,
+      stock: (firstVar as any).stock !== undefined ? (firstVar as any).stock : 50,
+      images: colorImages.length > 0 ? colorImages : ((firstVar as any).images || [{ id: "img-0", url: "/images/category/Latkan.webp", alt: product.name }])
     };
-  }, [product.colors, product.variations, selectedColor, selectedSize, prodAny]);
+  }, [product.colors, (product as any).colorMediaConfigs, product.variations, selectedColor, selectedSize, prodAny]);
 
   const [hoverVariation, setHoverVariation] = useState<ProductColorVariation | null>(null);
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
@@ -177,18 +188,18 @@ export const ProductDetailsPage: React.FC = () => {
     };
   }, [id]);
 
-  // Sync selectedColor and selectedSize whenever product updates
+  // Sync selectedColor and selectedSize only when product loads or product ID changes
   useEffect(() => {
     if (!product) return;
     const validColors = [
       ...(product.colors || []).map(c => c?.colorName || (c as any)?.name || (c as any)?.color),
       ...((product as any).colorMediaConfigs || []).map((cm: any) => cm?.colorName || cm?.name),
       ...(product.variations || []).map(v => v?.colorName || (v as any)?.color)
-    ].filter(Boolean);
+    ].map(c => (c || "").trim()).filter(Boolean);
 
     if (validColors.length > 0) {
       const colorExists = validColors.some(
-        (cName) => (cName || "").toLowerCase() === (selectedColor || "").toLowerCase()
+        (cName) => cName.toLowerCase() === (selectedColor || "").trim().toLowerCase()
       );
       if (!colorExists) {
         const firstColor = validColors[0] || "Standard";
@@ -206,7 +217,7 @@ export const ProductDetailsPage: React.FC = () => {
       const fallbackSize = (product.colors?.[0]?.sizes?.[0]) || (product.availableSizes?.[0]) || "Standard Pair";
       setSelectedSize(fallbackSize);
     }
-  }, [product]);
+  }, [product?.id]);
 
   // Initialize Lenis smooth scroll
   useEffect(() => {
@@ -227,7 +238,7 @@ export const ProductDetailsPage: React.FC = () => {
   const displayedVariation = hoverVariation || activeVariation;
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900 font-sans selection:bg-black selection:text-white pb-16 md:pb-0 overflow-x-hidden">
+    <div className="min-h-screen bg-white text-neutral-900 font-sans selection:bg-black selection:text-white pb-16 md:pb-0 overflow-x-clip">
       {/* Top Navbar */}
       <Navbar />
 
@@ -236,10 +247,10 @@ export const ProductDetailsPage: React.FC = () => {
         {/* Breadcrumb */}
 
         {/* TOP PRODUCT HERO SECTION */}
-        <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-4 md:py-8">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-8 py-4 md:py-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
-            {/* Left Column: Image Gallery (50% Width on Tablet & Laptop) */}
-            <div className="w-full">
+            {/* Left Column: Image Gallery (Sticky on Laptop & Desktop) */}
+            <div className="w-full lg:sticky lg:top-24 h-fit">
               <VerticalGallery
                 images={displayedVariation.images && displayedVariation.images.length > 0 ? displayedVariation.images : [
                   { id: "img-1", url: prodAny.image || "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=800", alt: product.name }
@@ -253,15 +264,18 @@ export const ProductDetailsPage: React.FC = () => {
               <ProductInfo
                 product={product}
                 activeVariation={activeVariation}
+                selectedColor={selectedColor}
                 onSelectVariation={(v) => {
-                  setSelectedColor(v.colorName);
+                  const targetCol = v.colorName || (v as any).color || "Standard";
+                  setSelectedColor(targetCol);
+                  setHoverVariation(null);
                   const colorObj = (product.colors || []).find(
-                    (c) => c.colorName.toLowerCase() === v.colorName.toLowerCase()
+                    (c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === targetCol.toLowerCase()
                   );
                   const colorSizes = (colorObj?.sizes && colorObj.sizes.length > 0)
                     ? colorObj.sizes
                     : (product.variations || [])
-                      .filter((varItem) => (varItem.colorName || "").toLowerCase() === (v.colorName || "").toLowerCase())
+                      .filter((varItem) => varItem && (varItem.colorName || (varItem as any).color || "").toLowerCase() === targetCol.toLowerCase())
                       .map((varItem) => varItem.size || varItem.sizeName)
                       .filter((s): s is string => Boolean(s));
                   if (colorSizes.length > 0 && !colorSizes.includes(selectedSize)) {

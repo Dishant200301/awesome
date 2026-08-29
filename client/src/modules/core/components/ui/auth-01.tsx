@@ -245,7 +245,7 @@ export function Auth1({
                 className={`relative rounded-xl border bg-zinc-50/70 transition-all duration-200 ${
                   nameError
                     ? "border-rose-400 focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 bg-rose-50/20"
-                    : "border-zinc-200 focus-within:border-[#80a17d] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#80a17d]/10"
+                    : "border-zinc-200 focus-within:border-[#520618] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#520618]/10"
                 }`}
               >
                 <User className="text-zinc-400 absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transition-colors pointer-events-none" />
@@ -282,7 +282,7 @@ export function Auth1({
             className={`relative rounded-xl border bg-zinc-50/70 transition-all duration-200 ${
               emailError
                 ? "border-rose-400 focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 bg-rose-50/20"
-                : "border-zinc-200 focus-within:border-[#80a17d] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#80a17d]/10"
+                : "border-zinc-200 focus-within:border-[#520618] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#520618]/10"
             }`}
           >
             <Mail className="text-zinc-400 absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transition-colors pointer-events-none" />
@@ -317,7 +317,7 @@ export function Auth1({
             className={`relative rounded-xl border bg-zinc-50/70 transition-all duration-200 ${
               passwordError
                 ? "border-rose-400 focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 bg-rose-50/20"
-                : "border-zinc-200 focus-within:border-[#80a17d] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#80a17d]/10"
+                : "border-zinc-200 focus-within:border-[#520618] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#520618]/10"
             }`}
           >
             <Lock className="text-zinc-400 absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transition-colors pointer-events-none" />
@@ -360,7 +360,7 @@ export function Auth1({
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-zinc-300 text-[#80a17d] focus:ring-[#80a17d]/20 cursor-pointer accent-[#80a17d]"
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
               />
               <span>Remember me on this device</span>
             </label>
@@ -371,7 +371,7 @@ export function Auth1({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full h-10.5 sm:h-11 bg-zinc-900 hover:bg-[#80a17d] text-white text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 shadow-md hover:shadow-lg active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50 disabled:cursor-not-allowed group"
+          className="w-full h-10.5 sm:h-11 bg-zinc-900 hover:bg-[#520618] text-white text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 shadow-md hover:shadow-lg active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50 disabled:cursor-not-allowed group"
         >
           {isSubmitting ? (
             <>

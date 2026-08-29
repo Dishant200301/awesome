@@ -21,6 +21,7 @@ import { DynamicLucideIcon } from "../../core/components/DynamicLucideIcon";
 interface ProductInfoProps {
   product: ProductDetails;
   activeVariation: ProductColorVariation;
+  selectedColor?: string;
   onSelectVariation: (variation: ProductColorVariation) => void;
   onHoverVariation?: (variation: ProductColorVariation | null) => void;
   selectedSize: string;
@@ -136,6 +137,7 @@ const ShadcnCupSizeSelect: React.FC<ShadcnCupSizeSelectProps> = ({
 export const ProductInfo: React.FC<ProductInfoProps> = ({
   product,
   activeVariation,
+  selectedColor,
   onSelectVariation,
   onHoverVariation,
   selectedSize,
@@ -304,7 +306,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
   const displaySubtitle = activeColorMedia?.productInfo || (activeVariation as any)?.productInfo || (activeVariation as any)?.subtitle || product.subtitle || product.shortDescription;
 
   return (
-    <div className="w-full flex flex-col gap-6 lg:sticky lg:top-24 h-fit font-sans">
+    <div className="w-full flex flex-col gap-6 font-sans">
       {/* Brand & Action Buttons */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -381,7 +383,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
       {/* Pricing with Discount Tag */}
       <div className="space-y-1 font-montserrat">
         <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="text-2xl md:text-3xl font-extrabold text-[#80a17d]">
+          <span className="text-2xl md:text-3xl font-semibold bg-gradient-to-r from-[#E859B1] to-[#F7D85E] bg-clip-text text-transparent drop-shadow-xs">
             -{activeVariation.discountPercentage}%
           </span>
           <span className="text-3xl md:text-4xl font-800 text-zinc-900">
@@ -391,7 +393,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
             ₹{activeVariation.originalPrice.toLocaleString("en-IN")}.00
           </span>
           {savings > 0 && (
-            <span className="text-xs font-bold text-[#798A7A] bg-[#798A7A]/10 px-3 py-1 rounded-full border border-[#798A7A]/30">
+            <span className="text-xs font-bold text-[#410815] bg-gradient-to-r from-[#E859B1] to-[#F7D85E] px-3 py-1 rounded-full shadow-xs">
               Save ₹{savings.toLocaleString("en-IN")}
             </span>
           )}
@@ -429,8 +431,8 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
               {/* Color Cards Row: Unique Color Swatches Grid */}
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3 py-1">
                 {uniqueColorVariations.map((v) => {
-                  const vColName = (v.colorName || (v as any).color || "").toLowerCase();
-                  const activeColName = (activeVariation?.colorName || "").toLowerCase();
+                  const vColName = (v.colorName || (v as any).color || "").trim().toLowerCase();
+                  const activeColName = (selectedColor || activeVariation?.colorName || "").trim().toLowerCase();
                   const isActive = vColName === activeColName;
                   const colorObj = (product.colors || []).find((c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === vColName);
                   const colorMedia = ((product as any).colorMediaConfigs || []).find((cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === vColName);
@@ -439,24 +441,29 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
                   return (
                     <motion.button
                       key={v.id || v.colorName}
+                      type="button"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => onSelectVariation(v)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSelectVariation(v);
+                      }}
                       onMouseEnter={() => onHoverVariation?.(v)}
                       onMouseLeave={() => onHoverVariation?.(null)}
-                      className={`flex flex-col p-1.5 sm:p-2 rounded-xl sm:rounded-[16px] border-2 transition-all duration-200 text-left bg-white relative group overflow-hidden cursor-pointer ${isActive
+                      className={`flex flex-col p-1.5 sm:p-2 rounded-xl sm:rounded-[16px] border-2 transition-all duration-200 text-left bg-white relative group overflow-hidden cursor-pointer select-none ${isActive
                           ? "border-zinc-900 shadow-md ring-1 ring-zinc-900"
                           : "border-zinc-200 hover:border-zinc-400 opacity-85 hover:opacity-100"
                         }`}
                     >
-                      <div className="w-full h-20 sm:aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden bg-[#f5f2ee] mb-1 sm:mb-1.5 relative">
+                      <div className="w-full aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-[#FAF8F5] mb-1 sm:mb-1.5 relative">
                         <img
                           src={displayImg || "/images/category/Latkan.webp"}
                           alt={v.colorName || "Variation"}
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = "/images/category/Latkan.webp";
                           }}
-                          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                          className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                         />
                       </div>
                       <div className="flex flex-col justify-between text-[11px] sm:text-xs px-0.5 leading-tight gap-0.5">
@@ -606,7 +613,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
               descEl.scrollIntoView({ behavior: "smooth" });
             }
           }}
-          className="text-xs font-bold text-zinc-900 hover:text-[#80a17d] tracking-wider pt-1 text-left block cursor-pointer transition-colors"
+          className="text-xs font-bold text-zinc-900 hover:text-[#520618] tracking-wider pt-1 text-left block cursor-pointer transition-colors"
         >
           View More Details →
         </button>

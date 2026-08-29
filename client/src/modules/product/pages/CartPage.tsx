@@ -112,7 +112,7 @@ export const CartPage: React.FC = () => {
                         <div className="grow min-w-0">
                           <Link
                             to={`/product/${it.productId}`}
-                            className="font-bold text-base text-zinc-900 hover:text-[#80a17d] transition-colors block mb-1 line-clamp-2"
+                            className="font-bold text-base text-zinc-900 hover:text-[#520618] transition-colors block mb-1 line-clamp-2"
                           >
                             {it.productName}
                           </Link>
@@ -178,7 +178,7 @@ export const CartPage: React.FC = () => {
                             <div>
                               <Link
                                 to={`/product/${it.productId}`}
-                                className="font-bold text-base text-zinc-900 hover:text-[#80a17d] transition-colors block"
+                                className="font-bold text-base text-zinc-900 hover:text-[#520618] transition-colors block"
                               >
                                 {it.productName}
                               </Link>

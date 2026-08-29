@@ -1,15 +1,7 @@
 import { useState, useRef } from "react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import type { Swiper as SwiperType } from "swiper";
-import { Pagination, Navigation, Mousewheel, FreeMode } from "swiper/modules";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
-import { Sparkles } from "lucide-react";
 import ReelCard, { ReelItem } from "./ReelCard";
-
-import "swiper/css";
-import "swiper/css/pagination";
-import "swiper/css/navigation";
-import "swiper/css/free-mode";
+import { PaginationDots } from "@/modules/core/components/PaginationDots";
 
 const REELS: ReelItem[] = [
   {
@@ -143,46 +135,82 @@ const REELS: ReelItem[] = [
 ];
 
 export default function WatchShopSection() {
-  const swiperRef = useRef<SwiperType | null>(null);
-  const [isBeginning, setIsBeginning] = useState(true);
-  const [isEnd, setIsEnd] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const startX = useRef<number>(0);
+  const scrollLeftStart = useRef<number>(0);
+  const hasMoved = useRef<boolean>(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
   const [activeDot, setActiveDot] = useState(0);
 
-  const handleSwiperInit = (swiper: SwiperType) => {
-    swiperRef.current = swiper;
-    setIsBeginning(swiper.isBeginning);
-    setIsEnd(swiper.isEnd);
-    const p = swiper.progress || 0;
-    setActiveDot(Math.min(3, Math.max(0, Math.round(p * 3))));
+  const checkScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setCanScrollLeft(scrollLeft > 10);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll > 0) {
+      const totalDots = 4;
+      const index = Math.round((scrollLeft / maxScroll) * (totalDots - 1));
+      setActiveDot(Math.max(0, Math.min(totalDots - 1, index)));
+    }
   };
 
-  const handleSlideChange = (swiper: SwiperType) => {
-    setIsBeginning(swiper.isBeginning);
-    setIsEnd(swiper.isEnd);
-    const p = swiper.progress || 0;
-    setActiveDot(Math.min(3, Math.max(0, Math.round(p * 3))));
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    hasMoved.current = false;
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeftStart.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5;
+    if (Math.abs(walk) > 5) {
+      hasMoved.current = true;
+    }
+    scrollRef.current.scrollLeft = scrollLeftStart.current - walk;
+    checkScroll();
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  };
+
+  const scrollByAmount = (direction: "left" | "right") => {
+    if (!scrollRef.current) return;
+    const amount = scrollRef.current.clientWidth * 0.75;
+    scrollRef.current.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
   };
 
   const handleDotClick = (index: number) => {
-    if (!swiperRef.current) return;
-    const targetProgress = index / 3;
-    swiperRef.current.setProgress(targetProgress, 400);
+    if (!scrollRef.current) return;
+    const { scrollWidth, clientWidth } = scrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    const targetScroll = (index / 3) * maxScroll;
+    scrollRef.current.scrollTo({ left: targetScroll, behavior: "smooth" });
     setActiveDot(index);
-    setIsBeginning(swiperRef.current.isBeginning);
-    setIsEnd(swiperRef.current.isEnd);
   };
 
   return (
-    <section className="bg-[#FAF8F4] py-16 md:py-24 border-t border-[#EDE5DA] overflow-hidden w-full">
+    <section className="py-8 sm:py-12 md:py-16 overflow-hidden w-full pr-0 mr-0">
       {/* Section Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 text-center">
-        <div className="inline-flex items-center gap-2 mb-2.5 px-3.5 py-1 rounded-full bg-brand-gold/15 border border-brand-gold/30 text-brand-maroon shadow-xs">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span className="text-[11px] font-bold tracking-[0.25em] uppercase">
-            Artisan Reels
-          </span>
-        </div>
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold tracking-tight text-brand-maroon uppercase">
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 text-center mb-6 sm:mb-8 md:mb-10">
+        <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.12em] text-brand-maroon uppercase">
           WATCH &amp; SHOP HANDMADE
         </h2>
         <p className="mt-2 text-xs sm:text-sm text-brand-ink/75 max-w-lg mx-auto font-light leading-relaxed">
@@ -190,92 +218,36 @@ export default function WatchShopSection() {
         </p>
       </div>
 
-      {/* Carousel Container - Left and Right padding/margin across all devices */}
-      <div className="relative w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 group/carousel">
-        {/* Swiper Slider */}
-        <Swiper
-          modules={[Pagination, Navigation, Mousewheel, FreeMode]}
-          onSwiper={handleSwiperInit}
-          onSlideChange={handleSlideChange}
-          onProgress={(swiper, p) => {
-            setActiveDot(Math.min(3, Math.max(0, Math.round(p * 3))));
-          }}
-          grabCursor={true}
-          simulateTouch={true}
-          touchRatio={1.2}
-          resistanceRatio={0.85}
-          freeMode={{
-            enabled: true,
-            momentum: true,
-            momentumRatio: 0.8,
-            momentumVelocityRatio: 0.8,
-            sticky: false,
-          }}
-          speed={400}
-          mousewheel={{
-            forceToAxis: true,
-            releaseOnEdges: true,
-            sensitivity: 1,
-          }}
-          slidesPerView={1.25}
-          centeredSlides={true}
-          spaceBetween={14}
-          breakpoints={{
-            0: {
-              slidesPerView: 1.25,
-              centeredSlides: true,
-              spaceBetween: 14,
-              freeMode: {
-                enabled: true,
-                momentum: true,
-                sticky: false,
-              },
-            },
-            640: {
-              slidesPerView: 2.5,
-              centeredSlides: false,
-              spaceBetween: 18,
-              freeMode: {
-                enabled: true,
-                momentum: true,
-                sticky: false,
-              },
-            },
-            1024: {
-              slidesPerView: 4,
-              centeredSlides: false,
-              spaceBetween: 20,
-              freeMode: {
-                enabled: true,
-                momentum: true,
-                sticky: false,
-              },
-            },
-            1280: {
-              slidesPerView: 5,
-              centeredSlides: false,
-              spaceBetween: 20,
-              freeMode: {
-                enabled: true,
-                momentum: true,
-                sticky: false,
-              },
-            },
-          }}
-          className="w-full pb-4 !overflow-hidden"
+      {/* Manual Horizontal Scroll Container (Outer wrapper full bleed with inner track padding) */}
+      <div className="relative w-full max-w-[1500px] mx-auto group/carousel">
+        <div
+          ref={scrollRef}
+          onScroll={checkScroll}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          className={`overflow-x-auto no-scrollbar scroll-smooth pb-2 ${
+            isDragging ? "cursor-grabbing" : "cursor-grab"
+          }`}
         >
-          {REELS.map((reel) => (
-            <SwiperSlide key={reel.id}>
-              <ReelCard r={reel} />
-            </SwiperSlide>
-          ))}
-        </Swiper>
+          <div className="flex gap-3.5 sm:gap-4 md:gap-5 flex-nowrap w-max px-4 sm:px-6">
+            {REELS.map((reel) => (
+              <div
+                key={reel.id}
+                className="shrink-0 w-[78vw] sm:w-[280px] md:w-[310px] lg:w-[330px]"
+              >
+                <ReelCard r={reel} />
+              </div>
+            ))}
+          </div>
+        </div>
 
-        {/* Left Arrow (Disappears when at the beginning) */}
+        {/* Left Arrow (Desktop / Tablet) */}
         <button
-          onClick={() => swiperRef.current?.slidePrev()}
-          className={`absolute left-1.5 sm:left-3 md:left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 border border-brand-gold/30 text-brand-maroon shadow-lg flex items-center justify-center hover:bg-brand-maroon hover:text-white transition-all duration-300 cursor-pointer ${
-            isBeginning
+          onClick={() => scrollByAmount("left")}
+          className={`hidden sm:flex absolute left-2 md:left-3 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 border border-brand-gold/30 text-brand-maroon shadow-lg items-center justify-center hover:bg-brand-maroon hover:text-white transition-all duration-300 cursor-pointer ${
+            !canScrollLeft
               ? "opacity-0 pointer-events-none scale-75"
               : "opacity-100 scale-100"
           }`}
@@ -284,11 +256,11 @@ export default function WatchShopSection() {
           <FiChevronLeft size={20} />
         </button>
 
-        {/* Right Arrow (Disappears when at the end) */}
+        {/* Right Arrow (Desktop / Tablet) */}
         <button
-          onClick={() => swiperRef.current?.slideNext()}
-          className={`absolute right-1.5 sm:right-3 md:right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 border border-brand-gold/30 text-brand-maroon shadow-lg flex items-center justify-center hover:bg-brand-maroon hover:text-white transition-all duration-300 cursor-pointer ${
-            isEnd
+          onClick={() => scrollByAmount("right")}
+          className={`hidden sm:flex absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 border border-brand-gold/30 text-brand-maroon shadow-lg items-center justify-center hover:bg-brand-maroon hover:text-white transition-all duration-300 cursor-pointer ${
+            !canScrollRight
               ? "opacity-0 pointer-events-none scale-75"
               : "opacity-100 scale-100"
           }`}
@@ -298,24 +270,13 @@ export default function WatchShopSection() {
         </button>
       </div>
 
-      {/* Simple 4-Dot Pagination */}
-      <div className="flex justify-center items-center gap-2 mt-8 select-none">
-        {[0, 1, 2, 3].map((index) => {
-          const isActive = activeDot === index;
-          return (
-            <button
-              key={index}
-              onClick={() => handleDotClick(index)}
-              className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                isActive
-                  ? "w-7 bg-brand-maroon shadow-xs"
-                  : "w-2.5 bg-brand-gold/35 hover:bg-brand-maroon/50"
-              }`}
-              aria-label={`Go to slide section ${index + 1}`}
-            />
-          );
-        })}
-      </div>
+      {/* Pagination Dots */}
+      <PaginationDots
+        total={4}
+        current={activeDot}
+        onChange={handleDotClick}
+        className="mt-6"
+      />
     </section>
   );
 }

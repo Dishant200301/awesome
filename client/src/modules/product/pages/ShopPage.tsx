@@ -18,6 +18,14 @@ import {
 } from "lucide-react";
 import Navbar from "@/modules/core/components/Navbar";
 import Footer from "@/modules/core/components/Footer";
+import { PaginationDots } from "@/modules/core/components/PaginationDots";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/modules/core/components/ui/select";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import { useQuickView } from "../context/QuickViewContext";
@@ -104,32 +112,54 @@ export default function ShopPage() {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Top Categories Horizontal Scroll & 5 Dots State (Sync for Mobile, Tablet & Desktop)
+  // Top Categories Horizontal Scroll & Dynamic Dots State (Adapts to Mobile, Tablet, Laptop, Desktop)
   const catScrollRef = useRef<HTMLDivElement>(null);
   const [activeCatDot, setActiveCatDot] = useState<number>(0);
+  const [totalCatDots, setTotalCatDots] = useState<number>(3);
   const isDraggingCat = useRef<boolean>(false);
   const startCatX = useRef<number>(0);
   const scrollLeftStartCat = useRef<number>(0);
   const hasMovedCat = useRef<boolean>(false);
 
-  const handleCatScroll = () => {
+  const updateDotCount = () => {
     if (!catScrollRef.current) return;
+    const { scrollWidth, clientWidth } = catScrollRef.current;
+    if (clientWidth <= 0) return;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 10) {
+      setTotalCatDots(0);
+      return;
+    }
+    const pages = Math.ceil(scrollWidth / clientWidth);
+    setTotalCatDots(Math.max(2, pages));
+  };
+
+  useEffect(() => {
+    updateDotCount();
+    window.addEventListener("resize", updateDotCount);
+    return () => window.removeEventListener("resize", updateDotCount);
+  }, []);
+
+  const handleCatScroll = () => {
+    if (!catScrollRef.current || totalCatDots <= 1) return;
     const { scrollLeft, scrollWidth, clientWidth } = catScrollRef.current;
     const maxScroll = scrollWidth - clientWidth;
     if (maxScroll <= 5) {
       setActiveCatDot(0);
       return;
     }
+    const maxDotIndex = Math.max(1, totalCatDots - 1);
     const progress = Math.max(0, Math.min(1, scrollLeft / maxScroll));
-    const dot = Math.min(4, Math.max(0, Math.round(progress * 4)));
+    const dot = Math.min(maxDotIndex, Math.max(0, Math.round(progress * maxDotIndex)));
     setActiveCatDot(dot);
   };
 
   const scrollToCatDot = (dotIdx: number) => {
-    if (!catScrollRef.current) return;
+    if (!catScrollRef.current || totalCatDots <= 1) return;
     const { scrollWidth, clientWidth } = catScrollRef.current;
     const maxScroll = scrollWidth - clientWidth;
-    const target = maxScroll * (dotIdx / 4);
+    const maxDotIndex = Math.max(1, totalCatDots - 1);
+    const target = maxScroll * (dotIdx / maxDotIndex);
     catScrollRef.current.scrollTo({ left: target, behavior: "smooth" });
     setActiveCatDot(dotIdx);
   };
@@ -424,7 +454,7 @@ export default function ShopPage() {
                       if (!isActive) setSearchParams({ category: catKey });
                       else setSearchParams({});
                     }}
-                    className={`flex w-full items-center justify-between text-left hover:text-[#80a17d] transition-colors cursor-pointer ${isActive ? "text-[#80a17d] font-extrabold" : ""
+                    className={`flex w-full items-center justify-between text-left hover:text-[#520618] transition-colors cursor-pointer ${isActive ? "text-[#520618] font-extrabold" : ""
                       }`}
                   >
                     <span>{catName}</span>
@@ -464,7 +494,7 @@ export default function ShopPage() {
               step="100"
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#80a17d]"
+              className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#520618]"
             />
             <div className="flex items-center justify-between text-xs font-medium text-zinc-700">
               <span>
@@ -502,7 +532,7 @@ export default function ShopPage() {
                     id={`color-${colorName}`}
                     checked={checked}
                     onChange={() => toggleColor(colorName)}
-                    className="w-4 h-4 rounded border-zinc-300 text-[#80a17d] focus:ring-[#80a17d]/20 cursor-pointer accent-[#80a17d]"
+                    className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
                   />
                   <label htmlFor={`color-${colorName}`} className="cursor-pointer select-none flex items-center gap-2">
                     {colorHex && (
@@ -545,8 +575,8 @@ export default function ShopPage() {
                   type="button"
                   onClick={() => toggleSize(sizeVal)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${checked
-                      ? "bg-zinc-900 text-white border-zinc-900 shadow-xs"
-                      : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                    ? "bg-zinc-900 text-white border-zinc-900 shadow-xs"
+                    : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
                     }`}
                 >
                   {sizeVal}
@@ -586,7 +616,7 @@ export default function ShopPage() {
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleRating(stars)}
-                      className="w-4 h-4 rounded border-zinc-300 text-[#80a17d] focus:ring-[#80a17d]/20 cursor-pointer accent-[#80a17d]"
+                      className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
                     />
                     <div className="flex items-center text-amber-500">
                       {Array.from({ length: 5 }).map((_, i) => (
@@ -615,7 +645,7 @@ export default function ShopPage() {
           <button
             type="button"
             onClick={resetFilters}
-            className="w-full py-2.5 bg-zinc-100 hover:bg-[#80a17d] hover:text-white text-zinc-900 font-bold text-xs font-semibold tracking-wider transition-colors rounded-xl cursor-pointer"
+            className="w-full py-2.5 bg-zinc-100 hover:bg-[#520618] hover:text-white text-zinc-900 font-bold text-xs font-semibold tracking-wider transition-colors rounded-xl cursor-pointer"
           >
             RESET ALL FILTERS
           </button>
@@ -634,7 +664,7 @@ export default function ShopPage() {
             AWESOME HANDMADE CATEGORIES
           </p>
 
-          {/* SINGLE HORIZONTAL LINE: 6 (Laptop) / 4.5 (Tablet) / 2.5 (Mobile) */}
+          {/* SINGLE HORIZONTAL LINE: 8 (Desktop xl) / 6 (Laptop lg) / 5 (Tablet sm/md) / 3 (Mobile) */}
           <div className="relative w-full">
             <div
               ref={catScrollRef}
@@ -643,7 +673,7 @@ export default function ShopPage() {
               onMouseMove={handleCatMouseMove}
               onMouseUp={handleCatMouseUp}
               onMouseLeave={handleCatMouseUp}
-              className="flex flex-row items-stretch overflow-x-auto scroll-smooth scrollbar-none select-none cursor-grab active:cursor-grabbing w-full pl-0"
+              className="flex flex-row items-stretch overflow-x-auto scroll-smooth scrollbar-none select-none cursor-grab active:cursor-grabbing w-full px-2"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
               {shopCategories.map((cat) => {
@@ -654,7 +684,7 @@ export default function ShopPage() {
                 return (
                   <div
                     key={cat.id}
-                    className="shrink-0 w-[calc(100%/2.5)] sm:w-[calc(100%/4.5)] lg:w-[calc(100%/6)] px-2 sm:px-3 text-center"
+                    className="shrink-0 w-[calc(100%/3)] sm:w-[calc(100%/5)] lg:w-[calc(100%/6)] xl:w-[calc(100%/8)] px-1.5 sm:px-2 md:px-3 text-center"
                   >
                     <button
                       type="button"
@@ -667,61 +697,50 @@ export default function ShopPage() {
                           setSelectedCategory(active ? null : cat.id);
                         }
                       }}
-                      className="group flex flex-col items-center justify-between w-full h-full py-2 cursor-pointer transition-all duration-300 transform active:scale-95"
+                      className="group flex flex-col items-center justify-between w-full h-full py-2 cursor-pointer transition-colors duration-300"
                     >
-                      {/* Circle Image */}
+                      {/* Story-style Square Card Image */}
                       <div
-                        className={`w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-28 lg:h-28 rounded-full overflow-hidden transition-all duration-300 p-0.5 shadow-xs ${
-                          active
-                            ? "border-2 border-[#80a17d] ring-2 ring-[#80a17d]/30"
-                            : "border-2 border-transparent group-hover:border-zinc-300"
-                        }`}
+                        className={`w-[76px] h-[76px] min-[400px]:w-[84px] min-[400px]:h-[84px] sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 aspect-square rounded-2xl overflow-hidden transition-all duration-300 p-0.5 shadow-sm ${active
+                          ? "border-2 border-[#520618] shadow-md"
+                          : "border-2 border-transparent group-hover:border-zinc-300"
+                          }`}
                       >
                         <img
                           src={cat.img}
                           alt={cat.name}
-                          className="w-full h-full object-cover rounded-full group-hover:scale-108 transition-transform duration-500 pointer-events-none"
+                          className="w-full h-full object-cover object-center rounded-[14px] pointer-events-none"
                           draggable={false}
                         />
                       </div>
 
                       {/* Title & Count */}
-                      <div className="mt-2.5 text-center w-full">
+                      {/* <div className="mt-2.5 text-center w-full">
                         <h3
-                          className={`text-xs sm:text-sm font-bold transition-colors leading-tight truncate ${
-                            active
-                              ? "text-[#80a17d]"
-                              : "text-zinc-900 group-hover:text-[#80a17d]"
-                          }`}
+                          className={`text-xs sm:text-sm font-bold transition-colors leading-tight truncate ${active
+                            ? "text-[#520618]"
+                            : "text-zinc-900 group-hover:text-[#520618]"
+                            }`}
                         >
                           {cat.name}
                         </h3>
-                        <span className="text-[11px] italic text-zinc-400 mt-0.5 block">
-                          {cat.count}
-                        </span>
-                      </div>
+
+                      </div> */}
                     </button>
                   </div>
                 );
               })}
             </div>
 
-            {/* ONLY 5 PAGINATION DOTS (ALL DEVICES) */}
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2 pt-4">
-              {[0, 1, 2, 3, 4].map((dotIdx) => (
-                <button
-                  key={dotIdx}
-                  type="button"
-                  onClick={() => scrollToCatDot(dotIdx)}
-                  aria-label={`Go to section ${dotIdx + 1}`}
-                  className={`h-2 transition-all duration-300 rounded-full cursor-pointer ${
-                    activeCatDot === dotIdx
-                      ? "w-6 bg-[#80a17d]"
-                      : "w-2 bg-zinc-300 hover:bg-zinc-400"
-                  }`}
-                />
-              ))}
-            </div>
+            {/* PAGINATION DOTS (Adapts dynamically to Mobile, Tablet, Laptop, Desktop) */}
+            {totalCatDots > 1 && (
+              <PaginationDots
+                total={totalCatDots}
+                current={activeCatDot}
+                onChange={scrollToCatDot}
+                className="pt-4"
+              />
+            )}
           </div>
         </div>
       </section>
@@ -729,21 +748,21 @@ export default function ShopPage() {
       {/* TOP VIEW & CONTROL BAR (Single Line Grid like Hervia Tea) */}
       <section className="w-full border-b border-zinc-200/80 bg-white">
         <div className="mx-auto max-w-[1400px]">
-          {/* DESKTOP & TABLET VIEW */}
-          <div className="hidden sm:grid grid-cols-[110px_1fr_auto_110px] lg:grid-cols-[160px_1fr_240px_160px] items-stretch divide-x divide-zinc-200/80 text-xs text-zinc-900">
-            {/* Box 1: Left - VIEW Toggles */}
-            <div className="flex items-center justify-center py-3.5 px-4">
+          {/* DESKTOP & TABLET VIEW (>= sm) */}
+          <div className="hidden sm:flex sm:items-center sm:justify-between px-4 sm:px-6 lg:px-8 py-3 text-xs text-zinc-900 gap-4">
+            {/* Left - VIEW Toggles & Mobile/Tablet Filter Button */}
+            <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setMobileFilterOpen(true)}
-                className="flex lg:hidden items-center gap-1.5 font-bold text-xs font-semibold tracking-widest text-zinc-900 hover:text-[#80a17d] transition-colors cursor-pointer"
+                className="flex lg:hidden items-center gap-1.5 font-bold text-xs tracking-wider text-zinc-900 hover:text-[#520618] transition-colors cursor-pointer py-1.5 px-3 rounded-lg border border-zinc-200 bg-zinc-50/80 hover:bg-zinc-100"
               >
-                <SlidersHorizontal className="w-4 h-4 text-zinc-900 shrink-0" />
+                <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-900 shrink-0 stroke-[1.8]" />
                 <span>FILTER</span>
               </button>
 
               <div className="hidden lg:flex items-center gap-3">
-                <span className="font-bold text-xs font-semibold tracking-widest text-zinc-900">
+                <span className="font-bold text-xs tracking-widest text-zinc-900">
                   VIEW
                 </span>
                 <button
@@ -767,102 +786,95 @@ export default function ShopPage() {
               </div>
             </div>
 
-            {/* Box 2: Center - Results Count */}
-            <div className="flex items-center justify-center py-3.5 px-4 text-xs font-semibold text-zinc-500 whitespace-nowrap">
+            {/* Center - Results Count */}
+            <div className="text-xs font-semibold text-zinc-500 whitespace-nowrap hidden md:block">
               Showing 1–{displayedProducts.length} of {totalResults} results
             </div>
 
-            {/* Box 3: Right - SORT BY */}
-            <div className="flex items-center justify-center py-3.5 px-4">
-              <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
-                <span className="text-zinc-400 font-semibold text-xs font-semibold tracking-wider shrink-0">
+            {/* Right - SORT BY & SHOW */}
+            <div className="flex items-center gap-4 shrink-0">
+              {/* SORT BY */}
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-zinc-400 font-semibold text-xs tracking-wider shrink-0">
                   SORT BY
                 </span>
-                <div className="relative flex items-center shrink-0">
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value)}
-                    className="appearance-none bg-transparent font-bold font-semibold tracking-wider text-zinc-900 text-xs outline-none cursor-pointer pr-4 py-0.5"
-                  >
-                    <option value="default">DEFAULT</option>
-                    <option value="price-asc">PRICE: LOW TO HIGH</option>
-                    <option value="price-desc">PRICE: HIGH TO LOW</option>
-                    <option value="rating">RATING</option>
-                    <option value="newest">NEWEST</option>
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-zinc-900 pointer-events-none absolute right-0 stroke-[1.5]" />
-                </div>
-              </label>
-            </div>
+                <Select value={sort} onValueChange={(val) => setSort(val)}>
+                  <SelectTrigger className="h-8 min-w-[130px] border border-zinc-200/90 bg-zinc-50/80 hover:bg-zinc-100 font-bold text-xs text-zinc-900 px-3 py-0 rounded-lg focus:ring-0">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent align="end" className="min-w-[170px] bg-white border border-zinc-200 shadow-xl rounded-xl">
+                    <SelectItem value="default">DEFAULT</SelectItem>
+                    <SelectItem value="price-asc">PRICE: LOW TO HIGH</SelectItem>
+                    <SelectItem value="price-desc">PRICE: HIGH TO LOW</SelectItem>
+                    <SelectItem value="rating">RATING</SelectItem>
+                    <SelectItem value="newest">NEWEST</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Box 4: Right - SHOW PER PAGE */}
-            <div className="flex items-center justify-center py-3.5 px-4">
-              <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
-                <span className="text-zinc-400 font-semibold text-xs font-semibold tracking-wider shrink-0">
+              {/* SHOW PER PAGE */}
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-zinc-400 font-semibold text-xs tracking-wider shrink-0">
                   SHOW
                 </span>
-                <div className="relative flex items-center shrink-0">
-                  <select
-                    value={showPerPage}
-                    onChange={(e) => setShowPerPage(Number(e.target.value))}
-                    className="appearance-none bg-transparent font-bold font-semibold tracking-wider text-zinc-900 text-xs outline-none cursor-pointer pr-4 py-0.5"
-                  >
-                    <option value={12}>12</option>
-                    <option value={24}>24</option>
-                    <option value={36}>36</option>
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-zinc-900 pointer-events-none absolute right-0 stroke-[1.5]" />
-                </div>
-              </label>
+                <Select value={String(showPerPage)} onValueChange={(val) => setShowPerPage(Number(val))}>
+                  <SelectTrigger className="h-8 min-w-[70px] border border-zinc-200/90 bg-zinc-50/80 hover:bg-zinc-100 font-bold text-xs text-zinc-900 px-2.5 py-0 rounded-lg focus:ring-0">
+                    <SelectValue placeholder="12" />
+                  </SelectTrigger>
+                  <SelectContent align="end" className="min-w-[90px] bg-white border border-zinc-200 shadow-xl rounded-xl">
+                    <SelectItem value="12">12</SelectItem>
+                    <SelectItem value="24">24</SelectItem>
+                    <SelectItem value="36">36</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
           {/* MOBILE VIEW (< sm) */}
-          <div className="grid sm:hidden grid-cols-3 items-stretch divide-x divide-zinc-200/80 text-zinc-900 w-full">
-            <div className="flex items-center justify-center py-2.5 px-1 min-w-0 overflow-hidden">
+          <div className="grid sm:hidden grid-cols-3 items-center divide-x divide-zinc-200/80 text-zinc-900 w-full py-1.5">
+            {/* 1. Filter Button */}
+            <div className="flex items-center justify-center px-1">
               <button
                 type="button"
                 onClick={() => setMobileFilterOpen(true)}
-                className="flex items-center gap-1 font-bold text-[11px] font-semibold tracking-wider text-zinc-900 hover:text-[#80a17d] transition-colors whitespace-nowrap"
+                className="flex items-center justify-center gap-1.5 font-bold text-[11px] tracking-wider text-zinc-900 hover:text-[#520618] transition-colors py-1.5 px-2 rounded-lg hover:bg-zinc-50 w-full cursor-pointer"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 stroke-[1.5] shrink-0" />
+                <SlidersHorizontal className="w-3.5 h-3.5 stroke-[1.8] shrink-0 text-zinc-700" />
                 <span>FILTER</span>
               </button>
             </div>
 
-            <div className="flex items-center justify-center py-2.5 px-1 min-w-0 overflow-hidden">
-              <label className="flex items-center gap-1 cursor-pointer whitespace-nowrap">
-                <span className="text-zinc-400 font-bold text-[10px] font-semibold tracking-wider shrink-0">
-                  SORT
-                </span>
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                  className="bg-transparent font-bold font-semibold tracking-wider text-zinc-900 text-[10px] outline-none cursor-pointer"
-                >
-                  <option value="default">DEFAULT</option>
-                  <option value="price-asc">LOW</option>
-                  <option value="price-desc">HIGH</option>
-                  <option value="rating">RATING</option>
-                </select>
-              </label>
+            {/* 2. Sort Dropdown */}
+            <div className="flex items-center justify-center px-1">
+              <Select value={sort} onValueChange={(val) => setSort(val)}>
+                <SelectTrigger className="h-8 w-full border-0 shadow-none bg-transparent hover:bg-zinc-50 font-bold text-[11px] text-zinc-900 px-1 py-0 focus:ring-0 gap-1 justify-center rounded-lg">
+                  <span className="text-zinc-400 font-semibold text-[10px] uppercase">SORT:</span>
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent align="center" className="min-w-[160px] bg-white border border-zinc-200 shadow-xl rounded-xl">
+                  <SelectItem value="default">DEFAULT</SelectItem>
+                  <SelectItem value="price-asc">PRICE: LOW TO HIGH</SelectItem>
+                  <SelectItem value="price-desc">PRICE: HIGH TO LOW</SelectItem>
+                  <SelectItem value="rating">RATING</SelectItem>
+                  <SelectItem value="newest">NEWEST</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="flex items-center justify-center py-2.5 px-1 min-w-0 overflow-hidden">
-              <label className="flex items-center gap-1 cursor-pointer whitespace-nowrap">
-                <span className="text-zinc-400 font-bold text-[10px] font-semibold tracking-wider shrink-0">
-                  SHOW
-                </span>
-                <select
-                  value={showPerPage}
-                  onChange={(e) => setShowPerPage(Number(e.target.value))}
-                  className="bg-transparent font-bold font-semibold tracking-wider text-zinc-900 text-[10px] outline-none cursor-pointer"
-                >
-                  <option value={12}>12</option>
-                  <option value={24}>24</option>
-                  <option value={36}>36</option>
-                </select>
-              </label>
+            {/* 3. Show Per Page Dropdown */}
+            <div className="flex items-center justify-center px-1">
+              <Select value={String(showPerPage)} onValueChange={(val) => setShowPerPage(Number(val))}>
+                <SelectTrigger className="h-8 w-full border-0 shadow-none bg-transparent hover:bg-zinc-50 font-bold text-[11px] text-zinc-900 px-1 py-0 focus:ring-0 gap-1 justify-center rounded-lg">
+                  <span className="text-zinc-400 font-semibold text-[10px] uppercase">SHOW:</span>
+                  <SelectValue placeholder="12" />
+                </SelectTrigger>
+                <SelectContent align="end" className="min-w-[90px] bg-white border border-zinc-200 shadow-xl rounded-xl">
+                  <SelectItem value="12">12</SelectItem>
+                  <SelectItem value="24">24</SelectItem>
+                  <SelectItem value="36">36</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -896,7 +908,7 @@ export default function ShopPage() {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="px-6 py-2.5 bg-zinc-900 text-white font-bold text-xs font-semibold tracking-wider hover:bg-[#80a17d] transition-colors rounded-xl cursor-pointer"
+                  className="px-6 py-2.5 bg-zinc-900 text-white font-bold text-xs font-semibold tracking-wider hover:bg-[#520618] transition-colors rounded-xl cursor-pointer"
                 >
                   Reset Filters
                 </button>
@@ -935,12 +947,12 @@ export default function ShopPage() {
                                 <ProductHoverSlider
                                   product={p}
                                   alt={p.name}
-                                  className="relative aspect-[3/3.5] bg-zinc-100 rounded-xl overflow-hidden block"
+                                  className="relative aspect-square bg-zinc-100 rounded-xl overflow-hidden block"
                                 >
                                   {/* Badges */}
                                   <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
                                     {discount > 0 && (
-                                      <span className="bg-[#80a17d] text-white text-[9px] font-extrabold font-semibold px-2 py-0.5 rounded-full shadow-xs">
+                                      <span className="bg-[#520618] text-white text-[9px] font-extrabold font-semibold px-2 py-0.5 rounded-full shadow-xs">
                                         -{discount}%
                                       </span>
                                     )}
@@ -959,17 +971,15 @@ export default function ShopPage() {
                                       e.stopPropagation();
                                       toggleWishlist(String(p.id));
                                     }}
-                                    className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${
-                                      wishlisted
-                                        ? "bg-rose-500 text-white"
-                                        : "bg-white/80 text-zinc-700 hover:bg-white"
-                                    }`}
+                                    className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${wishlisted
+                                      ? "bg-rose-500 text-white"
+                                      : "bg-white/80 text-zinc-700 hover:bg-white"
+                                      }`}
                                     aria-label="Wishlist"
                                   >
                                     <Heart
-                                      className={`w-3.5 h-3.5 ${
-                                        wishlisted ? "fill-white" : ""
-                                      }`}
+                                      className={`w-3.5 h-3.5 ${wishlisted ? "fill-white" : ""
+                                        }`}
                                     />
                                   </button>
                                 </ProductHoverSlider>
@@ -982,7 +992,7 @@ export default function ShopPage() {
                                 </span>
 
                                 <Link to={`/product/${p.id}`} onClick={(e) => handleProductClick(e, p.id)}>
-                                  <h3 className="font-semibold text-zinc-900 text-sm line-clamp-1 group-hover:text-[#80a17d] transition-colors">
+                                  <h3 className="font-semibold text-zinc-900 text-sm line-clamp-1 group-hover:text-[#520618] transition-colors">
                                     {p.name}
                                   </h3>
                                 </Link>
@@ -1062,7 +1072,7 @@ export default function ShopPage() {
                                       quantity: 1,
                                     })
                                   }
-                                  className="w-full h-10 bg-zinc-900 hover:bg-[#80a17d] text-white text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                                  className="w-full h-10 bg-zinc-900 hover:bg-[#520618] text-white text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                                 >
                                   <ShoppingBag className="w-4 h-4" />
                                   <span>Add To Bag</span>
@@ -1111,7 +1121,7 @@ export default function ShopPage() {
                         {/* Badges */}
                         <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                           {discount > 0 && (
-                            <span className="bg-[#80a17d] text-white text-[8px] sm:text-[9px] font-extrabold font-semibold px-1.5 sm:px-2 py-0.5 rounded-full shadow-xs">
+                            <span className="bg-[#520618] text-white text-[8px] sm:text-[9px] font-extrabold font-semibold px-1.5 sm:px-2 py-0.5 rounded-full shadow-xs">
                               -{discount}%
                             </span>
                           )}
@@ -1126,29 +1136,13 @@ export default function ShopPage() {
                             toggleWishlist(String(p.id));
                           }}
                           className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${wishlisted
-                              ? "bg-rose-500 text-white"
-                              : "bg-white/80 text-zinc-700 hover:bg-white"
+                            ? "bg-rose-500 text-white"
+                            : "bg-white/80 text-zinc-700 hover:bg-white"
                             }`}
                           aria-label="Wishlist"
                         >
                           <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${wishlisted ? "fill-current" : ""}`} />
                         </button>
-
-                        {/* Quick View Hover Button (Tablet & Laptop) */}
-                        <div className="absolute inset-x-2 bottom-2 z-20 translate-y-3 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openQuickView(p.id);
-                            }}
-                            className="w-full bg-white/95 hover:bg-black hover:text-white text-zinc-900 font-extrabold text-xs tracking-wider uppercase py-2.5 px-3 rounded-xl shadow-lg border border-white/50 backdrop-blur-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                          >
-                            <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Quick View</span>
-                          </button>
-                        </div>
                       </Link>
 
                       {/* Content Details */}
@@ -1158,7 +1152,7 @@ export default function ShopPage() {
                         </span>
 
                         <Link to={`/product/${p.id}`} onClick={(e) => handleProductClick(e, p.id)}>
-                          <h3 className="font-semibold text-zinc-900 text-xs sm:text-base line-clamp-1 group-hover:text-[#80a17d] transition-colors">
+                          <h3 className="font-semibold text-zinc-900 text-xs sm:text-base line-clamp-1 group-hover:text-[#520618] transition-colors">
                             {p.name}
                           </h3>
                         </Link>
@@ -1240,7 +1234,7 @@ export default function ShopPage() {
                                   quantity: 1,
                                 })
                               }
-                              className="w-[128px] h-[36px] bg-zinc-900 hover:bg-[#80a17d] text-white text-[12px] font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                              className="w-[128px] h-[36px] bg-zinc-900 hover:bg-[#520618] text-white text-[12px] font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
                             >
                               <ShoppingBag className="w-4 h-4" />
                               <span>Add to Cart</span>
@@ -1266,8 +1260,8 @@ export default function ShopPage() {
                       type="button"
                       onClick={() => setCurrentPage(pageNum)}
                       className={`w-9 h-9 rounded-md text-xs font-bold transition-all cursor-pointer ${isActive
-                          ? "bg-zinc-900 text-white"
-                          : "bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100"
+                        ? "bg-zinc-900 text-white"
+                        : "bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100"
                         }`}
                     >
                       {pageNum}
@@ -1317,7 +1311,7 @@ export default function ShopPage() {
             <button
               type="button"
               onClick={() => setMobileFilterOpen(false)}
-              className="w-full bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm tracking-wider shadow-md cursor-pointer hover:bg-[#80a17d] transition-colors"
+              className="w-full bg-zinc-900 text-white font-semibold py-3 rounded-xl text-sm tracking-wider shadow-md cursor-pointer hover:bg-[#520618] transition-colors"
             >
               Apply Filters
             </button>

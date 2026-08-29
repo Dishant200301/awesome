@@ -89,7 +89,7 @@ export const FeaturedCategoriesSection: React.FC<FeaturedCategoriesProps> = ({ o
   );
 
   return (
-    <section id="categories" className="py-8 sm:py-12 md:py-16 bg-[#FFFDF9] overflow-hidden pr-0 mr-0">
+    <section id="categories" className="scroll-mt-20 md:scroll-mt-24 py-8 sm:py-12 md:py-16 overflow-hidden pr-0 mr-0">
       {/* Section Heading aligned with Navbar */}
       <div className="max-w-[1500px] mx-auto px-4 sm:px-6 text-center mb-6 sm:mb-8 md:mb-10">
         <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.12em] text-brand-maroon uppercase">
@@ -97,25 +97,24 @@ export const FeaturedCategoriesSection: React.FC<FeaturedCategoriesProps> = ({ o
         </h2>
       </div>
 
-      {/* 2-Row Manual Horizontal Scroll Container (Aligned to Navbar Left Margin: px-4 sm:px-6) */}
-      <div className="w-full max-w-[1500px] mx-auto pl-4 sm:pl-6 pr-0">
+      {/* 2-Row Manual Horizontal Scroll Container (Outer wrapper full bleed with inner row track padding) */}
+      <div className="w-full max-w-[1500px] mx-auto">
         <div
           ref={scrollRef}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
-          className={`overflow-x-auto no-scrollbar scroll-smooth space-y-3.5 sm:space-y-5 md:space-y-6 pb-2 pr-0 mr-0 ${
-            isDragging ? 'cursor-grabbing' : 'cursor-grab'
-          }`}
+          className={`overflow-x-auto no-scrollbar scroll-smooth space-y-3.5 sm:space-y-5 md:space-y-6 pb-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
         >
           {/* Row 1 (6 categories) */}
-          <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max pr-0 mr-0">
+          <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max px-4 sm:px-6">
             {topRowCategories.map((cat, idx) => renderCategoryCard(cat, idx))}
           </div>
 
           {/* Row 2 (6 categories) */}
-          <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max pr-0 mr-0">
+          <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max px-4 sm:px-6">
             {bottomRowCategories.map((cat, idx) => renderCategoryCard(cat, idx + 6))}
           </div>
         </div>

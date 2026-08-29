@@ -19,7 +19,7 @@ export const WashingInstructionsSection: React.FC<WashingInstructionsSectionProp
         <h2 className="text-2xl md:text-4xl font-800 text-zinc-900 tracking-tight">
           Washing Instructions
         </h2>
-        <div className="w-16 h-1 bg-[#80a17d] rounded-full" />
+        <div className="w-16 h-1 bg-[#520618] rounded-full" />
       </div>
 
       {/* Mobile & Tablet View (< 1024px): Marquee */}

@@ -100,7 +100,7 @@ export const WishlistPage: React.FC = () => {
                         <div className="grow min-w-0">
                           <Link
                             to={`/product/${w.id}`}
-                            className="font-bold text-base text-zinc-900 hover:text-[#80a17d] line-clamp-2 transition-colors block mb-1"
+                            className="font-bold text-base text-zinc-900 hover:text-[#520618] line-clamp-2 transition-colors block mb-1"
                           >
                             {w.name}
                           </Link>
@@ -174,7 +174,7 @@ export const WishlistPage: React.FC = () => {
                             />
                             <Link
                               to={`/product/${w.id}`}
-                              className="font-bold text-base text-zinc-900 hover:text-[#80a17d] transition-colors"
+                              className="font-bold text-base text-zinc-900 hover:text-[#520618] transition-colors"
                             >
                               {w.name}
                             </Link>

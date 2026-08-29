@@ -133,14 +133,15 @@ export const MobileProductQuickViewSheet: React.FC = () => {
     if (!product) return [];
 
     if (product.colors && product.colors.length > 0) {
-      return product.colors.map((c) => {
+      return product.colors.map((c: any) => {
+        const cColName = typeof c === "string" ? c : (c?.colorName || c?.name || c?.color || "Standard");
         const matchingVar = (product.variations || []).find(
-          (v) => (v.colorName || "").toLowerCase() === c.colorName.toLowerCase()
+          (v: any) => (v?.colorName || v?.color || "").toLowerCase() === cColName.toLowerCase()
         );
         return {
-          colorName: c.colorName,
-          colorHex: c.colorHex || "#000000",
-          image: c.displayImage || c.mainImage || c.galleryImages?.[0] || (product as any).image || "",
+          colorName: cColName,
+          colorHex: c?.colorHex || c?.hex || "#000000",
+          image: c?.displayImage || c?.mainImage || c?.galleryImages?.[0] || (product as any).image || (product as any).mainImage || "/images/category/Latkan.webp",
           price: matchingVar?.price || (product as any).price || 499,
           originalPrice: matchingVar?.originalPrice || (product as any).originalPrice || 1500,
           stock: matchingVar?.stock || 24,
@@ -150,26 +151,26 @@ export const MobileProductQuickViewSheet: React.FC = () => {
 
     if (product.variations && product.variations.length > 0) {
       const uniqueColors = Array.from(
-        new Set(product.variations.map((v) => v.colorName).filter(Boolean))
+        new Set(product.variations.map((v: any) => v?.colorName || v?.color).filter(Boolean))
       );
-      return uniqueColors.map((cName) => {
-        const v = product.variations!.find((item) => item.colorName === cName)!;
+      return uniqueColors.map((cName: any) => {
+        const v = product.variations!.find((item: any) => (item?.colorName || item?.color) === cName) || {};
         return {
-          colorName: cName,
-          colorHex: v.colorHex || "#000000",
-          image: v.thumbnail || (product as any).image || "",
-          price: v.price || (product as any).price || 499,
-          originalPrice: v.originalPrice || (product as any).originalPrice || 1500,
-          stock: v.stock || 24,
+          colorName: String(cName),
+          colorHex: (v as any).colorHex || "#000000",
+          image: (v as any).thumbnail || (v as any).image || (product as any).image || (product as any).mainImage || "/images/category/Latkan.webp",
+          price: (v as any).price || (product as any).price || 499,
+          originalPrice: (v as any).originalPrice || (product as any).originalPrice || 1500,
+          stock: (v as any).stock || 24,
         };
       });
     }
 
     return [
       {
-        colorName: selectedColor || "DEFAULT",
+        colorName: selectedColor || "Standard",
         colorHex: "#000000",
-        image: (product as any)?.image || "",
+        image: (product as any)?.image || (product as any)?.mainImage || "/images/category/Latkan.webp",
         price: (product as any)?.price || 499,
         originalPrice: (product as any)?.originalPrice || 1500,
         stock: 24,
@@ -196,34 +197,35 @@ export const MobileProductQuickViewSheet: React.FC = () => {
     }
 
     const exactMatch = (product.variations || []).find(
-      (v) =>
-        (v.colorName || "").toLowerCase() === (selectedColor || "").toLowerCase() &&
-        ((v.size || "").toLowerCase() === (selectedSize || "").toLowerCase() ||
-          (v.sizeName || "").toLowerCase() === (selectedSize || "").toLowerCase())
+      (v: any) =>
+        v &&
+        (v.colorName || v.color || "").toLowerCase() === (selectedColor || "").toLowerCase() &&
+        (((v.size || "").toLowerCase() === (selectedSize || "").toLowerCase()) ||
+          ((v.sizeName || "").toLowerCase() === (selectedSize || "").toLowerCase()))
     );
 
     if (exactMatch) return exactMatch;
 
     const colorMatch = (product.variations || []).find(
-      (v) => (v.colorName || "").toLowerCase() === (selectedColor || "").toLowerCase()
+      (v: any) => v && (v.colorName || v.color || "").toLowerCase() === (selectedColor || "").toLowerCase()
     );
 
     if (colorMatch) return colorMatch;
 
     const activeColorObj = colorVariantsList.find(
-      (c) => c.colorName.toLowerCase() === selectedColor.toLowerCase()
+      (c) => (c?.colorName || "").toLowerCase() === (selectedColor || "").toLowerCase()
     );
 
     return {
       id: `v-${selectedColor}-${selectedSize}`,
-      colorName: selectedColor,
+      colorName: selectedColor || "Standard",
       colorHex: activeColorObj?.colorHex || "#000000",
       size: selectedSize,
-      thumbnail: activeColorObj?.image || (product as any).image,
+      thumbnail: activeColorObj?.image || (product as any).image || (product as any).mainImage || "/images/category/Latkan.webp",
       price: activeColorObj?.price || (product as any).price || 499,
       originalPrice: activeColorObj?.originalPrice || (product as any).originalPrice || 1500,
       discountPercentage: 67,
-      sku: product.defaultSku || `AH-${selectedColor.toUpperCase()}-${selectedSize}`,
+      sku: product.defaultSku || `AH-${(selectedColor || "STD").toUpperCase()}-${selectedSize}`,
       stock: activeColorObj?.stock || 24,
       images: [],
     };
@@ -232,26 +234,32 @@ export const MobileProductQuickViewSheet: React.FC = () => {
   // Available Sizes List
   const availableSizesList = useMemo(() => {
     if (!product) return ["XS", "S", "M", "L", "XL", "XXL"];
-    if (product.availableSizes && product.availableSizes.length > 0) {
-      return product.availableSizes;
+    let rawSizes: any[] = [];
+    if (product.availableSizes && Array.isArray(product.availableSizes) && product.availableSizes.length > 0) {
+      rawSizes = product.availableSizes;
+    } else {
+      const activeColorObj = (product.colors || []).find(
+        (c: any) => (c?.colorName || c?.name || c?.color || "").toLowerCase() === (selectedColor || "").toLowerCase()
+      );
+      if (activeColorObj?.sizes && Array.isArray(activeColorObj.sizes) && activeColorObj.sizes.length > 0) {
+        rawSizes = activeColorObj.sizes;
+      } else if (product.variations && product.variations.length > 0) {
+        rawSizes = product.variations.map((v: any) => v?.size || v?.sizeName).filter(Boolean);
+      }
     }
-    const activeColorObj = product.colors?.find(
-      (c) => c.colorName.toLowerCase() === selectedColor.toLowerCase()
-    );
-    if (activeColorObj?.sizes && activeColorObj.sizes.length > 0) {
-      return activeColorObj.sizes;
-    }
-    return ["XS", "S", "M", "L", "XL", "XXL"];
+
+    const cleaned = Array.from(new Set(rawSizes.map((s) => String(s || "").trim()).filter(Boolean)));
+    return cleaned.length > 0 ? cleaned : ["XS", "S", "M", "L", "XL", "XXL"];
   }, [product, selectedColor]);
 
   // Gallery Images List
   const galleryImages = useMemo(() => {
     const activeColorObj = (product?.colors || []).find(
-      (c) => c.colorName.toLowerCase() === selectedColor.toLowerCase()
+      (c: any) => (c?.colorName || c?.name || c?.color || "").toLowerCase() === (selectedColor || "").toLowerCase()
     );
 
     if (activeColorObj && activeColorObj.galleryImages && activeColorObj.galleryImages.length > 0) {
-      return activeColorObj.galleryImages.map((gUrl, idx) => ({
+      return activeColorObj.galleryImages.map((gUrl: string, idx: number) => ({
         id: `img-color-${idx}`,
         url: gUrl,
         alt: `${product?.name} - ${selectedColor} View ${idx + 1}`,
@@ -263,9 +271,9 @@ export const MobileProductQuickViewSheet: React.FC = () => {
     }
 
     if (product && Array.isArray((product as any).images) && (product as any).images.length > 0) {
-      return (product as any).images.map((url: string, i: number) => ({
+      return (product as any).images.map((url: any, i: number) => ({
         id: `img-fallback-${i}`,
-        url,
+        url: typeof url === "string" ? url : url?.url || "",
         alt: product.name,
       }));
     }
@@ -276,6 +284,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
         url:
           activeVariation.thumbnail ||
           (product as any)?.image ||
+          (product as any)?.mainImage ||
           "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=800",
         alt: product?.name || "Product Image",
       },
@@ -322,21 +331,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
     }
   };
 
-  // Auto-close if screen resizes to laptop/desktop view (>= 1024px)
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024 && isOpen) {
-        closeQuickView();
-      }
-    };
-    if (isOpen && typeof window !== "undefined" && window.innerWidth >= 1024) {
-      closeQuickView();
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [isOpen, closeQuickView]);
-
-  // Only render on mobile screens (< 768px) to prevent Vaul portal backdrop interference on laptop view
+  // Only render on mobile screens (< 768px)
   if (!product || !isOpen || (typeof window !== "undefined" && window.innerWidth >= 768)) {
     return null;
   }
@@ -345,21 +340,23 @@ export const MobileProductQuickViewSheet: React.FC = () => {
   const productCategory = (product as any).category || (product as any).type || product.brand || "Handmade";
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={(open) => !open && closeQuickView()}>
+    <Drawer.Root open={isOpen} onOpenChange={(open) => !open && closeQuickView()} shouldScaleBackground={false}>
       <Drawer.Portal>
         {/* Dark Backdrop Overlay */}
         <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 transition-opacity duration-300 sm:hidden" />
 
         <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 h-[88vh] max-h-[90vh] flex flex-col outline-none font-sans overflow-hidden max-w-full sm:hidden rounded-t-[24px] bg-white shadow-2xl">
           {/* TOP DRAG HANDLE BAR */}
-          <div className="py-2 flex justify-center items-center shrink-0 bg-white">
-            <div className="w-10 h-1 rounded-full bg-zinc-300" />
+          <div className="py-2.5 flex justify-center items-center shrink-0 bg-white cursor-grab active:cursor-grabbing">
+            <div className="w-10 h-1.5 rounded-full bg-zinc-300" />
           </div>
 
           {/* MAIN SCROLLABLE CONTENT BODY */}
           <div
             ref={contentRef}
-            className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-6 text-zinc-900 scroll-smooth space-y-4 max-w-full box-border bg-white"
+            data-vaul-no-drag
+            className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden px-3 pb-6 text-zinc-900 space-y-4 max-w-full box-border bg-white"
+            style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
           >
             {/* 1. HERO PRODUCT IMAGE GALLERY CONTAINER */}
             <div className="bg-white rounded-2xl max-w-full overflow-hidden">
@@ -371,6 +368,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
                   exit={{ opacity: 0.5 }}
                   transition={{ duration: 0.2 }}
                   drag="x"
+                  dragPropagation={true}
                   dragConstraints={{ left: 0, right: 0 }}
                   dragElastic={0.2}
                   onDragEnd={(_, { offset }) => {
@@ -383,7 +381,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
                   }}
                   src={currentImage.url}
                   alt={currentImage.alt || product.name}
-                  className="w-full h-full object-cover cursor-grab active:cursor-grabbing block"
+                  className="w-full h-full object-cover block touch-pan-y"
                 />
 
                 {/* Top Right Floating Action Buttons: Wishlist & Share */}
@@ -451,7 +449,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
                 >
                   {galleryImages.map((img: any, idx: number) => (
                     <button
-                      key={img.id || idx}
+                      key={`mob-thumb-${img.id || img.url || idx}-${idx}`}
                       type="button"
                       onClick={() => setActiveImageIndex(idx)}
                       className={`w-20 h-20 rounded-lg overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${activeImageIndex === idx
@@ -499,7 +497,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsDescriptionExpanded((prev) => !prev)}
-                className="text-xs font-semibold text-[#80a17d] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#520618] hover:underline flex items-center gap-1 cursor-pointer"
               >
 
                 {isDescriptionExpanded ? (
@@ -561,7 +559,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
                   {/* Care & Material info */}
                   <div className="bg-white rounded-xl p-3 border border-zinc-200/80 space-y-2">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900">
-                      <Sparkles className="w-3.5 h-3.5 text-[#80a17d]" />
+                      <Sparkles className="w-3.5 h-3.5 text-[#520618]" />
                       <span>Material & Care Instructions</span>
                     </div>
                     <p className="text-[11px] text-zinc-600 leading-normal">
@@ -572,129 +570,111 @@ export const MobileProductQuickViewSheet: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-
-
-
           </div>
 
           {/* 4. COLOR VARIANTS CARD */}
-          <div className="bg-white rounded-2xl px-2 space-y-3  max-w-full overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-900">
-                Colour: <span className="text-black font-semibold">{selectedColor}</span>
-              </span>
-            </div>
+            <div className="bg-white rounded-2xl px-2 space-y-3 max-w-full overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-900">
+                  Colour: <span className="text-black font-semibold">{selectedColor}</span>
+                </span>
+              </div>
 
-            {/* Color Cards Horizontal Scroll Row */}
-            <div className="flex items-stretch gap-3 overflow-x-auto no-scrollbar pb-1 max-w-full">
-              {colorVariantsList.map((cObj, idx) => {
-                const isSelected = cObj.colorName.toLowerCase() === selectedColor.toLowerCase();
-                return (
-                  <button
-                    key={cObj.colorName + idx}
-                    type="button"
-                    onClick={() => {
-                      setSelectedColor(cObj.colorName);
-                      setActiveImageIndex(0);
-                    }}
-                    className={`w-28 sm:w-32 rounded-xl p-1 border-2 bg-white flex flex-col justify-between shrink-0 transition-all cursor-pointer ${isSelected
-                      ? "border-[1px] border-black shadow-md ring-1 ring-black/10"
-                      : "border-zinc-200 hover:border-zinc-300"
-                      }`}
-                  >
-                    {/* Thumbnail Image + Active Checkmark Badge */}
-                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-white border border-zinc-100 mb-2">
-                      <img
-                        src={cObj.image}
-                        alt={cObj.colorName}
-                        className="w-full h-full object-cover"
-                      />
-                      {isSelected && (
-                        <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black text-white flex items-center justify-center shadow-md">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Color Title & Price */}
-                    <div className="text-left space-y-0.5">
-                      <span className="text-xs font-semibold text-zinc-900 block truncate">
-                        {cObj.colorName}
-                      </span>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-xs font-semibold text-zinc-900">
-                          ₹{cObj.price}
-                        </span>
-                        <span className="text-[10px] text-zinc-400 line-through font-semibold">
-                          ₹{cObj.originalPrice}
-                        </span>
+              {/* Color Cards Horizontal Scroll Row */}
+              <div className="flex items-stretch gap-3 overflow-x-auto no-scrollbar pb-1 max-w-full">
+                {colorVariantsList.map((cObj, idx) => {
+                  const isSelected = cObj.colorName.toLowerCase() === selectedColor.toLowerCase();
+                  return (
+                    <button
+                      key={`mob-color-${cObj.colorName}-${idx}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedColor(cObj.colorName);
+                        setActiveImageIndex(0);
+                      }}
+                      className={`w-28 sm:w-32 rounded-xl p-1 border-2 bg-white flex flex-col justify-between shrink-0 transition-all cursor-pointer ${isSelected
+                        ? "border-[1px] border-black shadow-md ring-1 ring-black/10"
+                        : "border-zinc-200 hover:border-zinc-300"
+                        }`}
+                    >
+                      {/* Thumbnail Image + Active Checkmark Badge */}
+                      <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-white border border-zinc-100 mb-2">
+                        <img
+                          src={cObj.image}
+                          alt={cObj.colorName}
+                          className="w-full h-full object-cover"
+                        />
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black text-white flex items-center justify-center shadow-md">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+
+                      {/* Color Title & Price */}
+                      <div className="text-left space-y-0.5">
+                        <span className="text-xs font-semibold text-zinc-900 block truncate">
+                          {cObj.colorName}
+                        </span>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xs font-semibold text-zinc-900">
+                            ₹{cObj.price}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 line-through font-semibold">
+                            ₹{cObj.originalPrice}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* 5. SIZE SELECTION WITH SHADCN UI DROPDOWN LIBRARY */}
+            <div className="bg-white rounded-2xl px-2 space-y-3 max-w-full overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold tracking-wider text-zinc-900 flex items-center gap-1.5">
+                  <Ruler className="w-3.5 h-3.5 text-zinc-700" />
+                  Select Size
+                </span>
+                <span className="text-[11px] font-mono font-semibold text-zinc-400">
+                  SKU: {activeVariation.sku}
+                </span>
+              </div>
+
+              {/* Shadcn UI Dropdown Component */}
+              <Select value={selectedSize} onValueChange={setSelectedSize}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a size" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSizesList.map((sz, idx) => (
+                    <SelectItem key={`mob-sel-size-${sz}-${idx}`} value={sz}>
+                      Size {sz} — In Stock (₹{livePrice})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Size Quick Select Pills & Chart Trigger */}
+              <div className="pt-1 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSizeChartOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-900 underline shrink-0 cursor-pointer hover:text-[#520618]"
+                >
+                  <Ruler className="w-3.5 h-3.5 text-[#520618]" />
+                  <span>Size Chart</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Padding spacer to ensure everything scrolls cleanly above the sticky bar */}
+            <div className="h-6" />
           </div>
 
-          {/* 5. SIZE SELECTION WITH SHADCN UI DROPDOWN LIBRARY */}
-          <div className="bg-white rounded-2xl px-2 space-y-3 max-w-full overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold  tracking-wider text-zinc-900 flex items-center gap-1.5">
-                <Ruler className="w-3.5 h-3.5 text-zinc-700" />
-                Select Size
-              </span>
-              <span className="text-[11px] font-mono font-semibold text-zinc-400">
-                SKU: {activeVariation.sku}
-              </span>
-            </div>
-
-            {/* Shadcn UI Dropdown Component */}
-            <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a size" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableSizesList.map((sz) => (
-                  <SelectItem key={sz} value={sz}>
-                    Size {sz} — In Stock (₹{livePrice})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Size Quick Select Pills & Chart Trigger */}
-            <div className="pt-1 flex items-center justify-end gap-2">
-              {/* <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                {availableSizesList.map((sz) => (
-                  <button
-                    key={sz}
-                    type="button"
-                    onClick={() => setSelectedSize(sz)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${selectedSize === sz
-                      ? "bg-black text-white border-black shadow-xs"
-                      : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300"
-                      }`}
-                  >
-                    {sz}
-                  </button>
-                ))}
-              </div> */}
-
-              <button
-                type="button"
-                onClick={() => setIsSizeChartOpen(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-900 underline shrink-0 cursor-pointer hover:text-[#80a17d]"
-              >
-                <Ruler className="w-3.5 h-3.5 text-[#80a17d]" />
-                <span>Size Chart</span>
-              </button>
-            </div>
-          </div>
-
-        
-        </div>
-
-        {/* 7. STICKY BOTTOM ACTION BAR */}
+          {/* 7. STICKY BOTTOM ACTION BAR */}
         <div className="shrink-0 bg-white border-t border-zinc-200/80 p-3 z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] flex items-center gap-3">
           {/* Quantity Stepper */}
           <div className="flex items-center justify-between border border-zinc-300 bg-white rounded-xl py-2 px-3 min-w-[100px] text-zinc-900 font-semibold shadow-2xs">
@@ -756,7 +736,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
         >
           <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
             <div className="flex items-center gap-2">
-              <Ruler className="w-5 h-5 text-[#80a17d]" />
+              <Ruler className="w-5 h-5 text-[#520618]" />
               <h3 className="text-base font-semibold text-zinc-900">
                 Awesome Handmade Size Guide
               </h3>

@@ -23,6 +23,13 @@ import {
 } from "lucide-react";
 import Navbar from "@/modules/core/components/Navbar";
 import Footer from "@/modules/core/components/Footer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/modules/core/components/ui/select";
 import ProductCard from "@/modules/home/components/ProductCard";
 import { categories, collections, Category } from "@/data/catalog";
 import {
@@ -419,20 +426,18 @@ export default function CollectionPage() {
 
             <div className="flex items-center gap-2">
               {/* Sort selector */}
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none bg-white border border-[#EDE5DA] rounded-full px-3.5 py-2 pr-8 text-xs font-semibold text-brand-ink focus:outline-none focus:border-brand-maroon cursor-pointer"
-                >
-                  <option value="featured">Featured</option>
-                  <option value="price-low">Price: Low to High</option>
-                  <option value="price-high">Price: High to Low</option>
-                  <option value="rating">Highest Rated</option>
-                  <option value="newest">Newest Arrivals</option>
-                </select>
-                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-brand-ink/50 pointer-events-none" />
-              </div>
+              <Select value={sortBy} onValueChange={(val) => setSortBy(val)}>
+                <SelectTrigger className="h-9 w-[160px] bg-white border-[#EDE5DA] rounded-full px-3.5 text-xs font-semibold text-brand-ink focus:ring-0 focus:border-[#520618]">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent align="end" className="min-w-[170px] bg-white border border-[#EDE5DA] shadow-xl rounded-xl">
+                  <SelectItem value="featured">Featured</SelectItem>
+                  <SelectItem value="price-low">Price: Low to High</SelectItem>
+                  <SelectItem value="price-high">Price: High to Low</SelectItem>
+                  <SelectItem value="rating">Highest Rated</SelectItem>
+                  <SelectItem value="newest">Newest Arrivals</SelectItem>
+                </SelectContent>
+              </Select>
 
               {/* Grid Column Switchers for Desktop */}
               <div className="hidden lg:flex items-center bg-[#FAF8F4] border border-[#EDE5DA] rounded-full p-1 gap-1">

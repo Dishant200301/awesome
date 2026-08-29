@@ -80,7 +80,7 @@ export const RelatedProductsSection: React.FC<RelatedProductsSectionProps> = ({ 
           <h2 className="text-2xl md:text-4xl font-800 text-zinc-900 tracking-tight">
             Loved Together
           </h2>
-          <div className="w-16 h-1 bg-[#80a17d] rounded-full" />
+          <div className="w-16 h-1 bg-gradient-to-r from-[#F7E7B4] via-[#D8B458] to-[#B38728] rounded-full" />
         </div>
 
         {/* Carousel Navigation Buttons */}
