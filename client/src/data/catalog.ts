@@ -9,7 +9,7 @@ export const IMG = {
   hero3: "/images/home/hero/hero-3.webp",
   hero4: "/images/home/hero/hero-4.webp",
   hero5: "/images/home/hero/hero-5.webp",
-  banner: "/images/banner/banner.png",
+  banner: "/images/banner/banner.webp",
   colLatkan: "/images/category/Latkan.webp",
   colJewellery: "/images/category/Necklace.webp",
   colCholi: "/images/category/Choli.webp",

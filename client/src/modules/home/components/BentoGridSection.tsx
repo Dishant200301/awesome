@@ -23,7 +23,7 @@ export default function BentoGridSection() {
               className="group relative w-full aspect-[1098/1740] rounded-2xl lg:rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
               <img
-                src="/images/home/Bento Grid/Choli.png"
+                src="/images/home/Bento Grid/Choli.webp"
                 alt="Handmade Choli"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
@@ -37,7 +37,7 @@ export default function BentoGridSection() {
               className="group relative w-full aspect-[826/832] rounded-2xl lg:rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
               <img
-                src="/images/home/Bento Grid/Watch.png"
+                src="/images/home/Bento Grid/Watch.webp"
                 alt="Handmade Watch"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
@@ -54,7 +54,7 @@ export default function BentoGridSection() {
               className="group relative w-full aspect-[1732/830] rounded-2xl lg:rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
               <img
-                src="/images/home/Bento Grid/Jewellery.png"
+                src="/images/home/Bento Grid/Jewellery.webp"
                 alt="Handmade Jewellery"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
@@ -70,7 +70,7 @@ export default function BentoGridSection() {
                 className="group relative w-full aspect-[826/830] rounded-2xl lg:rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
               >
                 <img
-                  src="/images/home/Bento Grid/Latkan.png"
+                  src="/images/home/Bento Grid/Latkan.webp"
                   alt="Handmade Latkan"
                   className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                   loading="lazy"
@@ -84,7 +84,7 @@ export default function BentoGridSection() {
                 className="group relative w-full aspect-[826/830] rounded-2xl lg:rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
               >
                 <img
-                  src="/images/home/Bento Grid/Tassel.png"
+                  src="/images/home/Bento Grid/Tassel.webp"
                   alt="Handmade Tassel"
                   className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                   loading="lazy"
@@ -99,7 +99,7 @@ export default function BentoGridSection() {
               className="group relative w-full aspect-[2004/832] rounded-2xl lg:rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
               <img
-                src="/images/home/Bento Grid/Hair Accessories.png"
+                src="/images/home/Bento Grid/Hair Accessories.webp"
                 alt="Handmade Hair Accessories"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
@@ -121,7 +121,7 @@ export default function BentoGridSection() {
               className="group relative w-full h-full aspect-[1348/1740] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
               <img
-                src="/images/home/Bento Grid/mobile/Choli.png"
+                src="/images/home/Bento Grid/mobile/Choli.webp"
                 alt="Handmade Choli"
                 className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                 loading="lazy"
@@ -137,7 +137,7 @@ export default function BentoGridSection() {
                 className="group relative w-full aspect-[826/830] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
               >
                 <img
-                  src="/images/home/Bento Grid/mobile/Latkan.png"
+                  src="/images/home/Bento Grid/mobile/Latkan.webp"
                   alt="Handmade Latkan"
                   className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                   loading="lazy"
@@ -151,7 +151,7 @@ export default function BentoGridSection() {
                 className="group relative w-full aspect-[826/830] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
               >
                 <img
-                  src="/images/home/Bento Grid/mobile/Tassel.png"
+                  src="/images/home/Bento Grid/mobile/Tassel.webp"
                   alt="Handmade Tassel"
                   className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                   loading="lazy"
@@ -169,7 +169,7 @@ export default function BentoGridSection() {
               className="group relative w-full aspect-[826/832] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
               <img
-                src="/images/home/Bento Grid/mobile/Watch.png"
+                src="/images/home/Bento Grid/mobile/Watch.webp"
                 alt="Handmade Watch"
                 className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                 loading="lazy"
@@ -183,7 +183,7 @@ export default function BentoGridSection() {
               className="group relative w-full aspect-[1348/830] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
             >
               <img
-                src="/images/home/Bento Grid/mobile/Jewellery.png"
+                src="/images/home/Bento Grid/mobile/Jewellery.webp"
                 alt="Handmade Jewellery"
                 className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                 loading="lazy"
@@ -198,7 +198,7 @@ export default function BentoGridSection() {
             className="group relative w-full aspect-[2254/832] rounded-xl sm:rounded-2xl overflow-hidden shadow-xs active:scale-[0.99] transition-all duration-300 block isolate [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] cursor-pointer"
           >
             <img
-              src="/images/home/Bento Grid/mobile/Hair Accessories.png"
+              src="/images/home/Bento Grid/mobile/Hair Accessories.webp"
               alt="Handmade Hair Accessories"
               className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
               loading="lazy"
