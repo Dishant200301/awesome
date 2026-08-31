@@ -1,0 +1,20 @@
+[
+  {
+    "id": "admin-awesome-1",
+    "name": "Awesome Handmade Admin",
+    "email": "admin@awesomehandmade.com",
+    "password": "Awesome@123",
+    "password_hash": "$2a$10$Y7L0x8i6.wQ2A6sQ1.rOceh1R4I1l1p0F5t8H3M6u7O8P9Q0R1S2T",
+    "role": "Super Admin",
+    "is_active": true
+  },
+  {
+    "id": "admin-awesome-2",
+    "name": "Super Admin",
+    "email": "admin@awesome.com",
+    "password": "Awesome@123",
+    "password_hash": "$2a$10$Y7L0x8i6.wQ2A6sQ1.rOceh1R4I1l1p0F5t8H3M6u7O8P9Q0R1S2T",
+    "role": "Super Admin",
+    "is_active": true
+  }
+]

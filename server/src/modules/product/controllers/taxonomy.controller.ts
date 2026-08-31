@@ -11,13 +11,20 @@ import {
   createSubcategoryStore,
   createBrandStore,
   createAttributeStore,
-  addAttributeValueStore
+  addAttributeValueStore,
+  syncAllCategoriesStore
 } from "../store/taxonomyStore.js";
 
 export const getCategories = (_req: Request, res: Response) => {
   const cats = getCategoriesStore();
   const subs = getSubcategoriesStore();
   res.json({ success: true, data: { categories: cats, subcategories: subs } });
+};
+
+export const syncCategories = (req: Request, res: Response) => {
+  const list = req.body.categories || req.body;
+  const result = syncAllCategoriesStore(Array.isArray(list) ? list : []);
+  res.json({ success: true, message: "Categories synchronized successfully!", data: result });
 };
 
 export const createCategory = (req: Request, res: Response) => {

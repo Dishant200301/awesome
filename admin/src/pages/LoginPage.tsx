@@ -6,11 +6,10 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
 interface LoginPageProps {
-  onNavigateToSignup: () => void;
   onLoginSuccess: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignup, onLoginSuccess }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -132,20 +131,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignup, onLogi
             </form>
           </CardContent>
         </Card>
-
-        {/* Footer Link */}
-        <div className="text-center">
-          <p className="text-neutral-500 text-sm font-medium">
-            Don't have an admin account?{' '}
-            <button
-              type="button"
-              onClick={onNavigateToSignup}
-              className="text-black font-semibold hover:underline cursor-pointer transition-all"
-            >
-              Sign up
-            </button>
-          </p>
-        </div>
       </div>
     </div>
   );

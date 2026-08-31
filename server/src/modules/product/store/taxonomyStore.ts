@@ -1,28 +1,30 @@
+import fs from "fs";
+import path from "path";
 import { Category, Subcategory, Brand, Attribute } from "../../../types/admin.js";
 
 // Initial Taxonomy Seed Data
-let categories: Category[] = [
-  { id: 'cat-1', name: 'Gift Hamper', slug: 'gift-hamper', productCount: 15, isActive: true },
-  { id: 'cat-2', name: 'Choli', slug: 'choli', productCount: 28, isActive: true },
-  { id: 'cat-3', name: 'Krishna Outfit', slug: 'krishna-outfit', productCount: 10, isActive: true },
-  { id: 'cat-4', name: 'Necklace', slug: 'necklace', productCount: 22, isActive: true },
-  { id: 'cat-5', name: 'Latkan', slug: 'latkan', productCount: 35, isActive: true },
-  { id: 'cat-6', name: 'Tassel', slug: 'tassel', productCount: 14, isActive: true },
-  { id: 'cat-7', name: 'Hair Accessories', slug: 'hair-accessories', productCount: 18, isActive: true },
-  { id: 'cat-8', name: 'Watch', slug: 'watch', productCount: 12, isActive: true },
-  { id: 'cat-9', name: 'Bracelet', slug: 'bracelet', productCount: 16, isActive: true },
-  { id: 'cat-10', name: 'Waist Belt', slug: 'waist-belt', productCount: 9, isActive: true },
-  { id: 'cat-11', name: 'Earrings', slug: 'earrings', productCount: 30, isActive: true },
-  { id: 'cat-12', name: 'Anklet', slug: 'anklet', productCount: 8, isActive: true },
-  { id: 'cat-13', name: 'Plastic Ring', slug: 'plastic-ring', productCount: 6, isActive: true },
-  { id: 'cat-14', name: 'Finger Ring', slug: 'finger-ring', productCount: 14, isActive: true },
-  { id: 'cat-15', name: 'Jewellery Set', slug: 'jewellery-set', productCount: 19, isActive: true },
-  { id: 'cat-16', name: 'Dispatch', slug: 'dispatch', productCount: 5, isActive: true },
-  { id: 'cat-17', name: 'Macrame Hanging', slug: 'macrame-hanging', productCount: 11, isActive: true },
-  { id: 'cat-18', name: 'Pom-Pom Wristband', slug: 'pom-pom-wristband', productCount: 8, isActive: true }
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: 'cat-1', name: 'Gift Hamper', slug: 'gift-hamper', image: '/images/category/Gift Hamper.webp', productCount: 15, isActive: true },
+  { id: 'cat-2', name: 'Choli', slug: 'choli', image: '/images/category/Choli.webp', productCount: 28, isActive: true },
+  { id: 'cat-3', name: 'Krishna Outfit', slug: 'krishna-outfit', image: '/images/category/Krishna outfit.webp', productCount: 10, isActive: true },
+  { id: 'cat-4', name: 'Necklace', slug: 'necklace', image: '/images/category/Necklace.webp', productCount: 22, isActive: true },
+  { id: 'cat-5', name: 'Latkan', slug: 'latkan', image: '/images/category/Latkan.webp', productCount: 35, isActive: true },
+  { id: 'cat-6', name: 'Tassel', slug: 'tassel', image: '/images/category/Tassel.webp', productCount: 14, isActive: true },
+  { id: 'cat-7', name: 'Hair Accessories', slug: 'hair-accessories', image: '/images/category/Hair_Accessories.webp', productCount: 18, isActive: true },
+  { id: 'cat-8', name: 'Watch', slug: 'watch', image: '/images/category/Watch.webp', productCount: 12, isActive: true },
+  { id: 'cat-9', name: 'Bracelet', slug: 'bracelet', image: '/images/category/Bracelet.webp', productCount: 16, isActive: true },
+  { id: 'cat-10', name: 'Waist Belt', slug: 'waist-belt', image: '/images/category/Waist Belt.webp', productCount: 9, isActive: true },
+  { id: 'cat-11', name: 'Earrings', slug: 'earrings', image: '/images/category/Earrings.webp', productCount: 30, isActive: true },
+  { id: 'cat-12', name: 'Anklet', slug: 'anklet', image: '/images/category/Anklet.webp', productCount: 8, isActive: true },
+  { id: 'cat-13', name: 'Plastic Ring', slug: 'plastic-ring', image: '/images/category/Necklace.webp', productCount: 6, isActive: true },
+  { id: 'cat-14', name: 'Finger Ring', slug: 'finger-ring', image: '/images/category/Necklace.webp', productCount: 14, isActive: true },
+  { id: 'cat-15', name: 'Jewellery Set', slug: 'jewellery-set', image: '/images/category/Necklace.webp', productCount: 19, isActive: true },
+  { id: 'cat-16', name: 'Dispatch', slug: 'dispatch', image: '/images/hero_twirl_tradition.jpg', productCount: 5, isActive: true },
+  { id: 'cat-17', name: 'Macrame Hanging', slug: 'macrame-hanging', image: '/images/grace_every_thread.jpg', productCount: 11, isActive: true },
+  { id: 'cat-18', name: 'Pom-Pom Wristband', slug: 'pom-pom-wristband', image: '/images/category/Bracelet.webp', productCount: 8, isActive: true }
 ];
 
-let subcategories: Subcategory[] = [
+const DEFAULT_SUBCATEGORIES: Subcategory[] = [
   { id: 'sub-1', categoryId: 'cat-1', categoryName: 'Gift Hamper', name: 'Keychain', slug: 'keychain' },
   { id: 'sub-2', categoryId: 'cat-2', categoryName: 'Choli', name: 'Kids Choli', slug: 'kids-choli' },
   { id: 'sub-3', categoryId: 'cat-2', categoryName: 'Choli', name: 'Adult Choli', slug: 'adult-choli' },
@@ -43,6 +45,38 @@ let subcategories: Subcategory[] = [
   { id: 'sub-18', categoryId: 'cat-11', categoryName: 'Earrings', name: 'Mirror Earrings', slug: 'mirror-earrings' },
   { id: 'sub-19', categoryId: 'cat-11', categoryName: 'Earrings', name: 'Hoop Earrings', slug: 'hoop-earrings' }
 ];
+
+const DB_FILE_PATH = path.join(process.cwd(), "taxonomies_db.json");
+
+let categories: Category[] = [...DEFAULT_CATEGORIES];
+let subcategories: Subcategory[] = [...DEFAULT_SUBCATEGORIES];
+
+const loadFromDisk = () => {
+  try {
+    if (fs.existsSync(DB_FILE_PATH)) {
+      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.categories)) {
+        categories = parsed.categories;
+      }
+      if (parsed && Array.isArray(parsed.subcategories)) {
+        subcategories = parsed.subcategories;
+      }
+    }
+  } catch (e) {
+    console.warn("[TaxonomyStore] Could not read taxonomies_db.json");
+  }
+};
+
+const saveToDisk = () => {
+  try {
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify({ categories, subcategories }, null, 2), "utf-8");
+  } catch (e) {
+    console.error("[TaxonomyStore] Failed to write taxonomies_db.json:", e);
+  }
+};
+
+loadFromDisk();
 
 let brands: Brand[] = [
   { id: 'b-1', name: 'AOCIND', slug: 'aocind', logo: '/images/common/logo.png' },
@@ -70,15 +104,51 @@ export const getBrandsStore = (): Brand[] => brands;
 export const getCollectionsStore = (): string[] => collections;
 export const getAttributesStore = (): Attribute[] => attributes;
 
+export const syncAllCategoriesStore = (rawList: any[]): { categories: Category[]; subcategories: Subcategory[] } => {
+  if (Array.isArray(rawList)) {
+    const parents: Category[] = [];
+    const subs: Subcategory[] = [];
+
+    rawList.forEach((item) => {
+      if (item.type === 'sub' || item.parentId) {
+        subs.push({
+          id: item.id || `sub-${Date.now()}-${Math.random()}`,
+          categoryId: item.parentId || '',
+          categoryName: item.parentName || '',
+          name: item.name || '',
+          slug: item.slug || (item.name ? item.name.toLowerCase().replace(/\s+/g, '-') : ''),
+          image: item.image,
+        });
+      } else {
+        parents.push({
+          id: item.id || `cat-${Date.now()}-${Math.random()}`,
+          name: item.name || '',
+          slug: item.slug || (item.name ? item.name.toLowerCase().replace(/\s+/g, '-') : ''),
+          image: item.image || '/images/category/Latkan.webp',
+          productCount: Number(item.productCount) || 0,
+          isActive: item.isActive !== false,
+        });
+      }
+    });
+
+    categories = parents;
+    subcategories = subs;
+    saveToDisk();
+  }
+  return { categories, subcategories };
+};
+
 export const createCategoryStore = (data: Partial<Category>): Category => {
   const newCat: Category = {
-    id: `cat-${Date.now()}`,
+    id: data.id || `cat-${Date.now()}`,
     name: data.name || 'New Category',
     slug: data.slug || (data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : 'new-category'),
+    image: data.image || '/images/category/Latkan.webp',
     productCount: 0,
     isActive: data.isActive !== undefined ? data.isActive : true
   };
   categories.push(newCat);
+  saveToDisk();
   return newCat;
 };
 
@@ -86,6 +156,7 @@ export const updateCategoryStore = (id: string, data: Partial<Category>): Catego
   const idx = categories.findIndex((c) => c.id === id);
   if (idx === -1) return null;
   categories[idx] = { ...categories[idx], ...data };
+  saveToDisk();
   return categories[idx];
 };
 
@@ -93,19 +164,22 @@ export const deleteCategoryStore = (id: string): boolean => {
   const initialLen = categories.length;
   categories = categories.filter((c) => c.id !== id);
   subcategories = subcategories.filter((s) => s.categoryId !== id);
+  saveToDisk();
   return categories.length < initialLen;
 };
 
 export const createSubcategoryStore = (data: Partial<Subcategory>): Subcategory => {
   const parentCat = categories.find((c) => c.id === data.categoryId) || categories[0];
   const newSub: Subcategory = {
-    id: `sub-${Date.now()}`,
-    categoryId: parentCat.id,
-    categoryName: parentCat.name,
+    id: data.id || `sub-${Date.now()}`,
+    categoryId: parentCat?.id || '',
+    categoryName: parentCat?.name || '',
     name: data.name || 'New Subcategory',
-    slug: data.slug || (data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : 'new-subcategory')
+    slug: data.slug || (data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : 'new-subcategory'),
+    image: data.image
   };
   subcategories.push(newSub);
+  saveToDisk();
   return newSub;
 };
 

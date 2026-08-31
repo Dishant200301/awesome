@@ -73,16 +73,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     loadStats();
+
+    // Listen to real-time events across the admin panel
+    const handleRealtimeSync = () => {
+      loadStats();
+    };
+
+    window.addEventListener('awesome_category_sync', handleRealtimeSync);
+    window.addEventListener('awesome_product_sync', handleRealtimeSync);
+    window.addEventListener('awesome_inventory_sync', handleRealtimeSync);
+    window.addEventListener('storage', handleRealtimeSync);
+    window.addEventListener('focus', handleRealtimeSync);
+
+    return () => {
+      window.removeEventListener('awesome_category_sync', handleRealtimeSync);
+      window.removeEventListener('awesome_product_sync', handleRealtimeSync);
+      window.removeEventListener('awesome_inventory_sync', handleRealtimeSync);
+      window.removeEventListener('storage', handleRealtimeSync);
+      window.removeEventListener('focus', handleRealtimeSync);
+    };
   }, [loadStats]);
 
-  const totalProducts = stats?.totalProducts || 1;
-  const publishedProducts = stats?.publishedProducts || 1;
-  const draftProducts = stats?.draftProducts || 0;
-  const totalVariants = stats?.totalVariants || 8;
-  const totalAttributes = stats?.totalAttributes || 3;
-  const totalCategories = stats?.totalCategories || 5;
+  const totalProducts = stats?.totalProducts ?? 0;
+  const publishedProducts = stats?.publishedProducts ?? 0;
+  const draftProducts = stats?.draftProducts ?? 0;
+  const totalVariants = stats?.totalVariants ?? 0;
+  const totalAttributes = stats?.totalAttributes ?? 0;
+  const totalCategories = stats?.totalCategories ?? 0;
   const totalMessages = stats?.totalMessages ?? 0;
-  const lowStockCount = stats?.lowStockCount || 0;
+  const lowStockCount = stats?.lowStockCount ?? 0;
 
   const recentProducts = stats?.recentProducts || [
     {

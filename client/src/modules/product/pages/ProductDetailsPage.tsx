@@ -6,15 +6,12 @@ import Navbar from "@/modules/core/components/Navbar";
 import Footer from "@/modules/core/components/Footer";
 import { VerticalGallery } from "../components/VerticalGallery";
 import { ProductInfo } from "../components/ProductInfo";
+import { ProductBreadcrumb } from "../components/ProductBreadcrumb";
 import { SizeChartModal } from "../components/SizeChartModal";
-import { FloatingStickyCart } from "../components/FloatingStickyCart";
 import { MobileStickyBottomBar } from "../components/MobileStickyBottomBar";
 import { BenefitsSection } from "../components/BenefitsSection";
 import { ProductDescriptionSection } from "../components/ProductDescriptionSection";
-import { WashingInstructionsSection } from "../components/WashingInstructionsSection";
-import { ManufacturingDetailsSection } from "../components/ManufacturingDetailsSection";
 import { CustomerReviewsSection } from "../components/CustomerReviewsSection";
-import { RelatedProductsSection } from "../components/RelatedProductsSection";
 import { ProductColorVariation } from "../types/product";
 import { getLiveProductById, fetchLiveProducts, subscribeToProductStore } from "@/modules/core/lib/apiStore";
 import { useRecentlyViewed } from "../context/RecentlyViewedContext";
@@ -244,7 +241,12 @@ export const ProductDetailsPage: React.FC = () => {
 
       {/* Main Content Container */}
       <div className="pt-10 md:pt-12">
-        {/* Breadcrumb */}
+        {/* Dynamic Breadcrumb */}
+        <ProductBreadcrumb
+          category={product.category || product.categories?.[0] || "Handmade"}
+          subCategory={product.subcategory || (product as any).subCategory}
+          productName={product.name}
+        />
 
         {/* TOP PRODUCT HERO SECTION */}
         <div className="max-w-[1500px] mx-auto px-4 md:px-8 py-4 md:py-8">
@@ -303,21 +305,11 @@ export const ProductDetailsPage: React.FC = () => {
           shortDescription={product.shortDescription}
         />
 
-        {/* WASHING INSTRUCTIONS */}
-        <WashingInstructionsSection instructions={product.washingInstructions} />
-
-        
         {/* CUSTOMER REVIEWS */}
         <div id="customer-reviews">
           <CustomerReviewsSection />
         </div>
-
-        {/* RELATED PRODUCTS / LOVED TOGETHER */}
-        <RelatedProductsSection currentProduct={product} />
       </div>
-
-      {/* FLOATING STICKY CART */}
-      <FloatingStickyCart />
 
       {/* MOBILE STICKY BOTTOM ACTION BAR */}
       <MobileStickyBottomBar

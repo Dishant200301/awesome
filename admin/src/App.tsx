@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LoginPage } from './pages/LoginPage';
-import { SignupPage } from './pages/SignupPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProductCreatePage } from './pages/ProductCreatePage';
@@ -22,7 +21,6 @@ import { getAdminProducts } from './data/mockAdminData';
 
 function AdminMainContent() {
   const { isAuthenticated } = useAuth();
-  const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [editingProductId, setEditingProductId] = useState<string | undefined>(undefined);
 
@@ -53,18 +51,10 @@ function AdminMainContent() {
     }
   };
 
+  // Strictly guard admin dashboard: unauthenticated or invalid users cannot enter
   if (!isAuthenticated) {
-    if (authView === 'signup') {
-      return (
-        <SignupPage
-          onNavigateToLogin={() => setAuthView('login')}
-          onSignupSuccess={() => handleNavigate('dashboard')}
-        />
-      );
-    }
     return (
       <LoginPage
-        onNavigateToSignup={() => setAuthView('signup')}
         onLoginSuccess={() => handleNavigate('dashboard')}
       />
     );

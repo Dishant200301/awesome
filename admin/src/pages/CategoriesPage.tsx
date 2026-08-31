@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, 
   FolderTree, 
@@ -11,7 +11,10 @@ import {
   Layers, 
   ArrowLeft,
   Check,
-  Tag
+  Tag,
+  UploadCloud,
+  Image as ImageIcon,
+  X
 } from 'lucide-react';
 import { MOCK_CATEGORIES, MOCK_SUBCATEGORIES } from '../data/mockAdminData';
 import { Category } from '../types/admin';
@@ -22,6 +25,7 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 
 export interface EnhancedCategory extends Category {
+  image?: string;
   type?: 'parent' | 'sub';
   parentId?: string;
   parentName?: string;
@@ -32,44 +36,20 @@ interface CategoriesPageProps {
 }
 
 export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'all-categories' }) => {
-  // Main Categories State with LocalStorage Persistence
+  // Main Categories State with LocalStorage Persistence (Never re-seeds mock data if cleared)
   const [categories, setCategories] = useState<EnhancedCategory[]>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('aocind_categories') || localStorage.getItem('aaramly_categories');
-        if (saved) {
+        const saved = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
+        if (saved !== null) {
           const parsed = JSON.parse(saved);
-          const hasOldCategories = Array.isArray(parsed) && parsed.some((c: any) => 
-            ['Bralettes', 'Everyday Bras', 'Seamless Panties', 'Shapewear', 'bralettes', 'everyday-bras'].includes(c.name || c.slug)
-          );
-          if (!hasOldCategories && Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             return parsed;
-          } else if (hasOldCategories) {
-            localStorage.removeItem('aaramly_categories');
-            localStorage.removeItem('aocind_categories');
           }
         }
       } catch (e) {}
     }
-
-    // Default Seed from MOCK_CATEGORIES & MOCK_SUBCATEGORIES
-    const mainList: EnhancedCategory[] = MOCK_CATEGORIES.map((c) => ({
-      ...c,
-      type: 'parent' as const
-    }));
-
-    const subList: EnhancedCategory[] = MOCK_SUBCATEGORIES.map((s) => ({
-      id: s.id,
-      name: s.name,
-      slug: s.slug,
-      type: 'sub' as const,
-      parentId: s.categoryId,
-      parentName: s.categoryName,
-      productCount: 12,
-      isActive: true
-    }));
-
-    return [...mainList, ...subList];
+    return [];
   });
 
   // Navigation & View Mode: 'all' | 'add' | 'edit'
@@ -98,9 +78,32 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [categoryName, setCategoryName] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
+  const [categoryImage, setCategoryImage] = useState<string>('/images/category/Latkan.webp');
   const [isActive, setIsActive] = useState(true);
 
-  // Sync to LocalStorage & Dispatch Sync Event
+  const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api/v1" : "http://localhost:5000/api/v1");
+
+  // Fetch live categories from Express Server on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/taxonomies/categories`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.data && Array.isArray(json.data.categories)) {
+          const parents = json.data.categories.map((c: any) => ({
+            ...c,
+            type: 'parent' as const,
+          }));
+          const subs = (json.data.subcategories || []).map((s: any) => ({
+            ...s,
+            type: 'sub' as const,
+          }));
+          setCategories([...parents, ...subs]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync to LocalStorage & Express Backend
   useEffect(() => {
     try {
       localStorage.setItem('awesome_categories', JSON.stringify(categories));
@@ -109,8 +112,20 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
         window.dispatchEvent(new Event('awesome_category_sync'));
         window.dispatchEvent(new Event('aocind_category_sync'));
         window.dispatchEvent(new Event('aaramly_category_sync'));
+        if ('BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('awesome_category_sync');
+          bc.postMessage({ type: 'CATEGORIES_UPDATED', categories });
+          bc.close();
+        }
       }
     } catch (e) {}
+
+    // Sync to Express Backend
+    fetch(`${API_BASE}/taxonomies/categories/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categories }),
+    }).catch(() => {});
   }, [categories]);
 
   // Main Categories list for parent selection
@@ -129,6 +144,9 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     return '';
   };
 
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Open Add View
   const handleOpenAddView = (defaultType: 'parent' | 'sub' = 'parent') => {
     setEditingCategory(null);
@@ -136,6 +154,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     setSelectedParentId(mainCategoriesList[0]?.id || '');
     setCategoryName('');
     setCategorySlug('');
+    setCategoryImage('');
     setIsActive(true);
     setSubView('add');
   };
@@ -148,9 +167,53 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     setSelectedParentId(cat.parentId || mainCategoriesList[0]?.id || '');
     setCategoryName(cat.name);
     setCategorySlug(cat.slug);
+    setCategoryImage(cat.image || '');
     setIsActive(cat.isActive ?? true);
     setSubView('edit');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Process File to Base64 / Data URL
+  const handleFileProcess = (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      if (uploadEvent.target?.result) {
+        setCategoryImage(uploadEvent.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle Drag and Drop Events
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFileProcess(file);
+    }
+  };
+
+  // Handle Input Change Upload
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileProcess(file);
+    }
   };
 
   // Handle Name Input Change & Auto-generate Slug
@@ -179,6 +242,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                 ...c,
                 name: categoryName.trim(),
                 slug: slugToSave,
+                image: categoryImage,
                 type: categoryType,
                 parentId: categoryType === 'sub' ? selectedParentId : undefined,
                 parentName: parentObj ? parentObj.name : undefined,
@@ -193,6 +257,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
         id: categoryType === 'sub' ? `sub-${Date.now()}` : `cat-${Date.now()}`,
         name: categoryName.trim(),
         slug: slugToSave,
+        image: categoryImage,
         type: categoryType,
         parentId: categoryType === 'sub' ? selectedParentId : undefined,
         parentName: parentObj ? parentObj.name : undefined,
@@ -389,18 +454,30 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                       </button>
                     </div>
 
-                    {/* NAME & PARENT BREADCRUMB */}
-                    <div>
-                      {cat.type === 'sub' && (cat.parentName || cat.parentId) && (
-                        <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block flex items-center gap-1 mb-0.5">
-                          <span>{cat.parentName || 'Main Category'}</span>
-                          <ChevronRight className="w-3 h-3 text-neutral-400" />
+                    {/* IMAGE THUMBNAIL, NAME & PARENT BREADCRUMB */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 shadow-2xs">
+                        <img
+                          src={cat.image || '/images/category/Latkan.webp'}
+                          alt={cat.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {cat.type === 'sub' && (cat.parentName || cat.parentId) && (
+                          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block flex items-center gap-1 mb-0.5">
+                            <span>{cat.parentName || 'Main Category'}</span>
+                            <ChevronRight className="w-2.5 h-2.5 text-neutral-400" />
+                          </span>
+                        )}
+                        <h3 className="font-bold text-black text-sm tracking-tight truncate">{cat.name}</h3>
+                        <span className="text-[10px] text-neutral-400 font-mono truncate block">
+                          /{cat.type === 'sub' && getParentSlug(cat.parentId, cat.parentName) ? `${getParentSlug(cat.parentId, cat.parentName)}/` : ''}{cat.slug}
                         </span>
-                      )}
-                      <h3 className="font-bold text-black text-base tracking-tight">{cat.name}</h3>
-                      <span className="text-[11px] text-neutral-400 font-mono">
-                        /{cat.type === 'sub' && getParentSlug(cat.parentId, cat.parentName) ? `${getParentSlug(cat.parentId, cat.parentName)}/` : ''}{cat.slug}
-                      </span>
+                      </div>
                     </div>
                   </div>
 
@@ -550,6 +627,107 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                   value={categorySlug}
                   onChange={(e) => setCategorySlug(e.target.value)}
                   className="flex-1 bg-transparent text-black font-bold focus:outline-none min-w-[120px]"
+                />
+              </div>
+            </div>
+
+            {/* CATEGORY IMAGE (DRAG & DROP / UPLOAD / DIRECT URL) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-black uppercase tracking-wider">
+                  Category Display Image *
+                </label>
+                {categoryImage && (
+                  <button
+                    type="button"
+                    onClick={() => setCategoryImage('')}
+                    className="text-[11px] font-semibold text-red-600 hover:text-red-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Remove Image</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileUpload}
+                className="hidden"
+              />
+
+              {/* DRAG & DROP UPLOAD ZONE */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative rounded-xl border-2 border-dashed p-4 sm:p-6 text-center cursor-pointer transition-all duration-200 ${
+                  isDragOver
+                    ? 'border-black bg-neutral-100 scale-[0.99]'
+                    : categoryImage
+                    ? 'border-neutral-300 bg-neutral-50/70 hover:border-black'
+                    : 'border-neutral-300 hover:border-black bg-neutral-50/50 hover:bg-neutral-50'
+                }`}
+              >
+                {categoryImage ? (
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-white border border-neutral-200 shadow-sm shrink-0">
+                      <img
+                        src={categoryImage}
+                        alt="Category Preview"
+                        className="w-full h-full object-cover object-center"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <div className="text-center sm:text-left space-y-1">
+                      <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs font-bold text-black">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Image Selected</span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 font-normal">
+                        Click or drag a new image here to replace
+                      </p>
+                      <div className="pt-1">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-black text-white text-[11px] font-semibold rounded-lg shadow-xs hover:bg-neutral-800 transition-colors">
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          <span>Change File</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 py-2">
+                    <div className="w-12 h-12 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-600 flex items-center justify-center mx-auto shadow-2xs">
+                      <UploadCloud className="w-6 h-6 text-black" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-bold text-black">
+                        Drag & drop category image here, or <span className="underline text-brand-maroon">Browse</span>
+                      </p>
+                      <p className="text-[11px] text-neutral-400 font-normal">
+                        Supports PNG, JPG, WEBP, AVIF (Max 10MB)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* DIRECT URL INPUT */}
+              <div className="pt-1">
+                <span className="text-[11px] text-neutral-500 font-medium block mb-1">
+                  Or enter image URL / asset path:
+                </span>
+                <Input
+                  type="text"
+                  placeholder="e.g. /images/category/Latkan.webp or https://images.unsplash.com/..."
+                  value={categoryImage}
+                  onChange={(e) => setCategoryImage(e.target.value)}
+                  className="bg-white border-neutral-200 text-xs text-black font-medium h-8"
                 />
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getCategories,
+  syncCategories,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -16,6 +17,7 @@ import {
 const router = Router();
 
 router.get("/categories", getCategories);
+router.post("/categories/sync", syncCategories);
 router.post("/categories", createCategory);
 router.put("/categories/:id", updateCategory);
 router.delete("/categories/:id", deleteCategory);

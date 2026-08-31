@@ -28,10 +28,29 @@ export class AdminApiService {
 
   // Dashboard Stats
   public static async getDashboardStats() {
-    const remote = await this.request<any>("/analytics/dashboard");
-    if (remote) return remote;
+    // 1. Calculate live categories from localStorage
+    let categoryCount = 0;
+    try {
+      const rawCat = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
+      if (rawCat) {
+        const parsed = JSON.parse(rawCat);
+        if (Array.isArray(parsed)) {
+          categoryCount = parsed.filter((c: any) => c.type !== 'sub' && !c.parentId).length;
+        }
+      }
+    } catch (e) {}
 
-    // Fallback sync with local state
+    // 2. Try remote API first
+    const remote = await this.request<any>("/analytics/dashboard");
+    if (remote) {
+      // Ensure category count accurately matches live admin category state if available
+      return {
+        ...remote,
+        totalCategories: categoryCount !== undefined && localStorage.getItem('awesome_categories') ? categoryCount : (remote.totalCategories ?? 0)
+      };
+    }
+
+    // 3. Fallback sync with live local state
     const products = MOCK_PRODUCTS;
     const published = products.filter((p) => p.isPublished || p.status === 'Published').length;
     const draft = products.length - published;
@@ -43,7 +62,7 @@ export class AdminApiService {
       publishedProducts: published,
       draftProducts: draft,
       totalVariants: variants.length,
-      totalCategories: MOCK_CATEGORIES.length,
+      totalCategories: categoryCount,
       totalAttributes: MOCK_ATTRIBUTES.length,
       lowStockCount: lowStock.length,
       totalMessages: MOCK_CONTACT_MESSAGES.length,

@@ -6,6 +6,7 @@ export interface Category {
   isActive: boolean;
   description?: string;
   imageUrl?: string;
+  image?: string;
 }
 
 export interface Subcategory {

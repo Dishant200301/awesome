@@ -38,20 +38,9 @@ import {
   getLiveProductsList,
   getLiveFilters,
   subscribeToFilterStore,
+  getLiveCategories,
+  subscribeToCategoriesStore,
 } from "@/modules/core/lib/apiStore";
-
-// Shop Categories for Header Bar
-const shopCategories = [
-  { id: "all", name: "All Products", count: "All items", img: "/images/category/Latkan.webp" },
-  { id: "Latkan", name: "Latkans", count: "12 items", img: "/images/category/Latkan.webp" },
-  { id: "Earrings", name: "Earrings", count: "10 items", img: "/images/category/Earrings.webp" },
-  { id: "Necklace", name: "Necklaces", count: "8 items", img: "/images/category/Necklace.webp" },
-  { id: "Choli", name: "Cholis", count: "6 items", img: "/images/category/Choli.webp" },
-  { id: "Gift Hamper", name: "Gift Hampers", count: "5 items", img: "/images/category/Gift Hamper.webp" },
-  { id: "Waist Belt", name: "Waist Belts", count: "4 items", img: "/images/category/Waist Belt.webp" },
-  { id: "Krishna Outfit", name: "Krishna Outfits", count: "4 items", img: "/images/category/Krishna outfit.webp" },
-  { id: "Tassel", name: "Tassels", count: "6 items", img: "/images/category/Tassel.webp" },
-];
 
 export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -60,15 +49,33 @@ export default function ShopPage() {
   const { wishlistIds, toggleWishlist, isWishlisted } = useWishlist();
   const { openQuickView, isMobileOrTablet } = useQuickView();
 
-  // Dynamic Filters State
+  // Dynamic Categories & Filters State
   const [filterConfig, setFilterConfig] = useState(() => getLiveFilters());
+  const [liveCategoriesList, setLiveCategoriesList] = useState(() => getLiveCategories());
 
   useEffect(() => {
     const unsubscribeFilters = subscribeToFilterStore(() => {
       setFilterConfig(getLiveFilters() || { categories: [], colors: [], sizes: [], maxPrice: 3000 });
     });
-    return () => unsubscribeFilters();
+    const unsubscribeCats = subscribeToCategoriesStore(() => {
+      setLiveCategoriesList(getLiveCategories());
+    });
+    return () => {
+      unsubscribeFilters();
+      unsubscribeCats();
+    };
   }, []);
+
+  // Top header categories derived dynamically from Admin
+  const dynamicShopCategories = useMemo(() => {
+    return liveCategoriesList.map((c) => ({
+      id: c.name,
+      name: c.name,
+      count: c.count || `${c.productCount || 0} items`,
+      img: c.image || "/images/category/Latkan.webp",
+    }));
+  }, [liveCategoriesList]);
+
 
   const handleProductClick = (e: React.MouseEvent, productId: string | number) => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -86,7 +93,9 @@ export default function ShopPage() {
 
   // Filter States
   const initialCategory = categorySlug || searchParams.get("category") || null;
+  const initialSubCategory = searchParams.get("sub") || null;
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(initialSubCategory);
   const [maxPrice, setMaxPrice] = useState<number>(3000);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
@@ -189,7 +198,10 @@ export default function ShopPage() {
 
   useEffect(() => {
     const catFromUrl = categorySlug || searchParams.get("category");
+    const subFromUrl = searchParams.get("sub");
     setSelectedCategory(catFromUrl || null);
+    setSelectedSubCategory(subFromUrl || null);
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   }, [searchParams, categorySlug]);
 
   // Load Live & Published Products
@@ -335,45 +347,65 @@ export default function ShopPage() {
       }
     }
 
+    // Subcategory Filter
+    if (selectedSubCategory) {
+      const cleanSub = (s?: string) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
+      const targetSub = cleanSub(selectedSubCategory);
+      list = list.filter((p: any) => {
+        const pSub = cleanSub(p.subcategory || (p as any).subCategory);
+        const pName = cleanSub(p.name);
+        return pSub.includes(targetSub) || targetSub.includes(pSub) || pName.includes(targetSub);
+      });
+    }
+
     // Max Price
     list = list.filter((p) => p.price <= maxPrice);
 
-    // Color
+    // Color Filter
     if (selectedColors.length > 0) {
-      list = list.filter((p) =>
-        selectedColors.some(
-          (c) =>
-            p.attributes?.some(
-              (a) =>
-                a.name.toLowerCase() === "color" &&
-                a.values.some((v: string) =>
-                  v.toLowerCase().includes(c.toLowerCase())
-                )
-            ) ||
-            p.variants?.some((v) =>
-              v.color?.toLowerCase().includes(c.toLowerCase())
-            )
-        )
+      list = list.filter((p: any) =>
+        selectedColors.some((c) => {
+          const cleanC = c.toLowerCase().trim();
+          const hasVarColor = (p.variations || []).some((v: any) =>
+            (v.colorName || (v as any).color || "").toLowerCase().includes(cleanC) ||
+            cleanC.includes((v.colorName || (v as any).color || "").toLowerCase())
+          );
+          const hasColorObj = (p.colors || []).some((col: any) =>
+            (typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().includes(cleanC)
+          );
+          const hasAttrColor = p.attributes?.some(
+            (a: any) => a.name.toLowerCase() === "color" &&
+              a.values.some((v: string) => v.toLowerCase().includes(cleanC))
+          );
+          const inNameOrDesc = (p.name || "").toLowerCase().includes(cleanC) || (p.shortDescription || "").toLowerCase().includes(cleanC);
+          return hasVarColor || hasColorObj || hasAttrColor || inNameOrDesc;
+        })
       );
     }
 
-    // Size
+    // Size Filter
     if (selectedSizes.length > 0) {
-      list = list.filter((p) =>
-        selectedSizes.some(
-          (s) =>
-            p.attributes?.some(
-              (a) => a.name.toLowerCase() === "size" && a.values.includes(s)
-            ) || p.variants?.some((v) => v.size === s)
-        )
+      list = list.filter((p: any) =>
+        selectedSizes.some((s) => {
+          const cleanS = s.toLowerCase().trim();
+          const hasAvailSize = (p.availableSizes || []).some((sz: string) => sz.toLowerCase().trim() === cleanS || cleanS.includes(sz.toLowerCase().trim()));
+          const hasVarSize = (p.variations || []).some((v: any) => (v.size || v.sizeName || "").toLowerCase().trim() === cleanS || cleanS.includes((v.size || v.sizeName || "").toLowerCase().trim()));
+          const hasSizesArr = (p.sizes || []).some((sz: string) => sz.toLowerCase().trim() === cleanS || cleanS.includes(sz.toLowerCase().trim()));
+          const hasAttrSize = p.attributes?.some(
+            (a: any) => a.name.toLowerCase() === "size" &&
+              a.values.some((v: string) => v.toLowerCase().includes(cleanS))
+          );
+          return hasAvailSize || hasVarSize || hasSizesArr || hasAttrSize;
+        })
       );
     }
 
-    // Rating
+    // Rating Filter
     if (selectedRatings.length > 0) {
-      list = list.filter((p) =>
-        selectedRatings.includes(Math.floor(p.rating || 4.8))
-      );
+      list = list.filter((p) => {
+        const prodRating = Math.floor(p.rating !== undefined && p.rating !== null ? p.rating : 4.8);
+        return selectedRatings.some((r) => prodRating >= r);
+      });
     }
 
     // Search Query
@@ -403,6 +435,7 @@ export default function ShopPage() {
   }, [
     products,
     selectedCategory,
+    selectedSubCategory,
     maxPrice,
     selectedColors,
     selectedSizes,
@@ -437,6 +470,28 @@ export default function ShopPage() {
         </button>
         {openSections.categories && (
           <ul className="space-y-2 text-xs font-semibold text-zinc-600 tracking-wide">
+            {/* All Products Option */}
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setSelectedSubCategory(null);
+                  setSearchParams({});
+                }}
+                className={`flex w-full items-center justify-between text-left hover:text-[#520618] transition-colors cursor-pointer ${
+                  !selectedCategory || selectedCategory.toLowerCase() === "all"
+                    ? "text-[#520618] font-extrabold"
+                    : ""
+                }`}
+              >
+                <span>All Products</span>
+                <span className="text-zinc-400 font-normal text-[10px]">
+                  ({products.length})
+                </span>
+              </button>
+            </li>
+
             {(filterConfig?.categories || []).map((cat: any) => {
               const catKey = cat.key || cat.id || cat.name;
               const rawName = cat.name || catKey;
@@ -673,10 +728,12 @@ export default function ShopPage() {
               onMouseMove={handleCatMouseMove}
               onMouseUp={handleCatMouseUp}
               onMouseLeave={handleCatMouseUp}
-              className="flex flex-row items-stretch overflow-x-auto scroll-smooth scrollbar-none select-none cursor-grab active:cursor-grabbing w-full px-2"
+              className={`flex flex-row items-stretch overflow-x-auto scroll-smooth scrollbar-none select-none cursor-grab active:cursor-grabbing w-full px-2 ${
+                dynamicShopCategories.length < 5 ? "justify-center" : ""
+              }`}
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
-              {shopCategories.map((cat) => {
+              {dynamicShopCategories.map((cat) => {
                 const active = cat.id === "all"
                   ? (!selectedCategory || selectedCategory.toLowerCase() === "all")
                   : (selectedCategory?.toLowerCase() === cat.id.toLowerCase());
@@ -999,9 +1056,9 @@ export default function ShopPage() {
 
                                 <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
                                   <Star className="w-3.5 h-3.5 fill-current" />
-                                  <span className="text-zinc-800">{p.rating || 4.8}</span>
+                                  <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
                                   <span className="text-zinc-400 font-normal text-[10px]">
-                                    ({p.salesCount || 323})
+                                    ({p.salesCount ?? (p as any).reviewCount ?? 0})
                                   </span>
                                 </div>
 
@@ -1159,14 +1216,14 @@ export default function ShopPage() {
 
                         <div className="flex items-center gap-1 text-amber-500 text-[11px] sm:text-xs font-bold">
                           <Star className="w-3.5 h-3.5 fill-current" />
-                          <span className="text-zinc-800">{p.rating || 4.8}</span>
+                          <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
                           <span className="text-zinc-400 font-normal text-[10px]">
-                            ({p.salesCount || 323})
+                            ({p.salesCount ?? (p as any).reviewCount ?? 0})
                           </span>
                         </div>
 
                         <p className="text-[11px] sm:text-xs text-zinc-500 line-clamp-1 sm:line-clamp-2 leading-relaxed font-medium">
-                          {p.shortDescription || p.fullDescription || "Seamless wire-free contour bra for 360-degree all-day comfort."}
+                          {p.shortDescription || p.fullDescription || p.category || ""}
                         </p>
 
                         <div className="flex items-baseline gap-2 pt-0.5">

@@ -13,12 +13,12 @@ import {
   Mail,
   Sparkles,
 } from "lucide-react";
-import { LOGO, categories } from "@/data/catalog";
+import { LOGO } from "@/data/catalog";
 import { useWishlist } from "@/modules/product/context/WishlistContext";
 import { useCart } from "@/modules/product/context/CartContext";
 import { useQuickView } from "@/modules/product/context/QuickViewContext";
 import { useAuth } from "@/modules/core/context/AuthContext";
-import { getLiveProductsList } from "@/modules/core/lib/apiStore";
+import { getLiveProductsList, getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
 
 const InstagramIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -100,6 +100,15 @@ export default function Navbar() {
   const [announcementIndex, setAnnouncementIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [liveCategories, setLiveCategories] = useState(() => getLiveCategories());
+
+  useEffect(() => {
+    const unsub = subscribeToCategoriesStore(() => {
+      setLiveCategories(getLiveCategories());
+    });
+    return () => unsub();
+  }, []);
 
   const allProducts = getLiveProductsList();
 
@@ -283,161 +292,65 @@ export default function Navbar() {
               <div className="mx-auto max-w-[1500px] px-8 py-8 bg-white">
                   <div className="grid grid-cols-12 gap-8 items-start">
                     
-                    {/* Left: 3 Columns of Categories (Col Span 7) */}
+                    {/* Left: Dynamic 3 Columns of Categories (Col Span 7) */}
                     <div className="col-span-7 grid grid-cols-3 gap-8">
-                      {/* Col 1: Jewellery */}
-                      <div className="space-y-2.5">
-                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight">
-                          Jewellery
-                        </h4>
-                        <ul className="space-y-2 text-xs text-brand-ink/80">
-                          <li>
-                            <Link to="/shop?category=earrings" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Earrings & Jhumkas
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=jewellery-set" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Bridal Jewellery Set
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=necklace" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Mirror Necklaces
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=bracelet" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Handmade Bracelets
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=anklet" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Anklets & Payal
-                            </Link>
-                          </li>
-                        </ul>
-                      </div>
-
-                      {/* Col 2: Festive & Latkans */}
-                      <div className="space-y-2.5">
-                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight">
-                          Festive & Latkans
-                        </h4>
-                        <ul className="space-y-2 text-xs text-brand-ink/80">
-                          <li>
-                            <Link to="/shop?category=choli" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Navratri Choli Set
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=latkan" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Bridal Mirror Latkans
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=latkan" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Blouse & Lehenga Latkans
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=tassel" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Colourful Long Tassels
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=krishna-outfit" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Krishna Outfits
-                            </Link>
-                          </li>
-                        </ul>
-                      </div>
-
-                      {/* Col 3: Gifts & Accessories */}
-                      <div className="space-y-2.5">
-                        <h4 className="font-bold text-sm text-brand-maroon tracking-tight">
-                          Gifts & More
-                        </h4>
-                        <ul className="space-y-2 text-xs text-brand-ink/80">
-                          <li>
-                            <Link to="/shop?category=gift-hamper" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Gift Hampers & Boxes
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=gift-hamper" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Macrame Keychains
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=hair-accessories" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Hair Bows & Clips
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/shop?category=waist-belt" onClick={() => setOpenMega(null)} className="relative inline-block hover:text-brand-maroon transition-colors py-0.5 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1.5px] after:bg-brand-maroon after:rounded-full after:transition-transform after:duration-300 after:ease-out after:scale-x-0 after:origin-right hover:after:scale-x-100 hover:after:origin-left">
-                              Mirror Waist Belts
-                            </Link>
-                          </li>
-                        </ul>
-                      </div>
+                      {[0, 1, 2].map((colIdx) => {
+                        const colCats = liveCategories.filter((_, idx) => idx % 3 === colIdx);
+                        return (
+                          <div key={colIdx} className="space-y-5">
+                            {colCats.map((cat) => (
+                              <div key={cat.id || cat.name} className="space-y-1.5">
+                                <Link
+                                  to={`/shop?category=${encodeURIComponent(cat.name)}`}
+                                  onClick={() => setOpenMega(null)}
+                                  className="font-bold text-sm text-brand-maroon tracking-tight block hover:underline"
+                                >
+                                  {cat.name}
+                                </Link>
+                                {cat.subs && cat.subs.length > 0 ? (
+                                  <ul className="space-y-1 text-xs text-brand-ink/80 pl-1">
+                                    {cat.subs.map((sub: any) => (
+                                      <li key={sub.slug || sub.name}>
+                                        <Link
+                                          to={`/shop?category=${encodeURIComponent(cat.name)}&sub=${encodeURIComponent(sub.slug || sub.name)}`}
+                                          onClick={() => setOpenMega(null)}
+                                          className="relative inline-block hover:text-brand-maroon transition-colors py-0.5"
+                                        >
+                                          {sub.name}
+                                        </Link>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
 
-                    {/* Right: 3 Visual Highlight Cards (Col Span 5) - Full Aspect Square (No Cropping) */}
+                    {/* Right: 3 Visual Highlight Cards (Col Span 5) - Derived from Admin */}
                     <div className="col-span-5 grid grid-cols-3 gap-3.5 items-center">
-                      <Link
-                        to="/shop?category=earrings"
-                        onClick={() => setOpenMega(null)}
-                        className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
-                      >
-                        <img
-                          src="/images/category/Earrings.webp"
-                          alt="Earrings"
-                          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute bottom-2 left-2 right-2">
-                          <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
-                            Earrings
+                      {liveCategories.slice(0, 3).map((cat) => (
+                        <Link
+                          key={cat.id || cat.name}
+                          to={`/shop?category=${encodeURIComponent(cat.name)}`}
+                          onClick={() => setOpenMega(null)}
+                          className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
+                        >
+                          <img
+                            src={cat.image || "/images/category/Latkan.webp"}
+                            alt={cat.name}
+                            className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                          <div className="absolute bottom-2 left-2 right-2">
+                            <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors truncate">
+                              {cat.name}
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-
-                      <Link
-                        to="/shop?category=choli"
-                        onClick={() => setOpenMega(null)}
-                        className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
-                      >
-                        <img
-                          src="/images/category/Choli.webp"
-                          alt="Navratri Choli"
-                          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute bottom-2 left-2 right-2">
-                          <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
-                            Choli Set
-                          </div>
-                        </div>
-                      </Link>
-
-                      <Link
-                        to="/shop?category=latkan"
-                        onClick={() => setOpenMega(null)}
-                        className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
-                      >
-                        <img
-                          src="/images/category/Latkan.webp"
-                          alt="Latkan"
-                          className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute bottom-2 left-2 right-2">
-                          <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors">
-                            Latkans
-                          </div>
-                        </div>
-                      </Link>
+                        </Link>
+                      ))}
                     </div>
 
                   </div>
@@ -454,54 +367,25 @@ export default function Navbar() {
               >
                 <div className="mx-auto max-w-[1500px] px-8 py-8 bg-white">
                   <div className="grid grid-cols-4 gap-6">
-                    <Link
-                      to="/collections/jewellery-set"
-                      onClick={() => setOpenMega(null)}
-                      className="group relative overflow-hidden rounded-2xl aspect-[4/3] block shadow-md hover:shadow-xl transition-all duration-300"
-                    >
-                      <img src="/images/hero_twirl_tradition.jpg" alt="Bridal & Festive" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                      <div className="absolute bottom-3 left-3 right-3 text-white">
-                        <span className="font-heading font-bold text-sm block">Festive & Bridal Collection</span>
-                        <p className="text-[11px] text-white/80">Handcrafted grandeur</p>
-                      </div>
-                    </Link>
-                    <Link
-                      to="/collections/latkan"
-                      onClick={() => setOpenMega(null)}
-                      className="group relative overflow-hidden rounded-2xl aspect-[4/3] block shadow-md hover:shadow-xl transition-all duration-300"
-                    >
-                      <img src="/images/category/Latkan.webp" alt="Latkan Collection" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                      <div className="absolute bottom-3 left-3 right-3 text-white">
-                        <span className="font-heading font-bold text-sm block">Mirror Latkan Studio</span>
-                        <p className="text-[11px] text-white/80">Intricate royal tasseling</p>
-                      </div>
-                    </Link>
-                    <Link
-                      to="/collections/choli"
-                      onClick={() => setOpenMega(null)}
-                      className="group relative overflow-hidden rounded-2xl aspect-[4/3] block shadow-md hover:shadow-xl transition-all duration-300"
-                    >
-                      <img src="/images/category/Choli.webp" alt="Choli Collection" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                      <div className="absolute bottom-3 left-3 right-3 text-white">
-                        <span className="font-heading font-bold text-sm block">Navratri Choli & Attire</span>
-                        <p className="text-[11px] text-white/80">Vibrant Gujarati craft</p>
-                      </div>
-                    </Link>
-                    <Link
-                      to="/collections/macrame-hanging"
-                      onClick={() => setOpenMega(null)}
-                      className="group relative overflow-hidden rounded-2xl aspect-[4/3] block shadow-md hover:shadow-xl transition-all duration-300"
-                    >
-                      <img src="/images/grace_every_thread.jpg" alt="Macrame & Crafts" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                      <div className="absolute bottom-3 left-3 right-3 text-white">
-                        <span className="font-heading font-bold text-sm block">Mother & Daughter Edit</span>
-                        <p className="text-[11px] text-white/80">Matching festive wear</p>
-                      </div>
-                    </Link>
+                    {liveCategories.slice(0, 4).map((cat) => (
+                      <Link
+                        key={cat.id || cat.name}
+                        to={`/shop?category=${encodeURIComponent(cat.name)}`}
+                        onClick={() => setOpenMega(null)}
+                        className="group relative overflow-hidden rounded-2xl aspect-[4/3] block shadow-md hover:shadow-xl transition-all duration-300 bg-[#fbf9f6]"
+                      >
+                        <img
+                          src={cat.image || "/images/category/Latkan.webp"}
+                          alt={cat.name}
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                        <div className="absolute bottom-3 left-3 right-3 text-white">
+                          <span className="font-heading font-bold text-sm block">{cat.name}</span>
+                          <p className="text-[11px] text-white/80">{cat.count || `${cat.productCount || 0} items`}</p>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -598,42 +482,42 @@ export default function Navbar() {
                   </button>
                   {mobileExpanded === link.key && (
                     <div className="pb-2 pl-3 animate-fade-slide-down border-l-2 border-brand-gold/30 ml-3 mb-2">
-                      {categories.map((cat) => (
-                        <div key={cat.slug} className="border-b border-black/5 last:border-0">
+                      {liveCategories.map((cat) => (
+                        <div key={cat.id || cat.slug || cat.name} className="border-b border-black/5 last:border-0">
                           <div className="flex items-center justify-between">
                             <Link
-                              to={`/shop?category=${cat.slug}`}
+                              to={`/shop?category=${encodeURIComponent(cat.name)}`}
                               onClick={() => setOpen(false)}
                               className="flex-1 py-2.5 text-left text-xs font-semibold text-brand-ink hover:text-brand-maroon transition-colors"
                             >
                               {cat.name}
                             </Link>
-                            {cat.subs.length > 0 && (
+                            {cat.subs && cat.subs.length > 0 && (
                               <button
                                 type="button"
-                                onClick={() => setMobileCatExpanded((v) => (v === cat.slug ? null : cat.slug))}
+                                onClick={() => setMobileCatExpanded((v) => (v === (cat.slug || cat.name) ? null : (cat.slug || cat.name)))}
                                 className="p-2 text-gray-400 hover:text-brand-maroon"
                                 aria-label={`Expand ${cat.name}`}
                               >
-                                <ChevronRight className={`h-3.5 w-3.5 transition-transform ${mobileCatExpanded === cat.slug ? "rotate-90 text-brand-maroon" : ""}`} />
+                                <ChevronRight className={`h-3.5 w-3.5 transition-transform ${mobileCatExpanded === (cat.slug || cat.name) ? "rotate-90 text-brand-maroon" : ""}`} />
                               </button>
                             )}
                           </div>
-                          {cat.subs.length > 0 && mobileCatExpanded === cat.slug && (
+                          {cat.subs && cat.subs.length > 0 && mobileCatExpanded === (cat.slug || cat.name) && (
                             <ul className="pl-4 pb-2 space-y-1 animate-fade-slide-down">
                               <li key="all">
                                 <Link
-                                  to={`/shop?category=${cat.slug}`}
+                                  to={`/shop?category=${encodeURIComponent(cat.name)}`}
                                   onClick={() => setOpen(false)}
                                   className="block px-2 py-1 text-xs font-semibold text-brand-maroon hover:underline"
                                 >
                                   • View All {cat.name}
                                 </Link>
                               </li>
-                              {cat.subs.map((s) => (
-                                <li key={s.slug}>
+                              {cat.subs.map((s: any) => (
+                                <li key={s.slug || s.name}>
                                   <Link
-                                    to={`/shop?category=${cat.slug}&sub=${s.slug}`}
+                                    to={`/shop?category=${encodeURIComponent(cat.name)}&sub=${encodeURIComponent(s.slug || s.name)}`}
                                     onClick={() => setOpen(false)}
                                     className="block px-2 py-1 text-xs text-brand-ink/70 hover:text-brand-maroon"
                                   >

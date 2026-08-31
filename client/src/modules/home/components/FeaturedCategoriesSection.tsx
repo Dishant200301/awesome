@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { categories } from '@/data/catalog';
+import React, { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getLiveCategories, subscribeToProductStore, subscribeToFilterStore, subscribeToCategoriesStore } from '@/modules/core/lib/apiStore';
 
 interface FeaturedCategoriesProps {
   onSelectCategory?: (key: string) => void;
@@ -13,9 +13,30 @@ export const FeaturedCategoriesSection: React.FC<FeaturedCategoriesProps> = ({ o
   const scrollLeftStart = useRef<number>(0);
   const hasMoved = useRef<boolean>(false);
 
-  // Exactly 12 categories: 6 in Row 1, 6 in Row 2
-  const topRowCategories = categories.slice(0, 6);
-  const bottomRowCategories = categories.slice(6, 12);
+  // Dynamic Categories State
+  const [liveCategories, setLiveCategories] = useState(() => getLiveCategories());
+
+  useEffect(() => {
+    const updateCategories = () => {
+      setLiveCategories(getLiveCategories());
+    };
+
+    const unsubProd = subscribeToProductStore(updateCategories);
+    const unsubFilter = subscribeToFilterStore(updateCategories);
+    const unsubCat = subscribeToCategoriesStore(updateCategories);
+
+    return () => {
+      unsubProd();
+      unsubFilter();
+      unsubCat();
+    };
+  }, []);
+
+  // Split dynamically into 2 balanced rows
+  const midIndex = Math.ceil(liveCategories.length / 2);
+  const topRowCategories = liveCategories.slice(0, midIndex);
+  const bottomRowCategories = liveCategories.slice(midIndex);
+
 
   // Mouse Drag Scroll for Desktop
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -58,7 +79,7 @@ export const FeaturedCategoriesSection: React.FC<FeaturedCategoriesProps> = ({ o
     }
   };
 
-  const renderCategoryCard = (cat: typeof categories[0], index: number) => (
+  const renderCategoryCard = (cat: any, index: number) => (
     <div
       key={cat.slug || index}
       className="shrink-0 w-[calc((100vw-32px)/3.5)] sm:w-[calc((100vw-48px)/4.5)] lg:w-[calc((min(1500px,100vw)-48px)/5.5)]"

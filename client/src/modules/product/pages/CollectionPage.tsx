@@ -31,11 +31,13 @@ import {
   SelectValue,
 } from "@/modules/core/components/ui/select";
 import ProductCard from "@/modules/home/components/ProductCard";
-import { categories, collections, Category } from "@/data/catalog";
+import { collections, Category } from "@/data/catalog";
 import {
   subscribeToProductStore,
   getLiveProductsList,
   fetchLiveProducts,
+  getLiveCategories,
+  subscribeToCategoriesStore,
 } from "@/modules/core/lib/apiStore";
 
 export default function CollectionPage() {
@@ -53,26 +55,31 @@ export default function CollectionPage() {
   const [gridCols, setGridCols] = useState<number>(4); // 2, 3, or 4 on desktop
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
-  // Live products from store
+  // Live products & categories from store
   const [liveProducts, setLiveProducts] = useState(getLiveProductsList);
+  const [liveCategories, setLiveCategories] = useState(() => getLiveCategories());
 
   useEffect(() => {
     fetchLiveProducts();
-    const update = () => setLiveProducts([...getLiveProductsList()]);
-    const unsub = subscribeToProductStore(update);
-    return () => unsub();
+    const updateProds = () => setLiveProducts([...getLiveProductsList()]);
+    const unsubProds = subscribeToProductStore(updateProds);
+    const unsubCats = subscribeToCategoriesStore(() => setLiveCategories(getLiveCategories()));
+    return () => {
+      unsubProds();
+      unsubCats();
+    };
   }, []);
 
   // Find category metadata
   const currentCategory: Category | undefined = useMemo(() => {
     if (activeSlug === "all") return undefined;
-    return categories.find(
+    return liveCategories.find(
       (c) =>
         c.slug.toLowerCase() === activeSlug ||
         c.name.toLowerCase() === activeSlug ||
         c.name.toLowerCase().replace(/\s+/g, "-") === activeSlug
     );
-  }, [activeSlug]);
+  }, [activeSlug, liveCategories]);
 
   const categoryTitle = currentCategory ? currentCategory.name : activeSlug === "all" ? "All Handcrafted Collections" : activeSlug.replace(/-/g, " ").toUpperCase();
   const categoryImage = currentCategory ? currentCategory.image : "/images/hero_twirl_tradition.jpg";
@@ -290,7 +297,7 @@ export default function CollectionPage() {
               to="/collections"
               className="text-xs font-bold text-brand-maroon hover:underline flex items-center gap-1"
             >
-              View All ({categories.length}) <ArrowRight className="w-3 h-3" />
+              View All ({liveCategories.length}) <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
 
@@ -308,13 +315,13 @@ export default function CollectionPage() {
               <span>All ({liveProducts.length})</span>
             </Link>
 
-            {/* 18 Categories pills */}
-            {categories.map((cat) => {
+            {/* Dynamic Categories pills */}
+            {liveCategories.map((cat) => {
               const isActive = activeSlug === cat.slug.toLowerCase();
               return (
                 <Link
-                  key={cat.slug}
-                  to={`/collections/${cat.slug}`}
+                  key={cat.id || cat.slug || cat.name}
+                  to={`/collections/${cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-')}`}
                   className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold tracking-wide transition-all duration-200 uppercase ${
                     isActive
                       ? "bg-brand-maroon text-white border-brand-maroon shadow-sm"

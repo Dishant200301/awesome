@@ -22,7 +22,6 @@ import { AuthProvider } from "@/modules/core/context/AuthContext";
 import { QuickViewProvider } from "@/modules/product/context/QuickViewContext";
 import MobileProductQuickViewSheet from "@/modules/product/components/MobileProductQuickViewSheet";
 import DesktopProductQuickViewModal from "@/modules/product/components/DesktopProductQuickViewModal";
-import FloatingStickyCart from "@/modules/product/components/FloatingStickyCart";
 
 export default function App() {
   return (
@@ -39,7 +38,6 @@ export default function App() {
                   <AuthModal />
                   <MobileProductQuickViewSheet />
                   <DesktopProductQuickViewModal />
-                  <FloatingStickyCart />
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/home" element={<HomePage />} />

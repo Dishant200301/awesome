@@ -2,6 +2,8 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  image?: string;
+  subs?: any[];
   productCount: number;
   isActive: boolean;
 }
@@ -12,6 +14,7 @@ export interface Subcategory {
   categoryName: string;
   name: string;
   slug: string;
+  image?: string;
 }
 
 export interface Brand {

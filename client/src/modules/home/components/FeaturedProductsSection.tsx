@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import { motion } from "framer-motion";
 import { FiChevronLeft, FiChevronRight, FiArrowRight } from "react-icons/fi";
-import { CATEGORY_TABS } from "../lib/products";
+import { CATEGORY_TABS as FALLBACK_TABS } from "../lib/products";
 import ProductCard from "./ProductCard";
-import { subscribeToProductStore, getLiveProductsList } from "@/modules/core/lib/apiStore";
+import { subscribeToProductStore, getLiveProductsList, getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
 
 interface FeaturedProps {
   activeTab?: string;
@@ -18,19 +18,39 @@ export default function FeaturedProductsSection({ activeTab, setActiveTab }: Fea
   const setTab = setActiveTab !== undefined ? setActiveTab : setLocalTab;
 
   const [liveList, setLiveList] = useState(getLiveProductsList);
+  const [categoriesList, setCategoriesList] = useState(getLiveCategories);
   const [activeIndex, setActiveIndex] = useState(0);
   const [totalDots, setTotalDots] = useState(3);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+
+  const dynamicTabs = useMemo(() => {
+    if (!categoriesList || categoriesList.length === 0) return FALLBACK_TABS;
+    return [
+      { key: "all", label: "All Items" },
+      ...categoriesList.slice(0, 7).map((c) => ({
+        key: c.slug || c.name.toLowerCase().replace(/\s+/g, "-"),
+        label: c.name,
+      })),
+    ];
+  }, [categoriesList]);
+
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const update = () => setLiveList([...getLiveProductsList()]);
-    const unsub = subscribeToProductStore(update);
-    return () => unsub();
+    const update = () => {
+      setLiveList([...getLiveProductsList()]);
+      setCategoriesList(getLiveCategories());
+    };
+    const unsubProd = subscribeToProductStore(update);
+    const unsubCat = subscribeToCategoriesStore(update);
+    return () => {
+      unsubProd();
+      unsubCat();
+    };
   }, []);
 
   const checkScroll = () => {
@@ -188,7 +208,7 @@ export default function FeaturedProductsSection({ activeTab, setActiveTab }: Fea
         {/* Scrollable Category Filter Tabs */}
         <div className="w-full max-w-6xl mt-5 md:mt-8 px-0 overflow-x-auto no-scrollbar">
           <div className="flex justify-center items-center gap-4 sm:gap-6 md:gap-8 min-w-max mx-auto px-4 border-b border-[#EDE5DA]">
-            {CATEGORY_TABS.map((t) => {
+            {dynamicTabs.map((t) => {
               const isActive = tab === t.key;
               return (
                 <button

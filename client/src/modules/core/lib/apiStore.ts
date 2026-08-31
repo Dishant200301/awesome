@@ -684,19 +684,28 @@ export const fetchLiveFilters = async () => {
 };
 
 export const getLiveFilters = () => {
+  const liveCats = getLiveCategories().map((c) => ({
+    name: c.name.toUpperCase(),
+    key: c.name,
+    count: c.productCount || 0,
+  }));
+
   try {
     const saved = localStorage.getItem('awesome_dynamic_filters') || localStorage.getItem('aaramly_dynamic_filters');
     if (saved) {
       const parsed = JSON.parse(saved);
       return {
-        categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : DEFAULT_FILTER_CONFIG.categories,
+        categories: liveCats.length > 0 ? liveCats : (Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : DEFAULT_FILTER_CONFIG.categories),
         colors: Array.isArray(parsed.colors) && parsed.colors.length > 0 ? parsed.colors : DEFAULT_FILTER_CONFIG.colors,
         sizes: Array.isArray(parsed.sizes) && parsed.sizes.length > 0 ? parsed.sizes : DEFAULT_FILTER_CONFIG.sizes,
         maxPrice: Number(parsed.maxPrice) || 3000,
       };
     }
   } catch (e) {}
-  return DEFAULT_FILTER_CONFIG;
+  return {
+    ...DEFAULT_FILTER_CONFIG,
+    categories: liveCats.length > 0 ? liveCats : DEFAULT_FILTER_CONFIG.categories,
+  };
 };
 
 const filterListeners = new Set<() => void>();
@@ -737,6 +746,160 @@ export const subscribeToFilterStore = (listener: () => void) => {
   };
 };
 
+// CATEGORIES STORE & ADMIN SYNC
+const categoryListeners = new Set<() => void>();
+let liveCategoryData: any[] = [];
+
+export const subscribeToCategoriesStore = (listener: () => void) => {
+  categoryListeners.add(listener);
+
+  let broadcastChannel: BroadcastChannel | null = null;
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    broadcastChannel = new BroadcastChannel('awesome_category_sync');
+    broadcastChannel.onmessage = () => {
+      fetchLiveCategories();
+      categoryListeners.forEach((fn) => fn());
+    };
+  }
+
+  const handleStorageChange = (e: StorageEvent) => {
+    if (e.key === 'awesome_categories' || e.key === 'aocind_categories') {
+      fetchLiveCategories();
+      categoryListeners.forEach((fn) => fn());
+    }
+  };
+
+  const handleCustomEvent = () => {
+    fetchLiveCategories();
+    categoryListeners.forEach((fn) => fn());
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('awesome_category_sync', handleCustomEvent);
+    window.addEventListener('aocind_category_sync', handleCustomEvent);
+  }
+
+  return () => {
+    categoryListeners.delete(listener);
+    if (broadcastChannel) broadcastChannel.close();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('awesome_category_sync', handleCustomEvent);
+      window.removeEventListener('aocind_category_sync', handleCustomEvent);
+    }
+  };
+};
+
+export const fetchLiveCategories = async (): Promise<any[]> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/taxonomies/categories`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.categories && Array.isArray(json.data.categories)) {
+        liveCategoryData = json.data.categories;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('awesome_categories', JSON.stringify(liveCategoryData));
+        }
+        categoryListeners.forEach((fn) => fn());
+        return getLiveCategories();
+      }
+    }
+  } catch (e) {
+    // console.warn("Express server taxonomy API offline, serving local categories.");
+  }
+  return getLiveCategories();
+};
+
+export const getLiveCategories = () => {
+  const liveProds = getLiveProductsList();
+  let baseCategories: any[] = [];
+
+  // 1. Strictly prefer memory store from Express API
+  if (Array.isArray(liveCategoryData) && liveCategoryData.length > 0) {
+    const activeParents = liveCategoryData.filter((c: any) => c.type !== 'sub' && c.isActive !== false);
+    baseCategories = activeParents.map((ac: any) => ({
+      id: ac.id,
+      name: ac.name,
+      slug: ac.slug || ac.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      image: ac.image || '/images/category/Latkan.webp',
+      subs: ac.subs || [],
+    }));
+  } else if (typeof window !== 'undefined') {
+    // 2. Check if Admin has custom/updated categories in storage
+    try {
+      const saved = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const adminParents = parsed.filter((c: any) => c.type !== 'sub' && c.isActive !== false);
+          baseCategories = adminParents.map((ac: any) => ({
+            id: ac.id,
+            name: ac.name,
+            slug: ac.slug || ac.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            image: ac.image || '/images/category/Latkan.webp',
+            subs: ac.subs || [],
+          }));
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback only if no admin categories loaded yet: derive from live products
+  if (baseCategories.length === 0 && liveCategoryData.length === 0) {
+    const prodCatNames = Array.from(new Set(liveProds.map((p) => p.category).filter(Boolean)));
+    if (prodCatNames.length > 0) {
+      baseCategories = prodCatNames.map((name: string, i: number) => ({
+        id: `cat-${i + 1}`,
+        name: name,
+        slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        image: '/images/category/Latkan.webp',
+        subs: [],
+      }));
+    }
+  }
+
+  // 4. Dynamic product count per category
+  const countMap = new Map<string, number>();
+  liveProds.forEach((p) => {
+    if (p && p.category) {
+      const c = String(p.category).trim().toLowerCase();
+      countMap.set(c, (countMap.get(c) || 0) + 1);
+    }
+    if (Array.isArray(p?.categories)) {
+      p.categories.forEach((catName: string) => {
+        const c = String(catName).trim().toLowerCase();
+        countMap.set(c, (countMap.get(c) || 0) + 1);
+      });
+    }
+  });
+
+  return baseCategories.map((cat) => {
+    const slugKey = (cat.slug || "").toLowerCase();
+    const nameKey = (cat.name || "").toLowerCase();
+    const liveCount = countMap.get(nameKey) ?? countMap.get(slugKey) ?? 0;
+    return {
+      ...cat,
+      productCount: liveCount,
+      count: liveCount > 0 ? `${liveCount} items` : "0 items",
+    };
+  });
+};
+
 // Trigger initial fetch
 fetchLiveProducts();
 fetchLiveFilters();
+fetchLiveCategories();
+
+// Auto refresh categories & products periodically or on window focus
+if (typeof window !== 'undefined') {
+  window.addEventListener('focus', () => {
+    fetchLiveProducts();
+    fetchLiveCategories();
+  });
+  setInterval(() => {
+    fetchLiveCategories();
+  }, 4000);
+}
+
+

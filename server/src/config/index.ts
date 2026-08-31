@@ -15,8 +15,8 @@ export const config = {
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || "super_secret_access_key",
     refreshSecret: process.env.JWT_REFRESH_SECRET || "super_secret_refresh_key",
-    accessExpiresIn: "15m",
-    refreshExpiresIn: "7d",
+    accessExpiresIn: (process.env.JWT_ACCESS_EXPIRES_IN || "24h") as string,
+    refreshExpiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || "24h") as string,
   },
   redis: {
     host: process.env.REDIS_HOST || "localhost",

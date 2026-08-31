@@ -14,129 +14,155 @@ interface AuthContextType {
   isAuthenticated: boolean;
   token: string | null;
   login: (email: string, pass: string) => Promise<void>;
-  signup: (name: string, email: string, pass: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const VALID_ADMIN_EMAILS = [
+  'admin@awesomehandmade.com',
+  'admin@awesome.com'
+];
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Clear any legacy aaramly keys on initialization
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('aaramly_admin_user');
+    localStorage.removeItem('aaramly_admin_token');
+    localStorage.removeItem('aaramly_user');
+    localStorage.removeItem('aaramly_token');
+  }
+
   const [user, setUser] = useState<AdminUser | null>(() => {
-    const saved = localStorage.getItem('awesome_admin_user') || localStorage.getItem('aaramly_admin_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('awesome_admin_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.email && VALID_ADMIN_EMAILS.includes(parsed.email.toLowerCase().trim())) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    // Clear invalid or stale stored user
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('awesome_admin_user');
+      localStorage.removeItem('awesome_admin_token');
+    }
+    return null;
   });
 
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('awesome_admin_token') || localStorage.getItem('aaramly_admin_token');
+    const savedUser = localStorage.getItem('awesome_admin_user');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.email && VALID_ADMIN_EMAILS.includes(parsed.email.toLowerCase().trim())) {
+          return localStorage.getItem('awesome_admin_token');
+        }
+      } catch (e) {}
+    }
+    return null;
   });
 
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('awesome_admin_user');
+      localStorage.removeItem('awesome_admin_token');
+      localStorage.removeItem('aaramly_admin_user');
+      localStorage.removeItem('aaramly_admin_token');
+    }
+  };
+
   useEffect(() => {
-    // If token exists, verify with backend /me endpoint if available
+    // If token exists, verify with backend /me endpoint
     if (token) {
       fetch(`${API_BASE_URL}/me`, {
         headers: { Authorization: `Bearer ${token}` }
       })
         .then((res) => {
-          if (!res.ok) return null;
+          if (!res.ok) {
+            // Invalid/expired token or user not in database -> strictly log out
+            logout();
+            return null;
+          }
           return res.json();
         })
         .then((data) => {
           if (data && data.success && data.data) {
-            setUser(data.data);
-            localStorage.setItem('awesome_admin_user', JSON.stringify(data.data));
+            const adminEmail = data.data.email?.toLowerCase().trim();
+            if (VALID_ADMIN_EMAILS.includes(adminEmail)) {
+              setUser(data.data);
+              localStorage.setItem('awesome_admin_user', JSON.stringify(data.data));
+            } else {
+              logout();
+            }
           }
         })
         .catch(() => {
-          // If offline or network error, keep stored user
+          // Network offline
         });
     }
   }, []);
 
   const login = async (email: string, pass: string): Promise<void> => {
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. Try Live Express Backend API
     try {
       const response = await fetch(`${API_BASE_URL}/signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass })
+        body: JSON.stringify({ email: cleanEmail, password: pass })
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.data) {
           const { user: loggedInUser, token: authToken } = data.data;
-          setUser(loggedInUser);
-          setToken(authToken);
-          localStorage.setItem('awesome_admin_user', JSON.stringify(loggedInUser));
-          localStorage.setItem('awesome_admin_token', authToken);
-          return;
+          if (loggedInUser && VALID_ADMIN_EMAILS.includes(loggedInUser.email?.toLowerCase().trim())) {
+            setUser(loggedInUser);
+            setToken(authToken);
+            localStorage.setItem('awesome_admin_user', JSON.stringify(loggedInUser));
+            localStorage.setItem('awesome_admin_token', authToken);
+            return;
+          }
         }
+      } else {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.message || 'Access Denied: Invalid admin email or password.');
       }
-    } catch {
-      // Backend not available - proceed with fallback
-    }
-
-    // Direct / Local Admin Fallback (works immediately without live backend)
-    const fallbackUser: AdminUser = {
-      id: `admin-${Date.now()}`,
-      name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Super Admin',
-      email: email,
-      role: 'Super Admin'
-    };
-    const fallbackToken = `mock-admin-token-${Date.now()}`;
-    setUser(fallbackUser);
-    setToken(fallbackToken);
-    localStorage.setItem('awesome_admin_user', JSON.stringify(fallbackUser));
-    localStorage.setItem('awesome_admin_token', fallbackToken);
-  };
-
-  const signup = async (name: string, email: string, pass: string): Promise<void> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password: pass, role: 'Super Admin' })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          const { user: registeredUser, token: authToken } = data.data;
-          setUser(registeredUser);
-          setToken(authToken);
-          localStorage.setItem('awesome_admin_user', JSON.stringify(registeredUser));
-          localStorage.setItem('awesome_admin_token', authToken);
-          return;
-        }
+    } catch (err: any) {
+      if (err.message && (err.message.includes('Access Denied') || err.message.includes('Invalid') || err.message.includes('deactivated'))) {
+        throw err;
       }
-    } catch {
-      // Backend not available - proceed with fallback
+
+      // If backend is completely offline, ONLY allow official Awesome Handmade admin accounts
+      const isAwesome1 = cleanEmail === 'admin@awesomehandmade.com' && pass === 'Awesome@123';
+      const isAwesome2 = cleanEmail === 'admin@awesome.com' && pass === 'Awesome@123';
+
+      if (isAwesome1 || isAwesome2) {
+        const fallbackUser: AdminUser = {
+          id: isAwesome1 ? 'admin-awesome-1' : 'admin-awesome-2',
+          name: isAwesome1 ? 'Awesome Handmade Admin' : 'Super Admin',
+          email: cleanEmail,
+          role: 'Super Admin'
+        };
+        const fallbackToken = `admin-token-${Date.now()}`;
+        setUser(fallbackUser);
+        setToken(fallbackToken);
+        localStorage.setItem('awesome_admin_user', JSON.stringify(fallbackUser));
+        localStorage.setItem('awesome_admin_token', fallbackToken);
+        return;
+      }
+
+      throw new Error('Access Denied: Invalid admin email or password.');
     }
-
-    // Direct / Local Admin Registration Fallback
-    const fallbackUser: AdminUser = {
-      id: `admin-${Date.now()}`,
-      name: name || 'Super Admin',
-      email: email,
-      role: 'Super Admin'
-    };
-    const fallbackToken = `mock-admin-token-${Date.now()}`;
-    setUser(fallbackUser);
-    setToken(fallbackToken);
-    localStorage.setItem('awesome_admin_user', JSON.stringify(fallbackUser));
-    localStorage.setItem('awesome_admin_token', fallbackToken);
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('awesome_admin_user');
-    localStorage.removeItem('awesome_admin_token');
-    localStorage.removeItem('aaramly_admin_user');
-    localStorage.removeItem('aaramly_admin_token');
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, token, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

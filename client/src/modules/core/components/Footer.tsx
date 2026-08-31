@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaInstagram, FaYoutube, FaWhatsapp } from "react-icons/fa";
 import { FiMail, FiPhone, FiMapPin, FiX, FiCheckCircle } from "react-icons/fi";
 import { AwesomeLogo } from "./Navbar";
 import NewsletterCTA from "./NewsletterCTA";
+import { getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
 import { MOCK_CONTACT_MESSAGES } from "../../../../../admin/src/data/mockAdminData";
 
 export default function Footer() {
+  const [liveCategories, setLiveCategories] = useState(() => getLiveCategories());
+
+  useEffect(() => {
+    const unsub = subscribeToCategoriesStore(() => {
+      setLiveCategories(getLiveCategories());
+    });
+    return () => unsub();
+  }, []);
+
   const [showContactModal, setShowContactModal] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -101,12 +111,22 @@ export default function Footer() {
         <div className="col-span-1">
           <p className="text-xs font-bold uppercase tracking-widest text-brand-maroon mb-4">Categories</p>
           <ul className="space-y-2.5 text-xs sm:text-sm text-brand-ink/75">
-            <li><Link to="/shop?category=Latkan" className="hover:text-brand-maroon">Bridal & Blouse Latkans</Link></li>
-            <li><Link to="/shop?category=Necklace" className="hover:text-brand-maroon">Mirror Necklaces</Link></li>
-            <li><Link to="/shop?category=Choli" className="hover:text-brand-maroon">Navratri Choli Sets</Link></li>
-            <li><Link to="/shop?category=Earrings" className="hover:text-brand-maroon">Kundan & Mirror Earrings</Link></li>
-            <li><Link to="/shop?category=Gift Hamper" className="hover:text-brand-maroon">Festive Gift Hampers</Link></li>
-            <li><Link to="/shop?category=Krishna Outfit" className="hover:text-brand-maroon">Krishna Outfits</Link></li>
+            {liveCategories.slice(0, 6).map((c) => (
+              <li key={c.id || c.name}>
+                <Link to={`/shop?category=${encodeURIComponent(c.name)}`} className="hover:text-brand-maroon">
+                  {c.name}
+                </Link>
+              </li>
+            ))}
+            <li className="pt-1">
+              <Link
+                to="/shop"
+                className="inline-flex items-center gap-1 font-semibold text-brand-maroon hover:text-brand-gold hover:underline transition-colors"
+              >
+                <span>See All</span>
+                <span aria-hidden="true">→</span>
+              </Link>
+            </li>
           </ul>
         </div>
 
@@ -120,7 +140,6 @@ export default function Footer() {
               </Link>
             </li>
             <li><Link to="/about" className="hover:text-brand-maroon">About Our Heritage</Link></li>
-            <li><a href="#" className="hover:text-brand-maroon">Shipping &amp; Delivery</a></li>
             <li><a href="#" className="hover:text-brand-maroon">Custom Bridal Orders</a></li>
             <li><a href="#" className="hover:text-brand-maroon">FAQs &amp; Help</a></li>
           </ul>
@@ -150,7 +169,6 @@ export default function Footer() {
       <div className="py-4">
         <div className="mx-auto flex max-w-[1500px] flex-col sm:flex-row items-center justify-between px-5 text-xs text-brand-ink/60 gap-2">
           <p>© {new Date().getFullYear()} Awesome Handmade. All rights reserved.</p>
-          <p className="text-[11px]">Crafted with love in Surat, Gujarat</p>
         </div>
       </div>
     </footer>

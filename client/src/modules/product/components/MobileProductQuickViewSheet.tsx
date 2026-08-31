@@ -479,8 +479,8 @@ export const MobileProductQuickViewSheet: React.FC = () => {
                 </span>
                 <div className="flex items-center gap-1 text-xs font-semibold text-amber-600 bg-white px-2 py-0.5 rounded-md">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span>{product.rating || 4.8}</span>
-                  <span className="text-zinc-400 font-normal">({product.reviewCount || 128})</span>
+                  <span>{product.rating !== undefined && product.rating !== null ? product.rating : 4.8}</span>
+                  <span className="text-zinc-400 font-normal">({(product as any).salesCount ?? product.reviewCount ?? 0})</span>
                 </div>
               </div>
             </div>

@@ -520,8 +520,8 @@ export const DesktopProductQuickViewModal: React.FC = () => {
                       </span>
                       <div className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/60">
                         <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                        <span>{product.rating || 4.8}</span>
-                        <span className="text-zinc-400 font-normal">({product.reviewCount || 128} reviews)</span>
+                        <span>{product.rating !== undefined && product.rating !== null ? product.rating : 4.8}</span>
+                        <span className="text-zinc-400 font-normal">({(product as any).salesCount ?? product.reviewCount ?? 0} reviews)</span>
                       </div>
                     </div>
 
@@ -796,7 +796,7 @@ export const DesktopProductQuickViewModal: React.FC = () => {
                               <div className="w-full space-y-0.5 min-w-0">
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="text-[10px] font-semibold text-[#798A7A] truncate">
-                                    {relP.category || relP.type || "Lingerie"}
+                                    {relP.category || relP.type || "Handmade"}
                                   </span>
                                   <div className="flex items-center gap-0.5 text-[9px] font-semibold text-amber-600">
                                     <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
