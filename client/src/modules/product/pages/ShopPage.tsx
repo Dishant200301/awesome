@@ -771,21 +771,6 @@ export default function ShopPage() {
                         />
                       </div>
 
-                      {/* Title & Count */}
-                      <div className="mt-2 text-center w-full">
-                        <h3
-                          className={`text-[11px] sm:text-xs md:text-sm font-heading font-bold transition-colors leading-tight truncate uppercase tracking-wider ${
-                            active
-                              ? "text-[#520618]"
-                              : "text-zinc-900 group-hover:text-[#520618]"
-                          }`}
-                        >
-                          {cat.name}
-                        </h3>
-                        <p className="text-[10px] text-zinc-500 font-medium truncate mt-0.5">
-                          {cat.count}
-                        </p>
-                      </div>
                     </button>
                   </div>
                 );

@@ -53,8 +53,7 @@ export default function HomePage() {
       <FeaturedCategoriesSection onSelectCategory={(cat) => setActiveTab(cat)} />
       <BentoGridSection />
       <FeaturedProductsSection activeTab={activeTab} setActiveTab={setActiveTab} />
-      <ExplainerSection />
-      {/* <PromoBannerSection /> */}
+      <PromoBannerSection />
       <BestSellingSection />
       {/* <PopularCategoriesSection /> */}
       <WatchShopSection />
