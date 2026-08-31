@@ -483,20 +483,25 @@ export default function Navbar() {
                   {mobileExpanded === link.key && (
                     <div className="pb-2 pl-3 animate-fade-slide-down border-l-2 border-brand-gold/30 ml-3 mb-2">
                       {liveCategories.map((cat) => (
-                        <div key={cat.id || cat.slug || cat.name} className="border-b border-black/5 last:border-0">
-                          <div className="flex items-center justify-between">
+                        <div key={cat.id || cat.slug || cat.name} className="border-b border-black/5 last:border-0 py-1">
+                          <div className="flex items-center justify-between gap-2">
                             <Link
                               to={`/shop?category=${encodeURIComponent(cat.name)}`}
                               onClick={() => setOpen(false)}
-                              className="flex-1 py-2.5 text-left text-xs font-semibold text-brand-ink hover:text-brand-maroon transition-colors"
+                              className="flex items-center gap-2.5 flex-1 py-1.5 text-left text-xs font-semibold text-brand-ink hover:text-brand-maroon transition-colors"
                             >
-                              {cat.name}
+                              <img
+                                src={cat.image || "/images/category/Latkan.webp"}
+                                alt={cat.name}
+                                className="w-7 h-7 rounded-lg object-cover border border-brand-gold/30 shrink-0"
+                              />
+                              <span className="truncate">{cat.name}</span>
                             </Link>
                             {cat.subs && cat.subs.length > 0 && (
                               <button
                                 type="button"
                                 onClick={() => setMobileCatExpanded((v) => (v === (cat.slug || cat.name) ? null : (cat.slug || cat.name)))}
-                                className="p-2 text-gray-400 hover:text-brand-maroon"
+                                className="p-2 text-gray-400 hover:text-brand-maroon cursor-pointer"
                                 aria-label={`Expand ${cat.name}`}
                               >
                                 <ChevronRight className={`h-3.5 w-3.5 transition-transform ${mobileCatExpanded === (cat.slug || cat.name) ? "rotate-90 text-brand-maroon" : ""}`} />
@@ -504,7 +509,7 @@ export default function Navbar() {
                             )}
                           </div>
                           {cat.subs && cat.subs.length > 0 && mobileCatExpanded === (cat.slug || cat.name) && (
-                            <ul className="pl-4 pb-2 space-y-1 animate-fade-slide-down">
+                            <ul className="pl-9 pb-2 space-y-1 animate-fade-slide-down">
                               <li key="all">
                                 <Link
                                   to={`/shop?category=${encodeURIComponent(cat.name)}`}

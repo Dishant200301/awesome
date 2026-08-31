@@ -12,7 +12,9 @@ import {
   ChevronDown,
   X,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  SlidersHorizontal,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Tooltip } from './ui/tooltip';
 
@@ -308,6 +310,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="flex items-center gap-2.5">
                   <Sliders className={`w-4 h-4 shrink-0 ${['attributes', 'all-attributes', 'add-attribute'].includes(activeTab) ? 'text-white' : 'text-neutral-700'}`} />
                   {!collapsed && <span>Attributes</span>}
+                </div>
+              </button>
+            </Tooltip>
+          </div>
+
+          {/* HERO SLIDER DIRECT MENU */}
+          <div className="space-y-0.5">
+            <Tooltip content="Hero Slider" disabled={!collapsed}>
+              <button
+                type="button"
+                onClick={() => handleItemClick('hero-slider')}
+                className={`w-full flex items-center ${collapsed ? 'justify-center px-0' : 'justify-between px-2.5'} py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer ${
+                  activeTab === 'hero-slider'
+                    ? 'bg-black text-white font-semibold shadow-xs'
+                    : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <SlidersHorizontal className={`w-4 h-4 shrink-0 ${activeTab === 'hero-slider' ? 'text-white' : 'text-neutral-700'}`} />
+                  {!collapsed && <span>Hero Slider</span>}
+                </div>
+              </button>
+            </Tooltip>
+          </div>
+
+          {/* PROMO BANNER DIRECT MENU */}
+          <div className="space-y-0.5">
+            <Tooltip content="Promo Banner" disabled={!collapsed}>
+              <button
+                type="button"
+                onClick={() => handleItemClick('homepage-banners')}
+                className={`w-full flex items-center ${collapsed ? 'justify-center px-0' : 'justify-between px-2.5'} py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer ${
+                  activeTab === 'homepage-banners'
+                    ? 'bg-black text-white font-semibold shadow-xs'
+                    : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <ImageIcon className={`w-4 h-4 shrink-0 ${activeTab === 'homepage-banners' ? 'text-white' : 'text-neutral-700'}`} />
+                  {!collapsed && <span>Promo Banner</span>}
                 </div>
               </button>
             </Tooltip>

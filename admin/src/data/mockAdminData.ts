@@ -1,4 +1,4 @@
-import { Product, Order, Category, Subcategory, Attribute, Customer, ContactMessage, Brand, Variant } from '../types/admin';
+import { Product, Order, Category, Subcategory, Attribute, Customer, ContactMessage, Brand, Variant, HeroSlide, HomepageBanner } from '../types/admin';
 import { idbGet, idbSet } from './idbStorage';
 
 export const MOCK_BRANDS: Brand[] = [
@@ -7,24 +7,18 @@ export const MOCK_BRANDS: Brand[] = [
 ];
 
 export const MOCK_CATEGORIES: Category[] = [
-  { id: 'cat-1', name: 'Gift Hamper', slug: 'gift-hamper', productCount: 15, isActive: true },
-  { id: 'cat-2', name: 'Choli', slug: 'choli', productCount: 28, isActive: true },
-  { id: 'cat-3', name: 'Krishna Outfit', slug: 'krishna-outfit', productCount: 10, isActive: true },
-  { id: 'cat-4', name: 'Necklace', slug: 'necklace', productCount: 22, isActive: true },
-  { id: 'cat-5', name: 'Latkan', slug: 'latkan', productCount: 35, isActive: true },
-  { id: 'cat-6', name: 'Tassel', slug: 'tassel', productCount: 14, isActive: true },
-  { id: 'cat-7', name: 'Hair Accessories', slug: 'hair-accessories', productCount: 18, isActive: true },
-  { id: 'cat-8', name: 'Watch', slug: 'watch', productCount: 12, isActive: true },
-  { id: 'cat-9', name: 'Bracelet', slug: 'bracelet', productCount: 16, isActive: true },
-  { id: 'cat-10', name: 'Waist Belt', slug: 'waist-belt', productCount: 9, isActive: true },
-  { id: 'cat-11', name: 'Earrings', slug: 'earrings', productCount: 30, isActive: true },
-  { id: 'cat-12', name: 'Anklet', slug: 'anklet', productCount: 8, isActive: true },
-  { id: 'cat-13', name: 'Plastic Ring', slug: 'plastic-ring', productCount: 6, isActive: true },
-  { id: 'cat-14', name: 'Finger Ring', slug: 'finger-ring', productCount: 14, isActive: true },
-  { id: 'cat-15', name: 'Jewellery Set', slug: 'jewellery-set', productCount: 19, isActive: true },
-  { id: 'cat-16', name: 'Dispatch', slug: 'dispatch', productCount: 5, isActive: true },
-  { id: 'cat-17', name: 'Macrame Hanging', slug: 'macrame-hanging', productCount: 11, isActive: true },
-  { id: 'cat-18', name: 'Pom-Pom Wristband', slug: 'pom-pom-wristband', productCount: 8, isActive: true }
+  { id: 'cat-1', name: 'Gift Hamper', slug: 'gift-hamper', image: '/images/category/Gift Hamper.webp', productCount: 15, isActive: true },
+  { id: 'cat-2', name: 'Choli', slug: 'choli', image: '/images/category/Choli.webp', productCount: 28, isActive: true },
+  { id: 'cat-3', name: 'Krishna Outfit', slug: 'krishna-outfit', image: '/images/category/Krishna outfit.webp', productCount: 10, isActive: true },
+  { id: 'cat-4', name: 'Necklace', slug: 'necklace', image: '/images/category/Necklace.webp', productCount: 22, isActive: true },
+  { id: 'cat-5', name: 'Latkan', slug: 'latkan', image: '/images/category/Latkan.webp', productCount: 35, isActive: true },
+  { id: 'cat-6', name: 'Tassel', slug: 'tassel', image: '/images/category/Tassel.webp', productCount: 14, isActive: true },
+  { id: 'cat-7', name: 'Hair Accessories', slug: 'hair-accessories', image: '/images/category/Hair_Accessories.webp', productCount: 18, isActive: true },
+  { id: 'cat-8', name: 'Watch', slug: 'watch', image: '/images/category/Watch.webp', productCount: 12, isActive: true },
+  { id: 'cat-9', name: 'Bracelet', slug: 'bracelet', image: '/images/category/Bracelet.webp', productCount: 16, isActive: true },
+  { id: 'cat-10', name: 'Waist Belt', slug: 'waist-belt', image: '/images/category/Waist Belt.webp', productCount: 9, isActive: true },
+  { id: 'cat-11', name: 'Earrings', slug: 'earrings', image: '/images/category/Earrings.webp', productCount: 30, isActive: true },
+  { id: 'cat-12', name: 'Anklet', slug: 'anklet', image: '/images/category/Anklet.webp', productCount: 8, isActive: true }
 ];
 
 export const MOCK_SUBCATEGORIES: Subcategory[] = [
@@ -430,4 +424,91 @@ export const getAdminCategoriesAndSubcategories = () => {
     parentName: s.categoryName
   }));
   return { mainCategories: mainCats, subcategories: subCats };
+};
+
+export const MOCK_HERO_SLIDES: HeroSlide[] = [
+  {
+    id: "slide-1",
+    tag: "Grace in Every",
+    title: "Thread",
+    subtitle: "Timeless ethnic wear crafted with love, precision and elegance.",
+    image: "/images/home/hero/hero-1.webp",
+    mobileImage: "/images/home/hero/mobile-1.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "gold",
+    align: "left",
+    status: "Active",
+    sortOrder: 1
+  },
+  {
+    id: "slide-2",
+    tag: "Artisan Special",
+    title: "Twirl Into Tradition",
+    subtitle: "Heritage crafted for every celebration.",
+    image: "/images/home/hero/hero-2.webp",
+    mobileImage: "/images/home/hero/mobile-2.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "gold",
+    align: "left",
+    status: "Active",
+    sortOrder: 2
+  },
+  {
+    id: "slide-3",
+    tag: "HANDCRAFTED JEWELLERY",
+    title: "Threads of Tradition",
+    subtitle: "A celebration of colour, craft and culture.",
+    image: "/images/home/hero/hero-3.webp",
+    mobileImage: "/images/home/hero/mobile-3.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "maroon",
+    align: "left",
+    status: "Active",
+    sortOrder: 3
+  },
+  {
+    id: "slide-4",
+    tag: "COMFORT • STYLE • TRADITION",
+    title: "Kids CHOLI",
+    subtitle: "Soft fabric, elegant design, made with love.",
+    image: "/images/home/hero/hero-4.webp",
+    mobileImage: "/images/home/hero/mobile-4.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "purple",
+    align: "left",
+    status: "Active",
+    sortOrder: 4
+  },
+  {
+    id: "slide-5",
+    tag: "Kids Choli Collection",
+    title: "TWIRL IN TRADITION",
+    subtitle: "Little styles made for joyful celebrations",
+    image: "/images/home/hero/hero-5.webp",
+    mobileImage: "/images/home/hero/mobile-5.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "purple",
+    align: "left",
+    status: "Active",
+    sortOrder: 5
+  }
+];
+
+export const MOCK_PROMO_BANNER: HomepageBanner = {
+  id: "promo-banner-main",
+  title: "Handmade Necklace",
+  subtitle: "Crafted with colour, culture & love.",
+  image: "/images/banner/banner.webp",
+  mobileImage: "/images/banner/mobile-banner.webp",
+  badge: "Festive Collection",
+  buttonText: "SHOP NOW",
+  link: "/shop?category=Necklace",
+  gridPosition: "Main Promo Banner",
+  showTextOverlay: true,
+  status: "Active"
 };

@@ -33,23 +33,26 @@ export interface EnhancedCategory extends Category {
 
 interface CategoriesPageProps {
   initialTab?: string;
+  onNavigate?: (tab: string) => void;
 }
 
-export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'all-categories' }) => {
-  // Main Categories State with LocalStorage Persistence (Never re-seeds mock data if cleared)
+export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'all-categories', onNavigate }) => {
+  // Main Categories State with LocalStorage Persistence (12 Master Categories Default)
   const [categories, setCategories] = useState<EnhancedCategory[]>(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
         if (saved !== null) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
+          if (Array.isArray(parsed) && parsed.length > 0) {
             return parsed;
           }
         }
       } catch (e) {}
     }
-    return [];
+    const initialParents = MOCK_CATEGORIES.map(c => ({ ...c, type: 'parent' as const }));
+    const initialSubs = MOCK_SUBCATEGORIES.map(s => ({ ...s, type: 'sub' as const }));
+    return [...initialParents, ...initialSubs];
   });
 
   // Navigation & View Mode: 'all' | 'add' | 'edit'

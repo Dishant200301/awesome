@@ -53,23 +53,30 @@ export interface ContactMessage {
 
 export interface HeroSlide {
   id: string;
+  tag?: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   image: string;
+  mobileImage?: string;
   buttonText: string;
   link: string;
+  theme?: 'gold' | 'maroon' | 'dark' | 'purple' | 'custom';
+  align?: 'left' | 'center' | 'right';
   status: 'Active' | 'Inactive';
   sortOrder: number;
 }
 
 export interface HomepageBanner {
   id: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   image: string;
+  mobileImage?: string;
   badge?: string;
+  buttonText?: string;
   link: string;
-  gridPosition: 'Hero Side Upper' | 'Hero Side Lower' | 'Middle Wide' | 'Grid Left' | 'Grid Right';
+  gridPosition?: 'Hero Side Upper' | 'Hero Side Lower' | 'Middle Wide' | 'Grid Left' | 'Grid Right' | 'Main Promo Banner';
+  showTextOverlay?: boolean;
   status: 'Active' | 'Inactive';
 }
 

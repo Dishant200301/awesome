@@ -52,7 +52,7 @@ export interface Category {
   count?: number;
 }
 
-// Exactly 18 Requested Categories with full subcategory hierarchy
+// Exactly 12 Master Categories with full subcategory hierarchy
 export const categories: Category[] = [
   {
     name: "Gift Hamper",
@@ -152,42 +152,6 @@ export const categories: Category[] = [
     name: "Anklet",
     slug: "anklet",
     image: "/images/category/Anklet.webp",
-    subs: [],
-  },
-  {
-    name: "Plastic Ring",
-    slug: "plastic-ring",
-    image: "/images/category/Necklace.webp",
-    subs: [],
-  },
-  {
-    name: "Finger Ring",
-    slug: "finger-ring",
-    image: "/images/category/Necklace.webp",
-    subs: [],
-  },
-  {
-    name: "Jewellery Set",
-    slug: "jewellery-set",
-    image: "/images/category/Necklace.webp",
-    subs: [],
-  },
-  {
-    name: "Dispatch",
-    slug: "dispatch",
-    image: "/images/hero_twirl_tradition.jpg",
-    subs: [],
-  },
-  {
-    name: "Macrame Hanging",
-    slug: "macrame-hanging",
-    image: "/images/grace_every_thread.jpg",
-    subs: [],
-  },
-  {
-    name: "Pom-Pom Wristband",
-    slug: "pom-pom-wristband",
-    image: "/images/category/Bracelet.webp",
     subs: [],
   },
 ];

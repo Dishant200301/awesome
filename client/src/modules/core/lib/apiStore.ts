@@ -797,7 +797,19 @@ export const fetchLiveCategories = async (): Promise<any[]> => {
     if (res.ok) {
       const json = await res.json();
       if (json?.data?.categories && Array.isArray(json.data.categories)) {
-        liveCategoryData = json.data.categories;
+        const subs = Array.isArray(json.data.subcategories) ? json.data.subcategories : [];
+        liveCategoryData = json.data.categories.map((cat: any) => {
+          const parentSubs = subs.filter((s: any) => 
+            s.categoryId === cat.id || (s.categoryName && cat.name && s.categoryName.toLowerCase() === cat.name.toLowerCase())
+          );
+          return {
+            ...cat,
+            subs: parentSubs.length > 0 ? parentSubs.map((s: any) => ({
+              name: s.name,
+              slug: s.slug || s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+            })) : (cat.subs || [])
+          };
+        });
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('awesome_categories', JSON.stringify(liveCategoryData));
         }
@@ -845,18 +857,15 @@ export const getLiveCategories = () => {
     } catch (e) {}
   }
 
-  // 3. Fallback only if no admin categories loaded yet: derive from live products
+  // 3. Fallback only if no admin categories loaded yet: use CATALOG_CATEGORIES
   if (baseCategories.length === 0 && liveCategoryData.length === 0) {
-    const prodCatNames = Array.from(new Set(liveProds.map((p) => p.category).filter(Boolean)));
-    if (prodCatNames.length > 0) {
-      baseCategories = prodCatNames.map((name: string, i: number) => ({
-        id: `cat-${i + 1}`,
-        name: name,
-        slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        image: '/images/category/Latkan.webp',
-        subs: [],
-      }));
-    }
+    baseCategories = CATALOG_CATEGORIES.map((c, i) => ({
+      id: c.id || `cat-${i + 1}`,
+      name: c.name,
+      slug: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      image: c.image || '/images/category/Latkan.webp',
+      subs: c.subs || [],
+    }));
   }
 
   // 4. Dynamic product count per category
@@ -886,20 +895,317 @@ export const getLiveCategories = () => {
   });
 };
 
+// DYNAMIC HERO SLIDER & PROMO BANNER STORE
+export interface LiveHeroSlide {
+  id: string;
+  tag?: string;
+  title: string;
+  subtitle?: string;
+  image: string;
+  mobileImage?: string;
+  buttonText: string;
+  link: string;
+  theme?: 'gold' | 'maroon' | 'dark' | 'purple' | 'custom';
+  align?: 'left' | 'center' | 'right';
+  status: 'Active' | 'Inactive';
+  sortOrder: number;
+}
+
+export interface LivePromoBanner {
+  id: string;
+  title?: string;
+  subtitle?: string;
+  image: string;
+  mobileImage?: string;
+  badge?: string;
+  buttonText?: string;
+  link: string;
+  gridPosition?: string;
+  showTextOverlay?: boolean;
+  status: 'Active' | 'Inactive';
+}
+
+const DEFAULT_LIVE_HERO_SLIDES: LiveHeroSlide[] = [
+  {
+    id: "slide-1",
+    tag: "Grace in Every",
+    title: "Thread",
+    subtitle: "Timeless ethnic wear crafted with love, precision and elegance.",
+    image: "/images/home/hero/hero-1.webp",
+    mobileImage: "/images/home/hero/mobile-1.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "gold",
+    align: "left",
+    status: "Active",
+    sortOrder: 1
+  },
+  {
+    id: "slide-2",
+    tag: "Artisan Special",
+    title: "Twirl Into Tradition",
+    subtitle: "Heritage crafted for every celebration.",
+    image: "/images/home/hero/hero-2.webp",
+    mobileImage: "/images/home/hero/mobile-2.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "gold",
+    align: "left",
+    status: "Active",
+    sortOrder: 2
+  },
+  {
+    id: "slide-3",
+    tag: "HANDCRAFTED JEWELLERY",
+    title: "Threads of Tradition",
+    subtitle: "A celebration of colour, craft and culture.",
+    image: "/images/home/hero/hero-3.webp",
+    mobileImage: "/images/home/hero/mobile-3.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "maroon",
+    align: "left",
+    status: "Active",
+    sortOrder: 3
+  },
+  {
+    id: "slide-4",
+    tag: "COMFORT • STYLE • TRADITION",
+    title: "Kids CHOLI",
+    subtitle: "Soft fabric, elegant design, made with love.",
+    image: "/images/home/hero/hero-4.webp",
+    mobileImage: "/images/home/hero/mobile-4.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "purple",
+    align: "left",
+    status: "Active",
+    sortOrder: 4
+  },
+  {
+    id: "slide-5",
+    tag: "Kids Choli Collection",
+    title: "TWIRL IN TRADITION",
+    subtitle: "Little styles made for joyful celebrations",
+    image: "/images/home/hero/hero-5.webp",
+    mobileImage: "/images/home/hero/mobile-5.webp",
+    buttonText: "Shop Collection",
+    link: "#categories",
+    theme: "purple",
+    align: "left",
+    status: "Active",
+    sortOrder: 5
+  }
+];
+
+const DEFAULT_LIVE_PROMO_BANNER: LivePromoBanner = {
+  id: "promo-banner-main",
+  title: "Handmade Necklace",
+  subtitle: "Crafted with colour, culture & love.",
+  image: "/images/banner/banner.webp",
+  mobileImage: "/images/banner/mobile-banner.webp",
+  badge: "Festive Collection",
+  buttonText: "SHOP NOW",
+  link: "/shop?category=Necklace",
+  gridPosition: "Main Promo Banner",
+  showTextOverlay: true,
+  status: "Active"
+};
+
+let liveHeroSlides: LiveHeroSlide[] = [...DEFAULT_LIVE_HERO_SLIDES];
+let livePromoBanner: LivePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER };
+
+const heroListeners = new Set<() => void>();
+const bannerListeners = new Set<() => void>();
+
+export const subscribeToHeroSlides = (listener: () => void) => {
+  heroListeners.add(listener);
+  return () => {
+    heroListeners.delete(listener);
+  };
+};
+
+export const subscribeToPromoBanner = (listener: () => void) => {
+  bannerListeners.add(listener);
+  return () => {
+    bannerListeners.delete(listener);
+  };
+};
+
+export const fetchLiveHeroSlides = async (): Promise<LiveHeroSlide[]> => {
+  // 1. Try IndexedDB first
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = await idbGet<LiveHeroSlide[]>('awesome_hero_slides');
+      if (Array.isArray(stored) && stored.length > 0) {
+        liveHeroSlides = stored.filter((s: any) => s.status !== 'Inactive');
+        heroListeners.forEach((fn) => fn());
+      }
+    } catch (e) {}
+  }
+
+  // 2. Fetch from Express backend API
+  try {
+    const res = await fetch(`${API_BASE_URL}/content/hero-slides`);
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json.data) && json.data.length > 0) {
+        liveHeroSlides = json.data.filter((s: any) => s.status !== 'Inactive');
+        if (typeof window !== 'undefined') {
+          await idbSet('awesome_hero_slides', json.data);
+          try {
+            localStorage.setItem('awesome_hero_slides', JSON.stringify(liveHeroSlides));
+          } catch (e) {}
+        }
+        heroListeners.forEach(fn => fn());
+        return liveHeroSlides;
+      }
+    }
+  } catch (e) {}
+  return getLiveHeroSlides();
+};
+
+export const getLiveHeroSlides = (): LiveHeroSlide[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('awesome_hero_slides') || localStorage.getItem('aocind_hero_slides');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((s: any) => s.status !== 'Inactive');
+        }
+      }
+    } catch (e) {}
+  }
+  return liveHeroSlides.filter((s) => s.status !== 'Inactive');
+};
+
+export const fetchLivePromoBanner = async (): Promise<LivePromoBanner> => {
+  // 1. Try IndexedDB first
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = await idbGet<LivePromoBanner>('awesome_promo_banner');
+      if (stored && (stored.image || stored.title)) {
+        livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...stored };
+        bannerListeners.forEach((fn) => fn());
+      }
+    } catch (e) {}
+  }
+
+  // 2. Fetch from Express backend API
+  try {
+    const res = await fetch(`${API_BASE_URL}/content/promo-banner`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && (json.data.image || json.data.title)) {
+        livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...json.data };
+        if (typeof window !== 'undefined') {
+          await idbSet('awesome_promo_banner', json.data);
+          try {
+            localStorage.setItem('awesome_promo_banner', JSON.stringify(livePromoBanner));
+          } catch (e) {}
+        }
+        bannerListeners.forEach(fn => fn());
+        return livePromoBanner;
+      }
+    }
+  } catch (e) {}
+  return getLivePromoBanner();
+};
+
+export const getLivePromoBanner = (): LivePromoBanner => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('awesome_promo_banner') || localStorage.getItem('aocind_promo_banner');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          return { ...DEFAULT_LIVE_PROMO_BANNER, ...parsed };
+        }
+      }
+    } catch (e) {}
+  }
+  return livePromoBanner;
+};
+
+// Global real-time content sync listener
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'awesome_hero_slides' || e.key === 'aocind_hero_slides') {
+      try {
+        if (e.newValue) {
+          liveHeroSlides = JSON.parse(e.newValue);
+          heroListeners.forEach(fn => fn());
+        }
+      } catch (err) {}
+    }
+    if (e.key === 'awesome_promo_banner' || e.key === 'aocind_promo_banner') {
+      try {
+        if (e.newValue) {
+          livePromoBanner = JSON.parse(e.newValue);
+          bannerListeners.forEach(fn => fn());
+        }
+      } catch (err) {}
+    }
+  });
+
+  if ('BroadcastChannel' in window) {
+    try {
+      const contentBc = new BroadcastChannel('awesome_content_sync');
+      contentBc.onmessage = (msg) => {
+        if (msg.data?.type === 'HERO_UPDATED' && Array.isArray(msg.data.slides)) {
+          liveHeroSlides = msg.data.slides.filter((s: any) => s.status !== 'Inactive');
+          idbSet('awesome_hero_slides', msg.data.slides);
+          try { localStorage.setItem('awesome_hero_slides', JSON.stringify(liveHeroSlides)); } catch (e) {}
+          heroListeners.forEach(fn => fn());
+        }
+        if (msg.data?.type === 'BANNER_UPDATED' && msg.data.banner) {
+          livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...msg.data.banner };
+          idbSet('awesome_promo_banner', msg.data.banner);
+          try { localStorage.setItem('awesome_promo_banner', JSON.stringify(livePromoBanner)); } catch (e) {}
+          bannerListeners.forEach(fn => fn());
+        }
+      };
+    } catch (e) {}
+  }
+
+  // Load from IndexedDB on startup (supports full base64 images of any size)
+  idbGet<LiveHeroSlide[]>('awesome_hero_slides').then((stored) => {
+    if (Array.isArray(stored) && stored.length > 0) {
+      liveHeroSlides = stored.filter((s: any) => s.status !== 'Inactive');
+      heroListeners.forEach(fn => fn());
+    }
+  }).catch(() => {});
+
+  idbGet<LivePromoBanner>('awesome_promo_banner').then((stored) => {
+    if (stored && (stored.image || stored.title)) {
+      livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...stored };
+      bannerListeners.forEach(fn => fn());
+    }
+  }).catch(() => {});
+}
+
 // Trigger initial fetch
 fetchLiveProducts();
 fetchLiveFilters();
 fetchLiveCategories();
+fetchLiveHeroSlides();
+fetchLivePromoBanner();
 
-// Auto refresh categories & products periodically or on window focus
+// Auto refresh categories, products, and content periodically
 if (typeof window !== 'undefined') {
   window.addEventListener('focus', () => {
     fetchLiveProducts();
     fetchLiveCategories();
+    fetchLiveHeroSlides();
+    fetchLivePromoBanner();
   });
   setInterval(() => {
     fetchLiveCategories();
+    fetchLiveHeroSlides();
+    fetchLivePromoBanner();
   }, 4000);
 }
+
 
 

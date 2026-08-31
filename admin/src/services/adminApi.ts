@@ -7,7 +7,7 @@ import {
   MOCK_CONTACT_MESSAGES,
   getGlobalVariantsList
 } from "../data/mockAdminData";
-import { Product, Category, Subcategory, Brand, Attribute, ContactMessage, SizeGuide } from "../types/admin";
+import { Product, Category, Subcategory, Brand, Attribute, ContactMessage, SizeGuide, HeroSlide, HomepageBanner } from "../types/admin";
 
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api/v1" : "http://localhost:5000/api/v1");
 
@@ -24,6 +24,29 @@ export class AdminApiService {
     } catch {
       return null;
     }
+  }
+
+  // Content: Hero Slides & Promo Banner
+  public static async getHeroSlides(): Promise<HeroSlide[] | null> {
+    return this.request<HeroSlide[]>("/content/hero-slides");
+  }
+
+  public static async syncHeroSlides(slides: HeroSlide[]): Promise<any> {
+    return this.request<any>("/content/hero-slides/sync", {
+      method: "POST",
+      body: JSON.stringify({ slides })
+    });
+  }
+
+  public static async getPromoBanner(): Promise<HomepageBanner | null> {
+    return this.request<HomepageBanner>("/content/promo-banner");
+  }
+
+  public static async updatePromoBanner(banner: HomepageBanner): Promise<any> {
+    return this.request<any>("/content/promo-banner", {
+      method: "POST",
+      body: JSON.stringify(banner)
+    });
   }
 
   // Dashboard Stats

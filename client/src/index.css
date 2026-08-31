@@ -13,6 +13,7 @@
   --font-allura: "Allura", cursive;
   --font-poppins: "Poppins", sans-serif;
   --font-montserrat: "Montserrat", sans-serif;
+  --font-bodoni: "Bodoni Moda", "Libre Bodoni", "Didot", Georgia, serif;
   --color-brand-ink: #1A1A1A;
   --color-brand-maroon: #520618;
   --color-brand-gold: #C89B3C;
@@ -26,6 +27,7 @@
 .font-allura { font-family: "Allura", cursive; }
 .font-poppins { font-family: "Poppins", sans-serif; }
 .font-montserrat { font-family: "Montserrat", sans-serif; }
+.font-bodoni { font-family: "Bodoni Moda", "Libre Bodoni", "Didot", Georgia, serif; }
 
 html, body { font-family: var(--font-sans); background: #fff; color: #000; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

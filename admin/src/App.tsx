@@ -80,7 +80,7 @@ function AdminMainContent() {
       case 'all-categories':
       case 'add-category':
       case 'brands':
-        return <CategoriesPage initialTab={activeTab} />;
+        return <CategoriesPage initialTab={activeTab} onNavigate={handleNavigate} />;
       case 'attributes':
       case 'all-attributes':
       case 'add-attribute':

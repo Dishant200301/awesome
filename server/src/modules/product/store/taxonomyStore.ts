@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Category, Subcategory, Brand, Attribute } from "../../../types/admin.js";
 
-// Initial Taxonomy Seed Data
+// Initial Taxonomy Seed Data (12 Master Categories)
 const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat-1', name: 'Gift Hamper', slug: 'gift-hamper', image: '/images/category/Gift Hamper.webp', productCount: 15, isActive: true },
   { id: 'cat-2', name: 'Choli', slug: 'choli', image: '/images/category/Choli.webp', productCount: 28, isActive: true },
@@ -15,13 +15,7 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat-9', name: 'Bracelet', slug: 'bracelet', image: '/images/category/Bracelet.webp', productCount: 16, isActive: true },
   { id: 'cat-10', name: 'Waist Belt', slug: 'waist-belt', image: '/images/category/Waist Belt.webp', productCount: 9, isActive: true },
   { id: 'cat-11', name: 'Earrings', slug: 'earrings', image: '/images/category/Earrings.webp', productCount: 30, isActive: true },
-  { id: 'cat-12', name: 'Anklet', slug: 'anklet', image: '/images/category/Anklet.webp', productCount: 8, isActive: true },
-  { id: 'cat-13', name: 'Plastic Ring', slug: 'plastic-ring', image: '/images/category/Necklace.webp', productCount: 6, isActive: true },
-  { id: 'cat-14', name: 'Finger Ring', slug: 'finger-ring', image: '/images/category/Necklace.webp', productCount: 14, isActive: true },
-  { id: 'cat-15', name: 'Jewellery Set', slug: 'jewellery-set', image: '/images/category/Necklace.webp', productCount: 19, isActive: true },
-  { id: 'cat-16', name: 'Dispatch', slug: 'dispatch', image: '/images/hero_twirl_tradition.jpg', productCount: 5, isActive: true },
-  { id: 'cat-17', name: 'Macrame Hanging', slug: 'macrame-hanging', image: '/images/grace_every_thread.jpg', productCount: 11, isActive: true },
-  { id: 'cat-18', name: 'Pom-Pom Wristband', slug: 'pom-pom-wristband', image: '/images/category/Bracelet.webp', productCount: 8, isActive: true }
+  { id: 'cat-12', name: 'Anklet', slug: 'anklet', image: '/images/category/Anklet.webp', productCount: 8, isActive: true }
 ];
 
 const DEFAULT_SUBCATEGORIES: Subcategory[] = [
