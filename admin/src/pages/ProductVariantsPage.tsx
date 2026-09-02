@@ -16,6 +16,7 @@ import {
 import { getGlobalVariantsList, MOCK_PRODUCTS } from '../data/mockAdminData';
 import { Variant } from '../types/admin';
 import { Select } from '../components/ui/select';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 
 interface ProductVariantsPageProps {
   onNavigate: (tab: string, productId?: string) => void;
@@ -28,6 +29,7 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
   const [colorFilter, setColorFilter] = useState('ALL');
   const [sizeFilter, setSizeFilter] = useState('ALL');
   const [stockFilter, setStockFilter] = useState('ALL');
+  const [deleteCandidate, setDeleteCandidate] = useState<Variant | null>(null);
 
   // Edit Modal State
   const [editingVariant, setEditingVariant] = useState<Variant | null>(null);
@@ -114,10 +116,14 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
   };
 
   // Delete Variant
-  const handleDeleteVariant = (id: string) => {
-    if (window.confirm('Are you sure you want to remove this variant combination?')) {
-      setVariantsList((prev) => prev.filter((v) => v.id !== id));
-    }
+  const handleDeleteVariant = (variant: Variant) => {
+    setDeleteCandidate(variant);
+  };
+
+  const confirmDeleteVariant = () => {
+    if (!deleteCandidate) return;
+    setVariantsList((prev) => prev.filter((v) => v.id !== deleteCandidate.id));
+    setDeleteCandidate(null);
   };
 
   return (
@@ -336,7 +342,7 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
                       </button>
 
                       <button
-                        onClick={() => handleDeleteVariant(variant.id)}
+                        onClick={() => handleDeleteVariant(variant)}
                         title="Delete Variant"
                         className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
                       >
@@ -526,6 +532,14 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
           </div>
         </div>
       )}
+      {/* REUSABLE DELETE CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteCandidate)}
+        title="Delete Variant Combination?"
+        itemName={deleteCandidate ? `${deleteCandidate.parentProductName || 'Product'} (${deleteCandidate.color} / ${deleteCandidate.size})` : undefined}
+        onConfirm={confirmDeleteVariant}
+        onCancel={() => setDeleteCandidate(null)}
+      />
     </div>
   );
 };

@@ -40,12 +40,7 @@ const BENEFITS = [
     subtitle: "Direct From Craftsman",
     icon: FiStar,
   },
-  {
-    id: "b6",
-    title: "24/7 Friendly",
-    subtitle: "Customer Support",
-    icon: FiHeadphones,
-  },
+  
 ];
 
 export const BenefitsSection: React.FC = () => {
@@ -86,7 +81,7 @@ export const BenefitsSection: React.FC = () => {
 
       {/* Laptop & Desktop Grid View (>= 1024px): 6 cols Grid without borders */}
       <div className="hidden lg:block max-w-[1400px] mx-auto px-4 md:px-8 border-none">
-        <div className="grid grid-cols-6 gap-6 md:gap-8 border-none">
+        <div className="grid grid-cols-5 gap-6 md:gap-8 border-none">
           {BENEFITS.map((item, idx) => {
             const Icon = item.icon;
             return (
@@ -100,7 +95,7 @@ export const BenefitsSection: React.FC = () => {
               >
                 {/* Clean Transparent Icon Container (No Background, Black Icon) */}
                 <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center text-black transition-all duration-300 mb-2">
-                  <Icon className="w-8 h-8 md:w-9 md:h-9 stroke-[1.5] transition-transform duration-300" />
+                  <Icon className="w-8 h-8 md:w-9 md:h-9 stroke-1 transition-transform duration-300" />
                 </div>
 
                 {/* Labels */}

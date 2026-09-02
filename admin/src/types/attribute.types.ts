@@ -25,6 +25,7 @@ export interface AttributeValue {
 export interface AttributeMaster {
   id: string;
   name: string;
+  displayName?: string;
   slug: string;
   type: AttributeDisplayType;
   usage: AttributeUsage;

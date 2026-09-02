@@ -5,3 +5,4 @@ export * from "./input";
 export * from "./table";
 export * from "./DropdownMenu";
 export * from "./select";
+export * from "./switch";

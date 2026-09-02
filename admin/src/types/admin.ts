@@ -40,8 +40,8 @@ export interface Attribute {
 export interface Variant {
   id: string;
   sku: string;
-  title?: string; // Custom Variant/Color Specific Title
-  productInfo?: string; // Custom Variant/Color Specific Description Info
+  title?: string;
+  productInfo?: string;
   parentProductId?: string;
   parentProductName?: string;
   color?: string;
@@ -79,6 +79,7 @@ export interface ProductInventory {
   lowStockAlert?: number;
   allowBackorders?: boolean;
   trackInventory?: boolean;
+  stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock' | 'backorder';
 }
 
 export interface ProductShipping {
@@ -86,6 +87,8 @@ export interface ProductShipping {
   length?: number;
   width?: number;
   height?: number;
+  unit?: string;
+  weightUnit?: string;
 }
 
 export interface ProductSEO {
@@ -111,7 +114,7 @@ export interface ProductDescriptionCard {
   description: string;
   image: string;
   sortOrder: number;
-  colorName?: string; // Optional color assignment (e.g., "Black", "Beige", "All Colors")
+  colorName?: string;
 }
 
 export interface ProductHighlight {
@@ -182,40 +185,141 @@ export interface SizeGuide {
 
 import { ProductSizeChartConfig } from './attribute.types';
 
+export interface ProductSpecification {
+  key: string;
+  value: string;
+}
+
+export interface ProductDimensions {
+  length: number;
+  width: number;
+  height: number;
+  unit: string;
+}
+
+export interface ProductWeight {
+  value: number;
+  unit: string;
+}
+
+export interface ProductCustomAttribute {
+  name: string;
+  values: string[];
+}
+
+export interface ProductOptionItem {
+  id: string;
+  name: string;
+  values: string[];
+}
+
+export interface ProductVariantDetail {
+  id: string;
+  name: string;
+  optionValue: string;
+  price: number;
+  salePrice?: number;
+  quantity: number;
+  sku: string;
+  colorHex?: string;
+  mainImage?: string;
+  galleryImages?: string[];
+  width?: string;
+  height?: string;
+  totalCarat?: string;
+  goldCarat?: string;
+  images: string[];
+}
+
+export interface ProductAddonOption {
+  id: string;
+  name: string;
+  values: string[];
+  price?: number;
+}
+
 export interface Product {
   id: string;
   name: string;
+  displayName?: string;
+  subtitle?: string;
+  defaultKey?: string;
   slug: string;
   sku: string;
+  defaultSku?: string;
+  barcode?: string;
+
   category: string;
   subcategory?: string;
+  subCategory?: string;
   categories?: string[];
   brand: string;
   collections?: string[];
   tags?: string[];
-  price: number;
+
+  // Pricing & Taxes
+  regularPrice?: number;
   originalPrice: number;
+  discountType?: 'percentage' | 'fixed';
+  discountValue?: number;
+  discountPercentage?: number;
+  price: number; // Final selling price
   costPrice?: number;
+  taxRate?: number;
+  taxIncluded?: boolean;
+
+  // Inventory
   stock: number;
+  stockQuantity?: number;
+  lowStockAlert?: number;
+  stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock' | 'backorder';
+  allowBackorders?: boolean;
+  trackInventory?: boolean;
+
+  // Status & Visibility
   rating: number;
   salesCount: number;
-  status: 'Published' | 'Draft' | 'Hidden' | 'Out of Stock';
+  reviewCount?: number;
+  status: 'Published' | 'Draft' | 'Active' | 'Inactive' | 'Out of Stock' | 'Hidden';
   isPublished: boolean;
+  isFeatured?: boolean;
   type: 'Simple' | 'Variable';
+
+  // Descriptions & Media
   shortDescription?: string;
   fullDescription?: string;
+  longDescription?: string;
   image?: string;
   mainImage?: string;
+  hoverImage?: string;
   galleryImages?: string[];
-  defaultSku?: string;
   images: string[];
+
+  // Specifications & Attributes
+  specifications?: ProductSpecification[];
+  features?: string[];
+  dimensions?: ProductDimensions;
+  weight?: ProductWeight;
+  material?: string;
+  color?: string;
+  size?: string;
+  customAttributes?: ProductCustomAttribute[];
+
+  // SEO
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string[] | string;
+  seo?: ProductSEO;
+
+  // Additional e-commerce configurations
   labels?: ProductLabels;
   inventory?: ProductInventory;
-  barcode?: string;
   shipping?: ProductShipping;
-  seo?: ProductSEO;
   variants: Variant[];
   variations?: any[];
+  productOptions?: ProductOptionItem[];
+  variantDetails?: ProductVariantDetail[];
+  addonOptions?: ProductAddonOption[];
   attributes: { name: string; values: string[] }[];
   colors?: ProductColor[];
   descriptionCards?: ProductDescriptionCard[];
@@ -228,7 +332,10 @@ export interface Product {
   idealForPills?: string[];
   sizeGuideId?: string;
   sizeChart?: ProductSizeChartConfig;
+  availableSizes?: string[];
+
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ContactMessage {
@@ -355,3 +462,21 @@ export interface StoreSettings {
   metaTitle: string;
   metaDescription: string;
 }
+
+export interface AdminReviewItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage?: string;
+  author: string;
+  email: string;
+  rating: number;
+  comment: string;
+  date: string;
+  verified?: boolean;
+  status?: 'Approved' | 'Pending' | 'Rejected';
+  createdAt?: string;
+}
+
+export type ReviewItem = AdminReviewItem;
+

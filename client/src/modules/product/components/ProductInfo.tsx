@@ -268,8 +268,27 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
       }
     });
 
+    // 4. If product is a simple product (0 variants/colors), create a card for it
+    if (map.size === 0) {
+      const simpleMainImg = (product as any).mainImage || (product as any).image || activeVariation?.thumbnail || "/images/category/Latkan.webp";
+      const simpleColName = (product as any).colorName || activeVariation?.colorName || "Standard";
+      map.set("default", {
+        id: "v-simple",
+        colorName: simpleColName,
+        colorHex: activeVariation?.colorHex || "#000000",
+        size: selectedSize || "Standard Pair",
+        thumbnail: simpleMainImg,
+        price: product.price || activeVariation?.price || 799,
+        originalPrice: product.originalPrice || activeVariation?.originalPrice || 1299,
+        discountPercentage: activeVariation?.discountPercentage || 38,
+        sku: product.defaultSku || product.sku || activeVariation?.sku || "AH-PROD-001",
+        stock: product.stock !== undefined ? product.stock : (activeVariation?.stock || 50),
+        images: activeVariation?.images || [{ id: "img-0", url: simpleMainImg, alt: product.name }]
+      });
+    }
+
     return Array.from(map.values());
-  }, [product.colors, (product as any).colorMediaConfigs, product.variations, product.price, product.originalPrice, product.defaultSku, product.name, selectedSize]);
+  }, [product.colors, (product as any).colorMediaConfigs, product.variations, product.price, product.originalPrice, product.defaultSku, product.name, product.mainImage, (product as any).image, (product as any).colorName, activeVariation, selectedSize]);
 
   // Filter available sizes specifically matching the currently active color strictly from Admin data
   const availableSizesForColor = React.useMemo(() => {
@@ -298,23 +317,35 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
     (product.availableSizes && product.availableSizes.length > 0) ||
     uniqueColorVariations.length > 0;
   const savings = activeVariation.originalPrice - activeVariation.price;
-
   const activeColorMedia = ((product as any).colorMediaConfigs || []).find(
     (cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === (activeVariation?.colorName || "").toLowerCase()
   );
   const displayTitle = activeColorMedia?.title || (activeVariation as any)?.title || product.name;
   const displaySubtitle = activeColorMedia?.productInfo || (activeVariation as any)?.productInfo || (activeVariation as any)?.subtitle || product.subtitle || product.shortDescription;
+  const rawDescription = displaySubtitle || product.shortDescription || product.fullDescription || product.extendedDetails?.description || "";
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
+  // Dynamic selector label (e.g. SELECT METAL, SELECT COLOR, SELECT VARIANT)
+  const selectorLabel = React.useMemo(() => {
+    const cat = (product.category || (product as any).categories?.[0] || "").toLowerCase();
+    if (cat.includes("jewelry") || cat.includes("necklace") || cat.includes("ring") || cat.includes("gold") || cat.includes("diamond")) {
+      return "SELECT METAL";
+    }
+    return "SELECT COLOR";
+  }, [product.category, (product as any).categories]);
 
   return (
-    <div className="w-full flex flex-col gap-6 font-sans">
-      {/* Brand & Action Buttons */}
+    <div className="w-full flex flex-col gap-5 font-sans">
+      {/* 1. TOP HEADER: Product Title & Action Buttons (Wishlist / Share) */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-montserrat font-600 tracking-[0.25em] text-[#798A7A]">
-            {/* Brand: <strong className="text-zinc-900 font-bold">{product.brand}</strong> */}
-          </span>
+        <div className="flex items-start justify-between gap-3">
+          {/* Main Product Title */}
+          <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-zinc-900 leading-snug tracking-tight">
+            {displayTitle}
+          </h1>
 
-          <div className="flex items-center gap-2">
+          {/* Quick Actions (Wishlist & Share) */}
+          <div className="flex items-center gap-2 shrink-0 pt-1">
             <button
               type="button"
               onClick={() => toggleWishlist(product.id)}
@@ -329,8 +360,8 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
               <FiHeart size={16} className={`stroke-[2.5] ${wishlisted ? "fill-current" : ""}`} />
             </button>
 
-
             <button
+              type="button"
               onClick={() => setIsShareModalOpen(true)}
               className="p-2.5 rounded-full border border-zinc-200 text-zinc-700 hover:border-zinc-900 hover:text-zinc-900 bg-white transition-all shadow-2xs cursor-pointer"
               title="Share Product"
@@ -341,342 +372,242 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
           </div>
         </div>
 
-        {/* Title in Montserrat 800 uppercase matching Home Page */}
-        <h1 className="text-[22px] sm:text-[26px] lg:text-[30px] xl:text-[34px] font-montserrat font-800 text-zinc-900 leading-[1.2] tracking-tight line-clamp-3">
-          {displayTitle}
-        </h1>
-
-        {displaySubtitle && (
-          <p className="text-xs sm:text-sm text-zinc-600 font-medium leading-relaxed">
-            {displaySubtitle}
-          </p>
-        )}
-
-        {/* Rating & Reviews */}
-        <div className="flex items-center gap-2 pt-1 font-montserrat">
-          <div className="flex items-center gap-1.5 bg-[#f5f2ee] border border-zinc-200 px-3 py-1 rounded-full">
-            <span className="text-xs font-bold text-zinc-900">{product.rating}</span>
-            <div className="flex text-amber-500">
-              {[...Array(5)].map((_, i) => (
+        {/* 2. STAR RATING DIRECTLY UNDER HEADING */}
+        <div className="flex items-center gap-2 pt-0.5">
+          <div className="flex text-amber-400 gap-0.5">
+            {[...Array(5)].map((_, i) => {
+              const ratingVal = product.rating || 5;
+              const isFilled = i < Math.floor(ratingVal);
+              return (
                 <FiStar
                   key={i}
-                  size={12}
-                  className={i < Math.floor(product.rating) ? "fill-amber-500" : "text-zinc-300"}
+                  size={15}
+                  className={isFilled ? "fill-amber-400 text-amber-400" : "text-zinc-300 fill-zinc-100"}
                 />
-              ))}
-            </div>
+              );
+            })}
           </div>
-          <span
-            onClick={() => {
-              const revEl = document.getElementById("customer-reviews");
-              revEl?.scrollIntoView({ behavior: "smooth" });
-            }}
-            className="text-xs text-zinc-500 font-semibold hover:text-zinc-900 cursor-pointer transition-colors"
-          >
-            ({product.reviewCount} reviews)
-          </span>
-        </div>
-      </div>
-
-      <hr className="border-zinc-100" />
-
-      {/* Pricing with Discount Tag */}
-      <div className="space-y-1 font-montserrat">
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="text-2xl md:text-3xl font-semibold bg-gradient-to-r from-[#E859B1] to-[#F7D85E] bg-clip-text text-transparent drop-shadow-xs">
-            -{activeVariation.discountPercentage}%
-          </span>
-          <span className="text-3xl md:text-4xl font-800 text-zinc-900">
-            ₹{activeVariation.price.toLocaleString("en-IN")}.00
-          </span>
-          <span className="text-base text-zinc-400 line-through font-medium">
-            ₹{activeVariation.originalPrice.toLocaleString("en-IN")}.00
-          </span>
-          {savings > 0 && (
-            <span className="text-xs font-bold text-[#410815] bg-gradient-to-r from-[#E859B1] to-[#F7D85E] px-3 py-1 rounded-full shadow-xs">
-              Save ₹{savings.toLocaleString("en-IN")}
+          {product.reviewCount !== undefined && (
+            <span
+              onClick={() => {
+                const revEl = document.getElementById("customer-reviews");
+                revEl?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="text-xs text-zinc-400 hover:text-zinc-700 cursor-pointer transition-colors font-medium"
+            >
+              ({product.reviewCount} reviews)
             </span>
           )}
         </div>
-        <p className="text-xs text-zinc-500 font-medium pt-1">
-          Inclusive of all taxes • SKU: <span className="font-mono text-zinc-700 font-bold uppercase">
-            {activeVariation.sku && !activeVariation.sku.includes("UNDEFINED")
-              ? activeVariation.sku
-              : `AH-${(product.category || "PRD").toUpperCase()}-${(activeVariation.colorName || "STD").toUpperCase()}-${selectedSize || "STD"}`}
-          </span>
-        </p>
       </div>
 
-      {/* Render Color & Size Selectors only if Product Type is Variable */}
-      {isVariableProduct && (
-        <>
+      {/* 3. PRICE DISPLAY: Current Price + Original Strikethrough */}
+      <div className="flex items-baseline gap-3 flex-wrap pt-0.5">
+        <span className="text-2xl sm:text-3xl font-bold text-zinc-900">
+          ₹{activeVariation.price.toLocaleString("en-IN")}.00
+        </span>
+        {activeVariation.originalPrice > activeVariation.price && (
+          <span className="text-base sm:text-lg text-zinc-400 line-through font-normal">
+            ₹{activeVariation.originalPrice.toLocaleString("en-IN")}.00
+          </span>
+        )}
+        {activeVariation.discountPercentage > 0 && (
+          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded">
+            {activeVariation.discountPercentage}% OFF
+          </span>
+        )}
+      </div>
+
+      {/* 4. SKU IN BOLD UPPERCASE */}
+      <div className="text-sm sm:text-base font-bold text-zinc-900 tracking-wide uppercase">
+        SKU {activeVariation.sku && !activeVariation.sku.includes("UNDEFINED")
+          ? activeVariation.sku
+          : (product.defaultSku || `AH-${(product.category || "PRD").toUpperCase()}-${(activeVariation.colorName || "STD").toUpperCase()}`)}
+      </div>
+
+      {/* 5. PRODUCT DESCRIPTION (Full Content Display) */}
+      {rawDescription && (
+        <div className="space-y-1.5 text-zinc-600 text-xs sm:text-sm leading-relaxed">
+          <p className="whitespace-pre-line">
+            {rawDescription}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("product-description");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }}
+            className="text-zinc-900 font-bold hover:underline text-xs cursor-pointer inline-flex items-center gap-1 pt-0.5"
+          >
+            See more
+          </button>
+        </div>
+      )}
+
+      {/* 6. SELECT COLOR & VARIANT CARDS (Shown for both Simple and Variable products) */}
+      {uniqueColorVariations.length > 0 && (
+        <div className="space-y-4 pt-1">
           {/* Color Selection Cards */}
-          {uniqueColorVariations.length > 0 && uniqueColorVariations[0]?.colorName !== "Standard" && (
-            <div className="space-y-3 font-montserrat">
+          <div className="space-y-3 font-montserrat">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-montserrat font-600 tracking-wider text-zinc-900">
+                Colour: <span className="font-bold text-black">{activeVariation?.colorName || uniqueColorVariations[0]?.colorName || "Standard"}</span>
+              </span>
+            </div>
+
+            {/* Color Cards Row: Responsive Swatches Grid for Mobile, Tablet & Desktop */}
+            <div className="grid grid-cols-2 min-[360px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 py-1">
+              {uniqueColorVariations.map((v) => {
+                const vColName = (v.colorName || (v as any).color || "Standard").trim().toLowerCase();
+                const activeColName = (selectedColor || activeVariation?.colorName || "Standard").trim().toLowerCase();
+                const isActive = vColName === activeColName || uniqueColorVariations.length === 1;
+                const colorObj = (product.colors || []).find((c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === vColName);
+                const colorMedia = ((product as any).colorMediaConfigs || []).find((cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === vColName);
+                const displayImg = colorMedia?.mainImage || (v as any).displayImage || colorObj?.displayImage || colorObj?.mainImage || (colorObj as any)?.image || v.thumbnail || (v.images && v.images[0] ? v.images[0].url : "") || (product as any).mainImage || (product as any).image || "/images/category/Latkan.webp";
+
+                return (
+                  <motion.button
+                    key={v.id || v.colorName}
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onSelectVariation(v);
+                    }}
+                    className={`flex flex-col p-1.5 sm:p-2 rounded-xl sm:rounded-[16px] border-2 transition-all duration-200 text-left bg-white relative group overflow-hidden cursor-pointer select-none ${
+                      isActive
+                        ? "border-zinc-900 shadow-md ring-1 ring-zinc-900"
+                        : "border-zinc-200 hover:border-zinc-400 opacity-85 hover:opacity-100"
+                    }`}
+                  >
+                    <div className="w-full aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-[#FAF8F5] mb-1 sm:mb-1.5 relative">
+                      <img
+                        src={displayImg || "/images/category/Latkan.webp"}
+                        alt={v.colorName || "Variation"}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/images/category/Latkan.webp";
+                        }}
+                        className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-between text-[11px] sm:text-xs px-0.5 leading-tight gap-0.5">
+                      <span className="font-extrabold text-zinc-900 truncate block text-[11px]">{v.colorName || "Standard"}</span>
+                      <div className="flex items-baseline justify-between w-full">
+                        <span className="font-bold text-zinc-900 text-[10px] sm:text-[11px]">₹{v.price}</span>
+                        <span className="text-[9px] text-zinc-400 line-through">₹{v.originalPrice}</span>
+                      </div>
+                    </div>
+                    {isActive && (
+                      <div className="absolute top-1 right-1 sm:top-2 sm:right-2 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center shadow-xs">
+                        <FiCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                      </div>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Size Selector (If Available) */}
+          {availableSizesForColor.length > 0 && availableSizesForColor[0] !== "Standard Pair" && availableSizesForColor[0] !== "Free Size" && (
+            <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-montserrat font-600 tracking-wider text-zinc-900">
-                  Colour: <span className="font-bold text-black">{activeVariation.colorName}</span>
+                <span className="text-xs font-bold tracking-wider text-zinc-900 uppercase">
+                  Select Size
                 </span>
-                {activeVariation.stock > 0 ? (
-                  <span className="text-xs font-bold text-[#798A7A] bg-[#798A7A]/15 px-3 py-0.5 rounded-full">
-                    In Stock ({activeVariation.stock} left)
-                  </span>
-                ) : (
-                  <span className="text-xs font-bold text-rose-700 bg-rose-100 px-3 py-0.5 rounded-full uppercase tracking-wider">
-                    Out of Stock
-                  </span>
+                {product.sizeChart && product.sizeChart.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onOpenSizeChart}
+                    className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 underline cursor-pointer"
+                  >
+                    Size Guide
+                  </button>
                 )}
               </div>
-
-              {/* Color Cards Row: Unique Color Swatches Grid */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3 py-1">
-                {uniqueColorVariations.map((v) => {
-                  const vColName = (v.colorName || (v as any).color || "").trim().toLowerCase();
-                  const activeColName = (selectedColor || activeVariation?.colorName || "").trim().toLowerCase();
-                  const isActive = vColName === activeColName;
-                  const colorObj = (product.colors || []).find((c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === vColName);
-                  const colorMedia = ((product as any).colorMediaConfigs || []).find((cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === vColName);
-                  const displayImg = colorMedia?.mainImage || (v as any).displayImage || colorObj?.displayImage || colorObj?.mainImage || (colorObj as any)?.image || v.thumbnail || (v.images && v.images[0] ? v.images[0].url : "") || (product as any).mainImage || (product as any).image || "/images/category/Latkan.webp";
-
-                  return (
-                    <motion.button
-                      key={v.id || v.colorName}
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onSelectVariation(v);
-                      }}
-                      onMouseEnter={() => onHoverVariation?.(v)}
-                      onMouseLeave={() => onHoverVariation?.(null)}
-                      className={`flex flex-col p-1.5 sm:p-2 rounded-xl sm:rounded-[16px] border-2 transition-all duration-200 text-left bg-white relative group overflow-hidden cursor-pointer select-none ${isActive
-                          ? "border-zinc-900 shadow-md ring-1 ring-zinc-900"
-                          : "border-zinc-200 hover:border-zinc-400 opacity-85 hover:opacity-100"
-                        }`}
-                    >
-                      <div className="w-full aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-[#FAF8F5] mb-1 sm:mb-1.5 relative">
-                        <img
-                          src={displayImg || "/images/category/Latkan.webp"}
-                          alt={v.colorName || "Variation"}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/images/category/Latkan.webp";
-                          }}
-                          className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                        />
-                      </div>
-                      <div className="flex flex-col justify-between text-[11px] sm:text-xs px-0.5 leading-tight gap-0.5">
-                        <span className="font-extrabold text-zinc-900 truncate block text-[11px]">{v.colorName || "Standard"}</span>
-                        <div className="flex items-baseline justify-between w-full">
-                          <span className="font-bold text-zinc-900 text-[10px] sm:text-[11px]">₹{v.price}</span>
-                          <span className="text-[9px] text-zinc-400 line-through">₹{v.originalPrice}</span>
-                        </div>
-                      </div>
-                      {isActive && (
-                        <div className="absolute top-1 right-1 sm:top-2 sm:right-2 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center shadow-xs">
-                          <FiCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                        </div>
-                      )}
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Size Selector with Out of Stock handling */}
-          {availableSizesForColor.length > 0 && (
-            <div className="space-y-3 font-montserrat">
-              
-
-              {/* Size Buttons Row with Out of Stock indication */}
               <div className="flex flex-wrap items-center gap-2">
                 {availableSizesForColor.map((sz) => {
-                  const activeColName = (activeVariation?.colorName || "").toLowerCase();
-                  const szLower = String(sz || "").toLowerCase();
-                  const matchingVar = (product.variations || []).find(
-                    (v) =>
-                      v &&
-                      (v.colorName || "").toLowerCase() === activeColName &&
-                      (((v.size || "").toLowerCase() === szLower) ||
-                        ((v.sizeName || "").toLowerCase() === szLower))
-                  );
-                  const isOutOfStock = matchingVar ? matchingVar.stock <= 0 : false;
-                  const isSelected = szLower === (selectedSize || "").toLowerCase();
-
+                  const isSelected = sz.toLowerCase() === (selectedSize || "").toLowerCase();
                   return (
                     <button
                       key={sz}
-                      disabled={isOutOfStock}
-                      onClick={() => !isOutOfStock && onSelectSize(sz)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all relative border cursor-pointer ${isSelected
-                          ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
-                          : isOutOfStock
-                            ? "bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed line-through opacity-70"
-                            : "bg-white text-zinc-800 border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50"
-                        }`}
-                      title={isOutOfStock ? `${sz} - Out of Stock` : `Select ${sz}`}
+                      type="button"
+                      onClick={() => onSelectSize(sz)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-zinc-900 text-white border-zinc-900"
+                          : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400"
+                      }`}
                     >
-                      <span>{sz}</span>
-                      {isOutOfStock && (
-                        <span className="absolute -top-1.5 -right-1 bg-rose-500 text-white text-[8px] font-extrabold px-1 rounded-full uppercase tracking-tighter">
-                          OOS
-                        </span>
-                      )}
+                      {sz}
                     </button>
                   );
                 })}
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* Top Highlights Section */}
-      <div className="border-t border-b border-zinc-200/80 py-4 space-y-3 font-montserrat">
-        <div className="flex items-center justify-between font-montserrat font-800 text-xs tracking-wider text-zinc-900">
-          <span>Top Highlights</span>
-        </div>
-
-        {/* Dynamic Highlight key-values list */}
-        <div className="space-y-2.5 text-xs">
-          {(() => {
-            const hasProductAttributes = product.productAttributes && Array.isArray(product.productAttributes) && product.productAttributes.length > 0;
-            
-            if (hasProductAttributes) {
-              const activeHighlights = product.productAttributes!
-                .filter((pa) => pa.showInHighlights && pa.value !== undefined && pa.value !== null && pa.value !== '')
-                .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-
-              return activeHighlights.map((pa, idx) => {
-                const formattedVal = Array.isArray(pa.value) ? pa.value.join(', ') : String(pa.value);
-                return (
-                  <div key={pa.attributeId || idx} className="flex items-center gap-3">
-                    <DynamicLucideIcon name="Sparkles" className="w-4 h-4 text-zinc-700 shrink-0" />
-                    <span className="text-zinc-500 font-bold tracking-wider text-[11px] w-36 shrink-0">{pa.attributeName}:</span>
-                    <span className="text-zinc-900 font-semibold">{formattedVal}</span>
-                  </div>
-                );
-              });
-            }
-
-            return (product.highlights || []).slice(0, 6).map((h: any, idx: number) => {
-              if (typeof h === "string") {
-                if (h.includes(":")) {
-                  const [lbl, ...valParts] = h.split(":");
-                  return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <DynamicLucideIcon name="Sparkles" className="w-4 h-4 text-zinc-700 shrink-0" />
-                      <span className="text-zinc-500 font-bold tracking-wider text-[11px] w-36 shrink-0">{lbl.trim()}:</span>
-                      <span className="text-zinc-900 font-semibold">{valParts.join(":").trim()}</span>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={idx} className="flex items-start gap-3">
-                    <DynamicLucideIcon name="Sparkles" className="w-4 h-4 text-zinc-700 shrink-0 mt-0.5" />
-                    <span className="text-zinc-900 font-medium">{h}</span>
-                  </div>
-                );
-              }
-
-              const icon = h.iconName || h.icon || "Sparkles";
-              const label = h.label || h.title || h.key || "";
-              const val = h.value || h.text || h.desc || "";
-
-              if (!label && val) {
-                return (
-                  <div key={idx} className="flex items-start gap-3">
-                    <DynamicLucideIcon name={icon} className="w-4 h-4 text-zinc-700 shrink-0 mt-0.5" />
-                    <span className="text-zinc-900 font-medium">{val}</span>
-                  </div>
-                );
-              }
-
-              return (
-                <div key={idx} className="flex items-center gap-3">
-                  <DynamicLucideIcon name={icon} className="w-4 h-4 text-zinc-700 shrink-0" />
-                  {label && <span className="text-zinc-500 font-bold tracking-wider text-[11px] w-36 shrink-0">{label}:</span>}
-                  <span className="text-zinc-900 font-semibold">{val}</span>
-                </div>
-              );
-            });
-          })()}
-        </div>
-
-        {/* View More button */}
-        <button
-          onClick={() => {
-            const descEl = document.getElementById("product-description") || document.getElementById("manufacturing-details");
-            if (descEl) {
-              descEl.scrollIntoView({ behavior: "smooth" });
-            }
-          }}
-          className="text-xs font-bold text-zinc-900 hover:text-[#520618] tracking-wider pt-1 text-left block cursor-pointer transition-colors"
-        >
-          View More Details →
-        </button>
-      </div>
-
-      {/* Primary Action Button: Full Width ADD TO BAG / QUANTITY CONTROLLER (Placed below Top Highlights) */}
-      <div className="pt-1 font-montserrat">
+      {/* 7. ACTION BUTTON & LIVE INVENTORY COUNT */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
+        {/* Add To Cart / Quantity Selector */}
         {activeVariation.stock <= 0 ? (
           <button
             disabled
-            className="w-full py-4 px-6 rounded-full font-bold text-xs tracking-[0.2em] flex items-center justify-center gap-2.5 bg-zinc-200 text-zinc-500 cursor-not-allowed uppercase shadow-xs select-none"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-md font-semibold text-xs sm:text-sm tracking-wider uppercase bg-zinc-200 text-zinc-500 cursor-not-allowed select-none"
           >
             Out of Stock
           </button>
         ) : inCartQuantity > 0 ? (
-          /* Interactive In-Cart Quantity Counter matching Product Card style 1:1 */
-          <div className="w-full py-3 px-6 rounded-full bg-[#1c1c1e] text-white flex items-center justify-between shadow-md border border-zinc-800 font-sans transition-all">
+          <div className="inline-flex items-center justify-between gap-4 px-6 py-2.5 rounded-md bg-[#232323] text-white shadow-sm font-sans min-w-[200px]">
             <button
               type="button"
               onClick={() => updateQuantity(cartItemId, inCartQuantity - 1)}
-              className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer active:scale-90"
+              className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded transition-colors cursor-pointer active:scale-90"
               aria-label="Decrease quantity"
             >
-              <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <Minus className="w-4 h-4" />
             </button>
-            <span className="text-xs sm:text-sm font-semibold px-1 min-w-[20px] text-center tracking-wider">
-              {inCartQuantity}
+            <span className="text-sm font-bold tracking-wider">
+              {inCartQuantity} in Cart
             </span>
             <button
               type="button"
               onClick={() => updateQuantity(cartItemId, inCartQuantity + 1)}
-              className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer active:scale-90"
+              className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded transition-colors cursor-pointer active:scale-90"
               aria-label="Increase quantity"
             >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
         ) : (
-          /* Default Full Width Add To Bag Button matching Product Card style 1:1 */
           <motion.button
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleAddToCart}
-            className={`w-full py-3.5 px-6 rounded-full font-bold text-xs sm:text-sm tracking-wider flex items-center justify-center gap-2 transition-all duration-300 shadow-xs cursor-pointer active:scale-95 ${
+            className={`w-full sm:w-auto px-8 py-3.5 rounded-md font-semibold text-xs sm:text-sm tracking-wider transition-all duration-200 shadow-sm cursor-pointer active:scale-95 ${
               isAddedAnimation
                 ? "bg-emerald-700 text-white shadow-emerald-700/30"
-                : "bg-[#1c1c1e] hover:bg-black text-white shadow-zinc-900/20"
+                : "bg-[#232323] hover:bg-black text-white"
             }`}
           >
-            {isAddedAnimation ? (
-              <>
-                <FiCheck size={18} className="animate-bounce" />
-                <span>Added To Bag!</span>
-              </>
-            ) : (
-              <>
-                <FiShoppingBag size={14} className="stroke-[2.5]" />
-                <span>Add To Bag</span>
-              </>
-            )}
+            {isAddedAnimation ? "Added To Cart!" : "Add To Shopping Cart"}
           </motion.button>
         )}
 
+        {/* Live Pieces Available Stock Display */}
+        <div className="text-xs sm:text-sm text-zinc-600 font-medium">
+          {activeVariation.stock > 0 ? (
+            <span>{activeVariation.stock} pieces available</span>
+          ) : (
+            <span className="text-rose-600 font-semibold">Currently Unavailable</span>
+          )}
+        </div>
       </div>
 
       {/* Social Share Modal */}

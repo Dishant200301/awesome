@@ -86,15 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-neutral-200 bg-white/90 px-4 sm:px-6 backdrop-blur-md font-sans">
       {/* LEFT SECTION: Toggle Sidebar button & Title */}
       <div className="flex items-center gap-3">
-        {/* Mobile Hamburger Drawer Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onOpenMobileDrawer}
-          className="lg:hidden text-neutral-600 hover:text-black"
-        >
-          <Menu className="w-5 h-5" />
-        </Button>
+        
 
         {/* Desktop Sidebar Collapse Toggle Button */}
         {setIsCollapsed && (
@@ -116,18 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* RIGHT SECTION: Quick Actions, Notifications & Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Quick Add Product Button */}
-        {onNavigate && (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => onNavigate('add-product')}
-            className="hidden sm:inline-flex items-center gap-1.5 bg-black hover:bg-neutral-800 text-white font-medium text-xs rounded-md shadow-2xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Product</span>
-          </Button>
-        )}
+       
 
         {/* Notification Bell Dropdown */}
         <div className="relative">
@@ -151,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="absolute right-0 mt-2 w-80 bg-white border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden text-xs"
               >
                 <div className="p-3 border-b border-neutral-100 flex items-center justify-between bg-neutral-50">
-                  <span className="font-semibold text-black">Inquiry Notifications</span>
+                  <span className="font-semibold text-black">Notifications</span>
                   <Badge variant={unreadMessages.length > 0 ? "default" : "secondary"} className="text-[10px]">
                     {unreadMessages.length} New Unread
                   </Badge>

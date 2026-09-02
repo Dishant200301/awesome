@@ -1,58 +1,103 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Sliders, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Check, 
-  X, 
-  Search, 
-  ArrowLeft, 
+import {
+  Sliders,
+  Plus,
+  Trash2,
+  Edit2,
+  Check,
+  X,
+  Search,
+  ArrowLeft,
   AlertCircle,
-  Palette
+  Palette,
+  ChevronDown,
+  RefreshCw,
+  CheckCircle2
 } from 'lucide-react';
-import { AttributeMaster, AttributeValue, AttributeDisplayType, AttributeUsage } from '../types/attribute.types';
+import {
+  AttributeMaster,
+  AttributeValue,
+  AttributeDisplayType,
+  AttributeUsage
+} from '../types/attribute.types';
 import { AttributeService } from '../services/attributeService';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
-import { Select } from '../components/ui/select';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
+import { findHexByColorName, getClosestColorName } from '../utils/colorMatcher';
 
-export const AttributesPage: React.FC = () => {
+interface AttributesPageProps {
+  initialTab?: string;
+  onNavigate?: (tab: string) => void;
+}
+
+const ATTRIBUTE_TYPES: { label: string; value: AttributeDisplayType }[] = [
+  { label: 'Large Text', value: 'TEXTAREA' },
+  { label: 'Text', value: 'TEXT' },
+  { label: 'Select / Dropdown', value: 'SELECT' },
+  { label: 'Color Swatch', value: 'SWATCH' },
+  { label: 'Button / Size Pills', value: 'BUTTON' },
+  { label: 'Radio / Buttons', value: 'RADIO' },
+  { label: 'Checkbox Multi-Select', value: 'CHECKBOX' },
+  { label: 'Number', value: 'NUMBER' },
+  { label: 'Boolean (Yes/No)', value: 'BOOLEAN' }
+];
+
+export const AttributesPage: React.FC<AttributesPageProps> = ({
+  initialTab,
+  onNavigate
+}) => {
   // Main State
   const [attributes, setAttributes] = useState<AttributeMaster[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Sub-view: 'all' | 'create' | 'edit'
-  const [subView, setSubView] = useState<'all' | 'create' | 'edit'>('all');
+  const [subView, setSubView] = useState<'all' | 'create' | 'edit'>(
+    initialTab === 'add-attribute' ? 'create' : 'all'
+  );
   const [editingAttrId, setEditingAttrId] = useState<string | null>(null);
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
-  const [filterUsage, setFilterUsage] = useState<string>('All');
   const [filterStatus, setFilterStatus] = useState<string>('All');
 
-  // Form State for Create / Edit Attribute
+  // Form State for Create / Edit Attribute (Matching Design Screenshot)
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
-  const [formType, setFormType] = useState<AttributeDisplayType>('SELECT');
-  const [formUsage, setFormUsage] = useState<AttributeUsage>('PRODUCT');
-  const [formShowInHighlights, setFormShowInHighlights] = useState(true);
-  const [formIsRequired, setFormIsRequired] = useState(false);
-  const [formSortOrder, setFormSortOrder] = useState<number>(1);
+  const [formDisplayName, setFormDisplayName] = useState('');
+  const [formType, setFormType] = useState<AttributeDisplayType>('TEXTAREA');
+  const [formUsage, setFormUsage] = useState<AttributeUsage>('BOTH');
   const [formStatus, setFormStatus] = useState<'active' | 'inactive'>('active');
   const [formValues, setFormValues] = useState<AttributeValue[]>([]);
 
-  // Attribute Value Form inputs
+  // Inline Add / Edit Value State (No Modal Popup)
+  const [inlineValueInput, setInlineValueInput] = useState('');
+  const [inlineHex, setInlineHex] = useState('#800000');
   const [editingValueId, setEditingValueId] = useState<string | null>(null);
-  const [newValLabel, setNewValLabel] = useState('');
-  const [newValValue, setNewValValue] = useState('');
-  const [newValHex, setNewValHex] = useState('#000000');
+  const [editingValueLabel, setEditingValueLabel] = useState('');
+
+  // Validation Error State
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
   // Delete Warning state
-  const [deleteWarning, setDeleteWarning] = useState<{ attrId: string; attrName: string; usedCount: number } | null>(null);
+  const [deleteWarning, setDeleteWarning] = useState<{
+    attrId: string;
+    attrName: string;
+    usedCount: number;
+  } | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<AttributeMaster | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => {
+      setToastMsg(null);
+    }, 4000);
+  };
 
   const fetchAttributes = async () => {
     setLoading(true);
@@ -70,23 +115,25 @@ export const AttributesPage: React.FC = () => {
     fetchAttributes();
   }, []);
 
+  useEffect(() => {
+    if (initialTab === 'add-attribute') {
+      handleOpenCreateView();
+    }
+  }, [initialTab]);
+
   // Open Create View
   const handleOpenCreateView = () => {
     setEditingAttrId(null);
     setFormName('');
     setFormSlug('');
-    setFormType('SELECT');
-    setFormUsage('PRODUCT');
-    setFormShowInHighlights(true);
-    setFormIsRequired(false);
-    setFormSortOrder(attributes.length + 1);
+    setFormDisplayName('');
+    setFormType('TEXTAREA');
+    setFormUsage('BOTH');
     setFormStatus('active');
     setFormValues([]);
-    setEditingValueId(null);
-    setNewValLabel('');
-    setNewValValue('');
-    setNewValHex('#000000');
+    setFormErrors({});
     setSubView('create');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Open Edit View
@@ -94,248 +141,607 @@ export const AttributesPage: React.FC = () => {
     setEditingAttrId(attr.id);
     setFormName(attr.name);
     setFormSlug(attr.slug);
-    setFormType(attr.type);
-    setFormUsage(attr.usage);
-    setFormShowInHighlights(attr.showInHighlights);
-    setFormIsRequired(attr.isRequired);
-    setFormSortOrder(attr.sortOrder || 1);
+    setFormDisplayName(attr.displayName || attr.name);
+    setFormType(attr.type || 'SELECT');
+    setFormUsage(attr.usage || 'BOTH');
     setFormStatus(attr.status || (attr.isActive ? 'active' : 'inactive'));
     setFormValues([...(attr.values || [])]);
-    setEditingValueId(null);
-    setNewValLabel('');
-    setNewValValue('');
-    setNewValHex('#000000');
+    setFormErrors({});
     setSubView('edit');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Auto-slug on name change
+  // Auto-slug on Name change
   const handleNameChange = (val: string) => {
     setFormName(val);
-    if (!editingAttrId) {
-      setFormSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
+    const generated = val
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+    setFormSlug(generated);
+    if (!formDisplayName || formDisplayName === formName) {
+      setFormDisplayName(val);
     }
   };
 
-  // Add or Update Value in Form State
-  const handleSaveValueToForm = () => {
-    if (!newValLabel.trim()) return;
-    const actualVal = newValValue.trim() || newValLabel.trim();
+  // Inline Value Handlers (No Modal)
+  const handleAddInlineValue = () => {
+    const raw = inlineValueInput.trim();
+    if (!raw) return;
 
-    if (editingValueId) {
-      // Update existing value
-      setFormValues(
-        formValues.map((v) =>
-          v.id === editingValueId
-            ? {
-                ...v,
-                label: newValLabel.trim(),
-                value: actualVal,
-                colorCode: formType === 'SWATCH' || formType === 'COLOR' ? newValHex : undefined
-              }
-            : v
-        )
-      );
-      setEditingValueId(null);
-    } else {
-      // Create new value
-      const valObj: AttributeValue = {
-        id: `val-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-        attributeId: editingAttrId || '',
-        label: newValLabel.trim(),
-        value: actualVal,
-        colorCode: formType === 'SWATCH' || formType === 'COLOR' ? newValHex : undefined,
+    const items = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (items.length === 0) return;
+
+    const isColorType = formType === 'SWATCH' || formType === 'COLOR' || formName.toLowerCase().includes('color');
+
+    const newItems: AttributeValue[] = items.map((itemLabel, idx) => {
+      const slug = itemLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const detectedColor = isColorType ? findHexByColorName(itemLabel) || inlineHex : undefined;
+
+      return {
+        id: `val-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+        label: itemLabel,
+        value: slug || itemLabel,
+        colorCode: detectedColor,
         status: 'active',
-        sortOrder: formValues.length + 1
+        sortOrder: formValues.length + idx + 1
       };
-      setFormValues([...formValues, valObj]);
+    });
+
+    setFormValues((prev) => [...prev, ...newItems]);
+    setInlineValueInput('');
+  };
+
+  const handleStartEditValue = (v: AttributeValue) => {
+    setEditingValueId(v.id);
+    setEditingValueLabel(v.label);
+  };
+
+  const handleSaveEditValue = (valueId: string) => {
+    if (!editingValueLabel.trim()) {
+      setEditingValueId(null);
+      return;
     }
 
-    setNewValLabel('');
-    setNewValValue('');
-    setNewValHex('#000000');
-  };
+    const cleanLabel = editingValueLabel.trim();
+    const isColorType = formType === 'SWATCH' || formType === 'COLOR' || formName.toLowerCase().includes('color');
 
-  // Edit Value inline
-  const handleEditValueInForm = (val: AttributeValue) => {
-    setEditingValueId(val.id);
-    setNewValLabel(val.label);
-    setNewValValue(val.value);
-    setNewValHex(val.colorCode || '#000000');
-  };
-
-  // Soft-Delete / Remove Value from Form State
-  const handleRemoveValueFromForm = (valId: string) => {
-    setFormValues(formValues.filter((v) => v.id !== valId));
-  };
-
-  // Toggle Value Active Status
-  const handleToggleValueStatusInForm = (valId: string) => {
-    setFormValues(
-      formValues.map((v) =>
-        v.id === valId ? { ...v, status: v.status === 'active' ? 'inactive' : 'active' } : v
+    setFormValues((prev) =>
+      prev.map((v) =>
+        v.id === valueId
+          ? {
+              ...v,
+              label: cleanLabel,
+              value: cleanLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+              colorCode: isColorType ? findHexByColorName(cleanLabel) || v.colorCode : v.colorCode
+            }
+          : v
       )
     );
+    setEditingValueId(null);
+    setEditingValueLabel('');
+  };
+
+  const handleRemoveValue = (valueId: string) => {
+    setFormValues((prev) => prev.filter((v) => v.id !== valueId));
+  };
+
+  // Form Validation
+  const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+    if (!formName.trim()) errors.name = 'Attribute Name is required.';
+    if (!formDisplayName.trim()) errors.displayName = 'Display Name is required.';
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Save Attribute
   const handleSaveAttribute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim()) {
-      alert('Please enter attribute name.');
-      return;
+    if (!validateForm()) return;
+
+    setIsSaving(true);
+    try {
+      const payload: AttributeMaster = {
+        id: editingAttrId || `attr-${Date.now()}`,
+        name: formName.trim(),
+        displayName: formDisplayName.trim(),
+        slug: formSlug.trim() || formName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        type: formType,
+        usage: formUsage,
+        showInHighlights: true,
+        isRequired: false,
+        sortOrder: attributes.length + 1,
+        status: formStatus,
+        isActive: formStatus === 'active',
+        values: formValues
+      };
+
+      await AttributeService.saveAttribute(payload);
+      await fetchAttributes();
+      showToast(
+        editingAttrId
+          ? 'Attribute updated successfully!'
+          : 'Attribute created successfully!'
+      );
+      setSubView('all');
+      setEditingAttrId(null);
+    } catch (err: any) {
+      console.error('Failed to save attribute:', err);
+      alert('Error saving attribute: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSaving(false);
     }
-
-    const payload: Partial<AttributeMaster> = {
-      id: editingAttrId || undefined,
-      name: formName.trim(),
-      slug: formSlug.trim() || formName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      type: formType,
-      usage: formUsage,
-      showInHighlights: formShowInHighlights,
-      isRequired: formIsRequired,
-      sortOrder: Number(formSortOrder) || 1,
-      status: formStatus,
-      isActive: formStatus === 'active',
-      values: formValues
-    };
-
-    await AttributeService.saveAttribute(payload);
-    await fetchAttributes();
-    setSubView('all');
-    setEditingAttrId(null);
   };
 
   // Toggle Status
   const handleToggleStatus = async (attr: AttributeMaster) => {
-    const updatedStatus = (attr.status === 'active' || attr.isActive) ? 'inactive' : 'active';
+    const updatedStatus = attr.status === 'active' || attr.isActive ? 'inactive' : 'active';
     await AttributeService.updateStatus(attr.id, updatedStatus);
     fetchAttributes();
+    showToast(`Attribute marked ${updatedStatus}`);
   };
 
-  // Delete Attribute Safety Check
-  const handleDeleteAttribute = async (attr: AttributeMaster) => {
-    const res = await AttributeService.deleteAttribute(attr.id);
+  // Delete Attribute
+  const handleDeleteAttribute = (attr: AttributeMaster) => {
+    setDeleteCandidate(attr);
+  };
+
+  const confirmDeleteAttribute = async () => {
+    if (!deleteCandidate) return;
+    const res = await AttributeService.deleteAttribute(deleteCandidate.id);
     if (!res.success && res.isUsed) {
       setDeleteWarning({
-        attrId: attr.id,
-        attrName: attr.name,
+        attrId: deleteCandidate.id,
+        attrName: deleteCandidate.name,
         usedCount: res.usedCount || 0
       });
+      setDeleteCandidate(null);
       return;
     }
     fetchAttributes();
-    if (editingAttrId === attr.id) {
+    showToast('Attribute deleted');
+    if (editingAttrId === deleteCandidate.id) {
       setSubView('all');
     }
+    setDeleteCandidate(null);
   };
 
   // Filtered attributes list
   const filteredAttributes = attributes.filter((attr) => {
     const matchesSearch =
       attr.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (attr.displayName && attr.displayName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       attr.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (attr.values && attr.values.some((v) => v.label.toLowerCase().includes(searchTerm.toLowerCase()) || v.value.toLowerCase().includes(searchTerm.toLowerCase())));
+      (attr.values &&
+        attr.values.some(
+          (v) =>
+            v.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            v.value.toLowerCase().includes(searchTerm.toLowerCase())
+        ));
 
     const matchesType = filterType === 'All' || attr.type === filterType;
-    const matchesUsage = filterUsage === 'All' || attr.usage === filterUsage || attr.usage === 'BOTH';
     const isAct = attr.status ? attr.status === 'active' : attr.isActive;
     const matchesStatus =
       filterStatus === 'All' ||
       (filterStatus === 'Active' && isAct) ||
       (filterStatus === 'Inactive' && !isAct);
 
-    return matchesSearch && matchesType && matchesUsage && matchesStatus;
+    return matchesSearch && matchesType && matchesStatus;
   });
 
   return (
-    <div className="space-y-6 font-sans selection:bg-black selection:text-white pb-20">
-      {/* HEADER BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-xl border border-neutral-200 shadow-2xs">
-        <div>
-          <h1 className="text-lg font-bold text-black tracking-tight flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-black" />
-            <span>Attributes Master Management</span>
-            <Badge variant="secondary" className="text-xs font-semibold bg-neutral-100 text-neutral-800 border-neutral-200">
-              {attributes.length} Attributes
-            </Badge>
-          </h1>
-          <p className="text-xs text-neutral-500 font-normal mt-1">
-            Centralized single source of truth for product attributes (Color, Size, Material, Cup Type, Style, Fit) and attribute values.
-          </p>
+    <div className="font-sans text-neutral-900 bg-[#fbfbfc] min-h-screen pb-24 selection:bg-black selection:text-white">
+      {/* SUCCESS TOAST */}
+      {toastMsg && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-neutral-950 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-neutral-800 animate-in fade-in slide-in-from-top-4">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="text-xs font-semibold">{toastMsg}</span>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setSubView('all')}
-            variant={subView === 'all' ? 'default' : 'outline'}
-            size="sm"
-            className={`text-xs font-medium ${subView === 'all' ? 'bg-black text-white hover:bg-neutral-800' : 'text-black border-neutral-200 hover:bg-neutral-50'}`}
-          >
-            All Attributes ({attributes.length})
-          </Button>
-
-          <Button
-            onClick={handleOpenCreateView}
-            variant={subView === 'create' ? 'default' : 'outline'}
-            size="sm"
-            className={`text-xs font-medium flex items-center gap-1.5 ${subView === 'create' ? 'bg-black text-white hover:bg-neutral-800' : 'text-black border-neutral-200 hover:bg-neutral-50'}`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Attribute</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* DELETE SAFETY WARNING MODAL */}
-      {deleteWarning && (
-        <Card className="p-6 bg-amber-50 border border-amber-200 rounded-xl space-y-4 font-sans animate-in fade-in">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-bold text-amber-900">Cannot Permanently Delete Attribute</h3>
-              <p className="text-xs text-amber-800 mt-1">
-                <strong>"{deleteWarning.attrName}"</strong> is currently used by <strong>{deleteWarning.usedCount} product(s)</strong>.
-                To protect historical product and order data, please <strong>Deactivate</strong> this attribute instead.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 pt-2">
-            <Button
-              size="sm"
-              onClick={async () => {
-                await AttributeService.updateStatus(deleteWarning.attrId, 'inactive');
-                setDeleteWarning(null);
-                fetchAttributes();
-              }}
-              className="bg-amber-800 hover:bg-amber-900 text-white text-xs font-semibold"
-            >
-              Deactivate Attribute Now
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setDeleteWarning(null)}
-              className="text-xs border-amber-300 text-amber-900 hover:bg-amber-100 font-medium"
-            >
-              Cancel
-            </Button>
-          </div>
-        </Card>
       )}
 
       {/* ========================================================================= */}
-      {/* SUB-VIEW 1: ALL ATTRIBUTES LIST TABLE / CARDS */}
+      {/* CREATE / EDIT ATTRIBUTE VIEW (EXACT REPLICA OF DESIGN SCREENSHOT) */}
       {/* ========================================================================= */}
-      {subView === 'all' && (
-        <div className="space-y-6">
-          {/* SEARCH & FILTERS BAR */}
+      {subView === 'create' || subView === 'edit' ? (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+          {/* HEADER BAR */}
+          <div className="flex items-center justify-between border-b border-neutral-200/80 pb-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSubView('all')}
+                className="h-8 w-8 rounded-lg border border-neutral-200 hover:bg-neutral-100 flex items-center justify-center text-neutral-700 transition-colors cursor-pointer"
+                title="Back to All Attributes"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <h1 className="text-base sm:text-lg font-bold text-neutral-950 tracking-tight">
+                {subView === 'edit' ? `Edit Attribute: ${formName}` : 'Create New Attribute'}
+              </h1>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSubView('all')}
+              className="text-xs border-neutral-200 text-neutral-700 hover:bg-neutral-50 cursor-pointer"
+            >
+              All Attributes ({attributes.length})
+            </Button>
+          </div>
+
+          {/* VALIDATION ERRORS */}
+          {Object.keys(formErrors).length > 0 && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block mb-1">Please fix the following:</span>
+                <ul className="list-disc list-inside space-y-0.5 text-rose-700">
+                  {Object.values(formErrors).map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSaveAttribute} className="space-y-10">
+            {/* SECTION 1: ATTRIBUTE DETAILS */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
+              <div className="lg:col-span-3 space-y-1">
+                <h2 className="text-sm font-bold text-neutral-900 tracking-tight">Attribute</h2>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Add your attribute name and necessary information from here
+                </p>
+              </div>
+
+              <div className="lg:col-span-9">
+                <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-5">
+                  {/* Name* */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-neutral-700">
+                      Name<span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formName}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      placeholder=""
+                      className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-950 focus:border-neutral-950 transition-all"
+                    />
+                  </div>
+
+                  {/* Slug (Read-only / Auto-generated Gray Input) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-neutral-700">
+                      Slug
+                    </label>
+                    <input
+                      type="text"
+                      value={formSlug}
+                      onChange={(e) => setFormSlug(e.target.value)}
+                      placeholder=""
+                      className="w-full px-3.5 py-2 text-xs text-neutral-700 bg-neutral-100/80 border border-neutral-200 rounded-lg focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  {/* Display Name* */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-neutral-700">
+                      Display Name<span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formDisplayName}
+                      onChange={(e) => setFormDisplayName(e.target.value)}
+                      placeholder=""
+                      className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-950 focus:border-neutral-950 transition-all"
+                    />
+                  </div>
+
+                  {/* Attribute Type* with Clear 'x' and Dropdown icon */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-neutral-700">
+                      Attribute Type<span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={formType}
+                        onChange={(e) => setFormType(e.target.value as AttributeDisplayType)}
+                        className="w-full pl-3.5 pr-10 py-2.5 text-xs text-neutral-800 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-950 focus:border-neutral-950 transition-all appearance-none cursor-pointer"
+                      >
+                        {ATTRIBUTE_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-neutral-400">
+                        {formType && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormType('TEXTAREA');
+                            }}
+                            className="pointer-events-auto hover:text-neutral-700 cursor-pointer p-0.5"
+                            title="Reset type"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                        <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 2: ATTRIBUTE VALUES (INLINE ADDER - NO POPUP) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
+              <div className="lg:col-span-3 space-y-1">
+                <h2 className="text-sm font-bold text-neutral-900 tracking-tight">
+                  Attribute Values
+                </h2>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Type values below and press Enter or click Add. Comma-separated values supported.
+                </p>
+              </div>
+
+              <div className="lg:col-span-9">
+                <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
+                  {/* Inline Value Input Row */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(formType === 'SWATCH' || formType === 'COLOR' || formName.toLowerCase().includes('color')) && (
+                      <div className="flex items-center gap-1.5 p-1 bg-neutral-50 border border-neutral-200 rounded-lg shrink-0">
+                        <input
+                          type="color"
+                          value={inlineHex}
+                          onChange={(e) => {
+                            setInlineHex(e.target.value);
+                            const match = getClosestColorName(e.target.value);
+                            if (!inlineValueInput) setInlineValueInput(match.name);
+                          }}
+                          className="w-7 h-7 rounded border-0 cursor-pointer p-0 bg-transparent"
+                          title="Click to pick swatch color"
+                        />
+                        <span className="font-mono text-[10px] text-neutral-600 font-bold uppercase pr-1">{inlineHex}</span>
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-[200px] relative">
+                      <input
+                        type="text"
+                        value={inlineValueInput}
+                        onChange={(e) => setInlineValueInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddInlineValue();
+                          }
+                        }}
+                        placeholder="Enter value (e.g. Orange, Blue, 14K Gold, Small) or multiple comma-separated..."
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-none focus:border-black font-medium"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddInlineValue}
+                      className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-semibold px-5 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Value</span>
+                    </button>
+                  </div>
+
+                  {/* Configured Values List */}
+                  {formValues.length > 0 ? (
+                    <div className="pt-2 space-y-2 border-t border-neutral-100">
+                      <div className="flex items-center justify-between text-xs text-neutral-500 font-medium">
+                        <span>Configured Values ({formValues.length}):</span>
+                        <button
+                          type="button"
+                          onClick={() => setFormValues([])}
+                          className="text-[11px] text-rose-600 hover:underline cursor-pointer"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {formValues.map((v) => {
+                          const isEditing = editingValueId === v.id;
+
+                          return (
+                            <div
+                              key={v.id}
+                              className="inline-flex items-center gap-2 bg-neutral-50 border border-neutral-200 text-neutral-800 text-xs px-3 py-1.5 rounded-lg font-medium shadow-2xs group"
+                            >
+                              {v.colorCode ? (
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-neutral-300 shadow-2xs shrink-0"
+                                  style={{ backgroundColor: v.colorCode }}
+                                />
+                              ) : (formType === 'SWATCH' || formType === 'COLOR' || formName.toLowerCase().includes('color')) ? (
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-neutral-300 shadow-2xs shrink-0"
+                                  style={{ backgroundColor: findHexByColorName(v.label) }}
+                                />
+                              ) : null}
+
+                              {isEditing ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    value={editingValueLabel}
+                                    onChange={(e) => setEditingValueLabel(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSaveEditValue(v.id);
+                                      }
+                                    }}
+                                    className="px-1.5 py-0.5 text-xs bg-white border border-neutral-300 rounded font-medium outline-none w-28"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEditValue(v.id)}
+                                    className="text-emerald-600 hover:text-emerald-700 p-0.5 cursor-pointer"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span
+                                  onDoubleClick={() => handleStartEditValue(v)}
+                                  className="cursor-pointer"
+                                  title="Double click to edit"
+                                >
+                                  {v.label}
+                                </span>
+                              )}
+
+                              {!isEditing && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditValue(v)}
+                                  className="text-neutral-400 hover:text-neutral-800 ml-0.5 cursor-pointer opacity-70 group-hover:opacity-100"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-2.5 h-2.5" />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveValue(v.id)}
+                                className="text-neutral-400 hover:text-rose-600 cursor-pointer ml-0.5"
+                                title="Remove"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-neutral-400 italic pt-1">
+                      No values added yet. Type a value name above and click "Add Value" or press Enter.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* BOTTOM RIGHT ACTION BUTTON */}
+            <div className="flex items-center justify-end pt-2">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="bg-neutral-900 hover:bg-black text-white text-xs font-semibold px-6 py-2.5 rounded-lg shadow-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>{subView === 'edit' ? 'Update Attribute' : 'Add Attribute'}</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* ALL ATTRIBUTES TABLE LIST VIEW */
+        /* ========================================================================= */
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+          {/* TOP HEADER */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-xl border border-neutral-200 shadow-2xs">
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-black tracking-tight flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-black" />
+                <span>Attributes Master Management</span>
+                <Badge
+                  variant="secondary"
+                  className="text-xs font-semibold bg-neutral-100 text-neutral-800 border-neutral-200"
+                >
+                  {attributes.length} Attributes
+                </Badge>
+              </h1>
+              <p className="text-xs text-neutral-500 font-normal mt-1">
+                Manage global attributes (Material, Metal Color, Size, Diamond Clarity, Style) and preset values.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleOpenCreateView}
+                size="sm"
+                className="bg-neutral-950 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Attribute</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* DELETE WARNING MODAL */}
+          {deleteWarning && (
+            <Card className="p-6 bg-amber-50 border border-amber-200 rounded-xl space-y-4 font-sans animate-in fade-in">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-amber-900">
+                    Cannot Permanently Delete Attribute
+                  </h3>
+                  <p className="text-xs text-amber-800 mt-1">
+                    <strong>"{deleteWarning.attrName}"</strong> is currently used by{' '}
+                    <strong>{deleteWarning.usedCount} product(s)</strong>. To protect catalog data,
+                    please <strong>Deactivate</strong> this attribute instead.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    await AttributeService.updateStatus(deleteWarning.attrId, 'inactive');
+                    setDeleteWarning(null);
+                    fetchAttributes();
+                  }}
+                  className="bg-amber-800 hover:bg-amber-900 text-white text-xs font-semibold"
+                >
+                  Deactivate Attribute Now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDeleteWarning(null)}
+                  className="text-xs border-amber-300 text-amber-900 hover:bg-amber-100 font-medium"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* SEARCH & FILTERS */}
           <Card className="p-4 bg-white border border-neutral-200 rounded-xl space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 type="text"
-                placeholder="Search attribute name, slug or value..."
+                placeholder="Search attribute name, slug, or values..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8 text-xs bg-white border-neutral-200 text-black"
@@ -344,60 +750,53 @@ export const AttributesPage: React.FC = () => {
 
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-neutral-500">Usage:</span>
-                <Select
-                  value={filterUsage}
-                  onValueChange={(val) => setFilterUsage(val)}
-                  options={[
-                    { value: 'All', label: 'All Usages' },
-                    { value: 'PRODUCT', label: 'Product Info' },
-                    { value: 'VARIANT', label: 'Variant Matrix' },
-                    { value: 'BOTH', label: 'Both' }
-                  ]}
-                />
-              </div>
-
-              <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-neutral-500">Type:</span>
-                <Select
+                <select
                   value={filterType}
-                  onValueChange={(val) => setFilterType(val)}
-                  options={[
-                    { value: 'All', label: 'All Control Types' },
-                    { value: 'SWATCH', label: 'SWATCH (Color Swatch)' },
-                    { value: 'BUTTON', label: 'BUTTON (Size Pills)' },
-                    { value: 'SELECT', label: 'SELECT (Dropdown)' },
-                    { value: 'RADIO', label: 'RADIO' },
-                    { value: 'CHECKBOX', label: 'CHECKBOX' },
-                    { value: 'TEXT', label: 'TEXT' }
-                  ]}
-                />
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="text-xs bg-white border border-neutral-200 rounded-md px-2.5 py-1 text-neutral-800 outline-none"
+                >
+                  <option value="All">All Types</option>
+                  {ATTRIBUTE_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-neutral-500">Status:</span>
-                <Select
+                <select
                   value={filterStatus}
-                  onValueChange={(val) => setFilterStatus(val)}
-                  options={[
-                    { value: 'All', label: 'All Status' },
-                    { value: 'Active', label: 'Active Only' },
-                    { value: 'Inactive', label: 'Inactive Only' }
-                  ]}
-                />
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="text-xs bg-white border border-neutral-200 rounded-md px-2.5 py-1 text-neutral-800 outline-none"
+                >
+                  <option value="All">All Status</option>
+                  <option value="Active">Active Only</option>
+                  <option value="Inactive">Inactive Only</option>
+                </select>
               </div>
             </div>
           </Card>
 
           {/* ATTRIBUTES TABLE */}
-          {filteredAttributes.length === 0 ? (
-            <Card className="p-12 text-center space-y-3 bg-white border-neutral-200">
+          {loading ? (
+            <div className="min-h-[200px] flex items-center justify-center bg-white rounded-xl border border-neutral-200">
+              <RefreshCw className="w-6 h-6 animate-spin text-neutral-800" />
+            </div>
+          ) : filteredAttributes.length === 0 ? (
+            <Card className="p-12 text-center space-y-3 bg-white border-neutral-200 rounded-xl">
               <Sliders className="w-8 h-8 text-neutral-400 mx-auto" />
               <h4 className="text-sm font-bold text-black">No Attributes Found</h4>
               <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                No attributes match your current search/filters. Create your first global attribute!
+                No attributes match your filter. Click below to create your first attribute.
               </p>
-              <Button onClick={handleOpenCreateView} size="sm" className="bg-black text-white text-xs font-semibold mt-2">
+              <Button
+                onClick={handleOpenCreateView}
+                size="sm"
+                className="bg-black text-white text-xs font-semibold mt-2"
+              >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Attribute</span>
               </Button>
@@ -408,10 +807,10 @@ export const AttributesPage: React.FC = () => {
                 <table className="w-full text-left text-xs font-sans border-collapse">
                   <thead>
                     <tr className="bg-neutral-50/80 border-b border-neutral-200 text-neutral-700 font-bold uppercase tracking-wider text-[11px]">
-                      <th className="p-4">Sort Order</th>
-                      <th className="p-4">Attribute Name &amp; Slug</th>
-                      <th className="p-4">Display Type</th>
-                      <th className="p-4">Usage</th>
+                      <th className="p-4">Name</th>
+                      <th className="p-4">Display Name</th>
+                      <th className="p-4">Slug</th>
+                      <th className="p-4">Type</th>
                       <th className="p-4">Defined Values</th>
                       <th className="p-4">Status</th>
                       <th className="p-4 text-right">Actions</th>
@@ -422,83 +821,76 @@ export const AttributesPage: React.FC = () => {
                       const isAct = attr.status ? attr.status === 'active' : attr.isActive;
                       return (
                         <tr key={attr.id} className="hover:bg-neutral-50/50 transition-colors">
-                          <td className="p-4 font-mono font-bold text-neutral-600">
-                            #{attr.sortOrder || 1}
-                          </td>
                           <td className="p-4">
-                            <div className="font-bold text-black text-xs">{attr.name}</div>
-                            <div className="text-[10px] font-mono text-neutral-400">/{attr.slug}</div>
+                            <span className="font-bold text-neutral-900">{attr.name}</span>
                           </td>
-                          <td className="p-4">
-                            <Badge variant="outline" className="text-[10px] uppercase font-semibold bg-neutral-50 text-neutral-800 border-neutral-200">
-                              {attr.type}
-                            </Badge>
+                          <td className="p-4 text-neutral-700 font-medium">
+                            {attr.displayName || attr.name}
+                          </td>
+                          <td className="p-4 font-mono text-neutral-500 text-[11px]">
+                            {attr.slug}
                           </td>
                           <td className="p-4">
                             <Badge
                               variant="outline"
-                              className={`text-[10px] font-bold ${
-                                attr.usage === 'PRODUCT'
-                                  ? 'bg-blue-50 text-blue-800 border-blue-200'
-                                  : attr.usage === 'VARIANT'
-                                  ? 'bg-purple-50 text-purple-800 border-purple-200'
-                                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              }`}
+                              className="text-[10px] uppercase font-semibold bg-neutral-50 text-neutral-800 border-neutral-200"
                             >
-                              {attr.usage === 'PRODUCT' ? 'Product Info' : attr.usage === 'VARIANT' ? 'Variant Matrix' : 'Product & Variant'}
+                              {attr.type}
                             </Badge>
                           </td>
                           <td className="p-4">
                             {attr.values && attr.values.length > 0 ? (
                               <div className="flex flex-wrap gap-1 max-w-xs">
                                 {attr.values.slice(0, 4).map((v) => (
-                                  <span key={v.id} className="bg-neutral-100 px-2 py-0.5 rounded text-[10px] text-neutral-800 font-medium flex items-center gap-1">
-                                    {v.colorCode && (
-                                      <span className="w-2.5 h-2.5 rounded-full border border-neutral-300 inline-block" style={{ backgroundColor: v.colorCode }} />
-                                    )}
-                                    <span>{v.label}</span>
+                                  <span
+                                    key={v.id}
+                                    className="text-[10px] bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded border border-neutral-200"
+                                  >
+                                    {v.label}
                                   </span>
                                 ))}
                                 {attr.values.length > 4 && (
-                                  <span className="text-[10px] text-neutral-400 font-medium">+{attr.values.length - 4} more</span>
+                                  <span className="text-[10px] text-neutral-400 font-medium self-center">
+                                    +{attr.values.length - 4} more
+                                  </span>
                                 )}
                               </div>
                             ) : (
-                              <span className="text-neutral-400 text-[11px] font-normal">Custom Input</span>
+                              <span className="text-neutral-400 italic">None</span>
                             )}
                           </td>
                           <td className="p-4">
                             <button
                               type="button"
                               onClick={() => handleToggleStatus(attr)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider cursor-pointer border transition-all ${
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
                                 isAct
                                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                                  : 'bg-neutral-100 text-neutral-500 border-neutral-200 hover:bg-neutral-200'
+                                  : 'bg-neutral-100 text-neutral-600 border-neutral-200 hover:bg-neutral-200'
                               }`}
                             >
                               {isAct ? 'Active' : 'Inactive'}
                             </button>
                           </td>
                           <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
-                                variant="ghost"
-                                size="icon"
+                                size="sm"
+                                variant="outline"
                                 onClick={() => handleOpenEditView(attr)}
-                                className="h-7 w-7 text-neutral-600 hover:text-black hover:bg-neutral-100"
-                                title="Edit Attribute & Values"
+                                className="h-7 px-2.5 text-xs text-neutral-700 border-neutral-200 hover:bg-neutral-100"
+                                title="Edit Attribute"
                               >
-                                <Edit2 className="w-3.5 h-3.5" />
+                                <Edit2 className="w-3 h-3" />
                               </Button>
                               <Button
-                                variant="ghost"
-                                size="icon"
+                                size="sm"
+                                variant="outline"
                                 onClick={() => handleDeleteAttribute(attr)}
-                                className="h-7 w-7 text-neutral-400 hover:text-red-600 hover:bg-red-50"
+                                className="h-7 px-2.5 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
                                 title="Delete Attribute"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3 h-3" />
                               </Button>
                             </div>
                           </td>
@@ -513,283 +905,14 @@ export const AttributesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* SUB-VIEW 2 & 3: ADD / EDIT ATTRIBUTE FORM */}
-      {/* ========================================================================= */}
-      {(subView === 'create' || subView === 'edit') && (
-        <Card className="p-6 sm:p-8 bg-white border border-neutral-200 shadow-2xs rounded-xl max-w-4xl mx-auto space-y-6 font-sans">
-          <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSubView('all')}
-                className="text-xs border-neutral-200 text-neutral-700 hover:bg-neutral-100 font-medium"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to List</span>
-              </Button>
-              <div>
-                <h2 className="text-base font-bold text-black tracking-tight">
-                  {subView === 'edit' ? `Edit Attribute: ${formName}` : 'Create New Global Attribute'}
-                </h2>
-                <p className="text-xs text-neutral-500 font-normal">
-                  Configure attribute parameters, display control type, and define global option values.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveAttribute} className="space-y-6 text-xs">
-            {/* STEP 1: NAME, SLUG & USAGE */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Attribute Name *
-                </label>
-                <Input
-                  type="text"
-                  required
-                  placeholder="e.g. Color, Size, Cup Type, Material..."
-                  value={formName}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  className="bg-white border-neutral-200 text-xs font-medium text-black"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Slug (URL / Key) *
-                </label>
-                <Input
-                  type="text"
-                  required
-                  placeholder="e.g. color, size, cup-type"
-                  value={formSlug}
-                  onChange={(e) => setFormSlug(e.target.value)}
-                  className="bg-white border-neutral-200 text-xs font-mono font-medium text-black"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Usage Type *
-                </label>
-                <Select
-                  value={formUsage}
-                  onValueChange={(val) => setFormUsage(val as AttributeUsage)}
-                  options={[
-                    { value: 'BOTH', label: 'Both (Product Info & Variant Matrix)' },
-                    { value: 'PRODUCT', label: 'Product Info Only' },
-                    { value: 'VARIANT', label: 'Variant Matrix Only' }
-                  ]}
-                />
-              </div>
-            </div>
-
-            {/* STEP 2: DISPLAY TYPE & SORT ORDER */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Display Control Type *
-                </label>
-                <Select
-                  value={formType}
-                  onValueChange={(val) => setFormType(val as AttributeDisplayType)}
-                  options={[
-                    { value: 'SWATCH', label: 'SWATCH (Color Swatch Picker)' },
-                    { value: 'BUTTON', label: 'BUTTON (Size Pills)' },
-                    { value: 'SELECT', label: 'SELECT (Dropdown)' },
-                    { value: 'RADIO', label: 'RADIO Buttons' },
-                    { value: 'CHECKBOX', label: 'CHECKBOX Multi-Select' },
-                    { value: 'TEXT', label: 'TEXT Input' }
-                  ]}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Global Sort Order *
-                </label>
-                <Input
-                  type="number"
-                  required
-                  value={formSortOrder}
-                  onChange={(e) => setFormSortOrder(Number(e.target.value))}
-                  className="bg-white border-neutral-200 text-xs font-mono font-medium text-black"
-                />
-              </div>
-            </div>
-
-            {/* STEP 3: TOGGLES */}
-            <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <label className="flex items-center justify-between p-2 bg-white rounded-lg border border-neutral-200 cursor-pointer">
-                <div>
-                  <span className="text-xs font-bold text-black block">Show in Highlights</span>
-                  <span className="text-[10px] text-neutral-500">Visible in Top Highlights</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formShowInHighlights}
-                  onChange={(e) => setFormShowInHighlights(e.target.checked)}
-                  className="w-4 h-4 rounded text-black cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-2 bg-white rounded-lg border border-neutral-200 cursor-pointer">
-                <div>
-                  <span className="text-xs font-bold text-black block">Required Field</span>
-                  <span className="text-[10px] text-neutral-500">Mandatory on product save</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formIsRequired}
-                  onChange={(e) => setFormIsRequired(e.target.checked)}
-                  className="w-4 h-4 rounded text-black cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-2 bg-white rounded-lg border border-neutral-200 cursor-pointer">
-                <div>
-                  <span className="text-xs font-bold text-black block">Active Status</span>
-                  <span className="text-[10px] text-neutral-500">Available for assignment</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formStatus === 'active'}
-                  onChange={(e) => setFormStatus(e.target.checked ? 'active' : 'inactive')}
-                  className="w-4 h-4 rounded text-black cursor-pointer"
-                />
-              </label>
-            </div>
-
-            {/* STEP 4: GLOBAL ATTRIBUTE VALUES CRUD EDITOR */}
-            <div className="p-5 rounded-xl bg-neutral-50/70 border border-neutral-200 space-y-4">
-              <div>
-                <h3 className="text-xs font-bold text-black uppercase tracking-wider block">
-                  Manage Global Attribute Values ({formValues.length} defined)
-                </h3>
-                <p className="text-[11px] text-neutral-500">
-                  Define global values for {formName || 'this attribute'} (e.g. Black, White, Beige, Red for Color or S, M, L, XL for Size).
-                </p>
-              </div>
-
-              {/* INPUT CONTROLS */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <Input
-                  type="text"
-                  placeholder="Value Label (e.g. Black, S, Removable)"
-                  value={newValLabel}
-                  onChange={(e) => {
-                    setNewValLabel(e.target.value);
-                    if (!newValValue) setNewValValue(e.target.value);
-                  }}
-                  className="flex-1 bg-white border-neutral-200 text-xs font-medium text-black"
-                />
-
-                {(formType === 'SWATCH' || formType === 'COLOR') && (
-                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-md border border-neutral-200 shrink-0">
-                    <span className="text-xs font-medium text-neutral-600">HEX:</span>
-                    <input
-                      type="color"
-                      value={newValHex}
-                      onChange={(e) => setNewValHex(e.target.value)}
-                      className="w-6 h-6 rounded cursor-pointer border-0 p-0"
-                    />
-                    <span className="font-mono text-xs font-bold uppercase">{newValHex}</span>
-                  </div>
-                )}
-
-                <Button
-                  type="button"
-                  onClick={handleSaveValueToForm}
-                  className="bg-black hover:bg-neutral-800 text-white font-semibold text-xs px-4 py-2 rounded-md shrink-0 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>{editingValueId ? 'Update Value' : 'Add Value'}</span>
-                </Button>
-              </div>
-
-              {/* DEFINED VALUES TABLE / LIST */}
-              <div className="space-y-2">
-                {formValues.length === 0 ? (
-                  <p className="text-xs text-neutral-400 italic bg-white p-4 rounded-lg border border-neutral-200 text-center">
-                    No values added yet. Type a value label above and click "+ Add Value".
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto bg-white p-3 rounded-lg border border-neutral-200">
-                    {formValues.map((v) => (
-                      <div
-                        key={v.id}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium ${
-                          v.status === 'inactive'
-                            ? 'bg-neutral-100 text-neutral-400 border-neutral-200 line-through'
-                            : 'bg-neutral-50 text-black border-neutral-200'
-                        }`}
-                      >
-                        {v.colorCode && (
-                          <span
-                            className="w-3.5 h-3.5 rounded-full border border-neutral-300 shadow-2xs shrink-0"
-                            style={{ backgroundColor: v.colorCode }}
-                          />
-                        )}
-                        <span>{v.label}</span>
-
-                        <div className="flex items-center gap-1 ml-2">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleValueStatusInForm(v.id)}
-                            className="text-[10px] font-mono text-neutral-500 hover:text-black"
-                            title="Toggle active/inactive status"
-                          >
-                            {v.status === 'active' ? '[Active]' : '[Inactive]'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditValueInForm(v)}
-                            className="text-neutral-500 hover:text-black cursor-pointer"
-                            title="Edit Value"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveValueFromForm(v.id)}
-                            className="text-neutral-400 hover:text-red-600 cursor-pointer"
-                            title="Remove Value"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ACTION BUTTONS */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setSubView('all')}
-                className="text-xs border-neutral-200 text-neutral-700 hover:bg-neutral-100 font-medium"
-              >
-                Cancel
-              </Button>
-
-              <Button
-                type="submit"
-                className="bg-black hover:bg-neutral-800 text-white font-semibold text-xs px-6 py-2 rounded-md shadow-2xs transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span>{subView === 'edit' ? 'Update Attribute' : 'Save Attribute'}</span>
-              </Button>
-            </div>
-          </form>
-        </Card>
-      )}
+      {/* REUSABLE DELETE CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteCandidate)}
+        title="Delete Attribute Master?"
+        itemName={deleteCandidate ? `${deleteCandidate.name} (${deleteCandidate.displayName || deleteCandidate.slug})` : undefined}
+        onConfirm={confirmDeleteAttribute}
+        onCancel={() => setDeleteCandidate(null)}
+      />
     </div>
   );
 };

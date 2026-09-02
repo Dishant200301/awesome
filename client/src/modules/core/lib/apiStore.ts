@@ -36,9 +36,24 @@ export const sanitizeClientProducts = (list: any[]): any[] => {
   return list.filter((p) => !isLegacyAaramlyProduct(p));
 };
 
-const DEFAULT_CATALOG_PRODUCTS: any[] = sanitizeClientProducts(CLIENT_SHOP_PRODUCTS);
+const DEFAULT_CATALOG_PRODUCTS: any[] = [];
 
-let liveProducts: any[] = [...DEFAULT_CATALOG_PRODUCTS];
+let liveProducts: any[] = [];
+
+if (typeof window !== "undefined") {
+  try {
+    const local = localStorage.getItem("awesome_admin_sync") || localStorage.getItem("aaramly_admin_sync");
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed.products)) {
+        liveProducts = sanitizeClientProducts(parsed.products).filter(
+          (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
+        );
+      }
+    }
+  } catch (e) {}
+}
+
 let isLoaded = false;
 
 export const subscribeToProductStore = (listener: Listener) => {
@@ -60,27 +75,29 @@ export const fetchLiveProducts = async (): Promise<any[]> => {
   if (typeof window !== "undefined") {
     try {
       const stored = await idbGet<any>("awesome_admin_sync");
-      if (stored && Array.isArray(stored.products) && stored.products.length > 0) {
+      if (stored && Array.isArray(stored.products)) {
         const clean = sanitizeClientProducts(stored.products);
         liveProducts = clean.filter(
           (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
         );
         isLoaded = true;
         notifyListeners();
+        return liveProducts;
       }
     } catch (e) {}
 
     try {
       const local = localStorage.getItem("awesome_admin_sync");
-      if (local && !isLoaded) {
+      if (local) {
         const parsed = JSON.parse(local);
-        if (Array.isArray(parsed.products) && parsed.products.length > 0) {
+        if (Array.isArray(parsed.products)) {
           const clean = sanitizeClientProducts(parsed.products);
           liveProducts = clean.filter(
             (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
           );
           isLoaded = true;
           notifyListeners();
+          return liveProducts;
         }
       }
     } catch (e) {}
@@ -91,8 +108,8 @@ export const fetchLiveProducts = async (): Promise<any[]> => {
     const res = await fetch(`${API_BASE_URL}/products`);
     if (res.ok) {
       const json = await res.json();
-      const list = json.data || json.items || json.products;
-      if (Array.isArray(list) && list.length > 0) {
+      const list = json.data?.items || json.data || json.items || json.products;
+      if (Array.isArray(list)) {
         liveProducts = sanitizeClientProducts(list).filter(
           (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
         );
@@ -306,49 +323,69 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
 
   const fallbackMainImg = parentImages[0] || "/images/category/Latkan.webp";
 
-  const mainImg =
-    colorMedia?.mainImage ||
-    colorObj?.mainImage ||
-    colorObj?.displayImage ||
-    (typeof v.image === "string" && v.image.trim() ? v.image.trim() : "") ||
-    (typeof v.thumbnail === "string" && v.thumbnail.trim() ? v.thumbnail.trim() : "") ||
-    fallbackMainImg;
-
-  const colorGalleryUrls = (colorMedia?.gallery && Array.isArray(colorMedia.gallery))
-    ? colorMedia.gallery
-    : (colorObj?.galleryImages && Array.isArray(colorObj.galleryImages))
-    ? colorObj.galleryImages
-    : (v.galleryImages && Array.isArray(v.galleryImages))
-    ? v.galleryImages
-    : [];
-
-  let galleryList: any[] = [];
-
-  if (colorGalleryUrls.length > 0) {
-    const allUrls = Array.from(new Set([mainImg, ...colorGalleryUrls].filter(Boolean)));
-    galleryList = allUrls.map((url, i) => ({
-      id: `img-${v.id || index}-${i}`,
-      url,
-      alt: `${parentProduct?.name || ''} - ${colorName} View ${i + 1}`,
-    }));
-  } else if (Array.isArray(v.images) && v.images.length > 0) {
-    galleryList = v.images.map((img: any, i: number) =>
-      typeof img === "string"
-        ? { id: `img-${v.id || index}-${i}`, url: img, alt: `${colorName} ${i + 1}` }
-        : { id: img.id || `img-${v.id || index}-${i}`, url: img.url || mainImg, alt: img.alt || `${colorName} ${i + 1}` }
-    );
-  } else if (parentImages.length > 0) {
-    const combined = Array.from(new Set([mainImg, ...parentImages].filter(Boolean)));
-    galleryList = combined.map((url, i) => ({
-      id: `img-${v.id || index}-${i}`,
-      url,
-      alt: `${parentProduct?.name || ''} - ${colorName} View ${i + 1}`,
-    }));
+  // 1. Check if the variant itself has explicit images configured in admin
+  const variantExplicitImages: string[] = [];
+  if (Array.isArray(v.images) && v.images.length > 0) {
+    v.images.forEach((u: any) => {
+      const urlStr = typeof u === "string" ? u : u?.url;
+      if (urlStr && typeof urlStr === "string" && urlStr.trim() && !variantExplicitImages.includes(urlStr.trim())) {
+        variantExplicitImages.push(urlStr.trim());
+      }
+    });
   } else {
-    galleryList = [
-      { id: `img-${v.id || index}-0`, url: mainImg, alt: `${colorName} Front View` }
-    ];
+    const vMain = (typeof v.mainImage === "string" && v.mainImage.trim() ? v.mainImage.trim() : "") ||
+      (typeof v.image === "string" && v.image.trim() ? v.image.trim() : "") ||
+      (typeof v.thumbnail === "string" && v.thumbnail.trim() ? v.thumbnail.trim() : "");
+    if (vMain) variantExplicitImages.push(vMain);
+    if (Array.isArray(v.galleryImages)) {
+      v.galleryImages.forEach((u: any) => {
+        const urlStr = typeof u === "string" ? u : u?.url;
+        if (urlStr && typeof urlStr === "string" && urlStr.trim() && !variantExplicitImages.includes(urlStr.trim())) {
+          variantExplicitImages.push(urlStr.trim());
+        }
+      });
+    }
   }
+
+  // 2. If variant has explicit images, use ONLY those images (do NOT bleed root images)
+  let rawUrls: string[] = [];
+  if (variantExplicitImages.length > 0) {
+    rawUrls = variantExplicitImages;
+  } else {
+    // 3. Fallback to color media / color config only if variant has no explicit images
+    const cmMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || "";
+    if (cmMain) rawUrls.push(cmMain);
+    const colorGalleryUrls = (colorMedia?.gallery && Array.isArray(colorMedia.gallery))
+      ? colorMedia.gallery
+      : (colorObj?.galleryImages && Array.isArray(colorObj.galleryImages))
+      ? colorObj.galleryImages
+      : [];
+    colorGalleryUrls.forEach((u: any) => {
+      const urlStr = typeof u === "string" ? u : u?.url;
+      if (urlStr && typeof urlStr === "string" && urlStr.trim() && !rawUrls.includes(urlStr.trim())) {
+        rawUrls.push(urlStr.trim());
+      }
+    });
+
+    // 4. Fallback to parent product root images only if variant and color have no images
+    if (rawUrls.length === 0) {
+      if (Array.isArray(parentImages) && parentImages.length > 0) {
+        rawUrls = [...parentImages];
+      } else {
+        rawUrls = [fallbackMainImg];
+      }
+    }
+  }
+
+  const mainImg = rawUrls[0] || fallbackMainImg;
+
+  const galleryList = rawUrls.length > 0
+    ? rawUrls.map((url, i) => ({
+        id: `img-${v.id || index}-${i}`,
+        url,
+        alt: `${parentProduct?.name || ''} - ${colorName} View ${i + 1}`,
+      }))
+    : [{ id: `img-${v.id || index}-0`, url: fallbackMainImg, alt: `${colorName} Front View` }];
 
   // Derive hex code for common color names if missing
   let colorHex = colorObj?.colorHex || colorMedia?.colorCode || v.colorHex || "#000000";
@@ -464,12 +501,18 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails => {
         const colSizes = (col.sizes && col.sizes.length > 0) ? col.sizes : (found.availableSizes || ["S", "M", "L"]);
         colSizes.forEach((sz: string, sIdx: number) => {
           const mainImg = col.mainImage || col.displayImage || (parentImages[0]) || "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=800";
-          const gallery = col.mainImage
-            ? [
-                { id: "img-main", url: col.mainImage, alt: `${found.name} - ${col.colorName}` },
-                ...(col.galleryImages || []).map((gUrl: string, idx: number) => ({ id: `img-gal-${idx}`, url: gUrl, alt: `${found.name} - ${col.colorName} ${idx + 1}` }))
-              ]
-            : [];
+          const rawGals: string[] = [];
+          if (mainImg) rawGals.push(mainImg);
+          (col.galleryImages || []).forEach((gUrl: string) => {
+            if (gUrl && typeof gUrl === "string" && gUrl.trim() && !rawGals.includes(gUrl.trim())) {
+              rawGals.push(gUrl.trim());
+            }
+          });
+          const gallery = rawGals.map((gUrl: string, idx: number) => ({
+            id: `img-gal-${idx}`,
+            url: gUrl,
+            alt: `${found.name} - ${col.colorName} ${idx + 1}`
+          }));
           mappedVariations.push({
             id: `v-synth-${col.colorName}-${sz}-${sIdx}`,
             colorName: col.colorName,
@@ -582,41 +625,260 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails => {
     ? found.highlights
     : (Array.isArray(found.keyFeatures) && found.keyFeatures.length > 0
         ? found.keyFeatures
-        : SAMPLE_PRODUCT.highlights);
+        : []);
 
   return {
-    ...SAMPLE_PRODUCT,
     id: found.id,
     type: (found.type as any) || (mappedVariations.length > 1 && mappedVariations[0]?.colorName !== 'Standard' ? 'Variable' : 'Simple'),
     brand: found.brand || "Awesome Handmade",
-    name: found.name || SAMPLE_PRODUCT.name,
-    subtitle: found.subtitle || found.shortDescription || SAMPLE_PRODUCT.subtitle,
+    name: found.name || "",
+    subtitle: found.subtitle || found.shortDescription || "",
     shortDescription: found.shortDescription || found.subtitle || "",
     fullDescription: found.fullDescription || found.description || "",
-    price: Number(found.price) || SAMPLE_PRODUCT.price,
-    originalPrice: Number(found.originalPrice) || SAMPLE_PRODUCT.originalPrice,
-    rating: Number(found.rating) || 4.8,
-    reviewCount: Number(found.reviewCount || found.salesCount) || 120,
-    defaultSku: found.defaultSku || found.sku || "AWH-SKU-100",
+    price: Number(found.price) || (mappedVariations[0] ? Number(mappedVariations[0].price) : 0),
+    originalPrice: Number(found.originalPrice) || (mappedVariations[0] ? Number(mappedVariations[0].originalPrice) : 0),
+    discountPercentage: found.discountPercentage || (mappedVariations[0] ? mappedVariations[0].discountPercentage : 0),
+    rating: Number(found.rating) || 5.0,
+    reviewCount: getLiveReviews(String(found.id)).length,
+    defaultSku: found.defaultSku || found.sku || (mappedVariations[0] ? mappedVariations[0].sku : "AWH-SKU-100"),
     colors: found.colors || [],
     colorMediaConfigs: found.colorMediaConfigs || [],
     variations: mappedVariations,
-    availableSizes: found.availableSizes || (found.sizes ? found.sizes : ["Free Size", "Standard Pair", "Bridal Set"]),
-    descriptionCards: descCards,
+    availableSizes: found.availableSizes || (found.sizes ? found.sizes : []),
+    descriptionCards: found.descriptionCards || descCards || [],
     highlights: productHighlights,
-    specs: found.specs || SAMPLE_PRODUCT.specs,
+    features: Array.isArray(found.features) && found.features.length > 0 ? found.features : productHighlights,
+    specifications: Array.isArray(found.specifications) && found.specifications.length > 0
+      ? found.specifications
+      : (found.specs ? Object.entries(found.specs).map(([key, value]) => ({ key, value: String(value) })) : []),
+    customAttributes: found.customAttributes || found.productAttributes || [],
+    dimensions: found.dimensions,
+    weight: found.weight,
+    material: found.material || (found.specs && found.specs.material),
+    color: found.color,
+    size: found.size,
+    specs: found.specs || {},
     galleryImages: parentImages,
     images: parentImages,
     mainImage: parentImages[0] || found.image || "/images/category/Latkan.webp",
-    idealForPills: found.idealForPills || (found.category ? [found.category, "Handmade", "Surat Artisan"] : SAMPLE_PRODUCT.idealForPills),
-    washingInstructions: found.washingInstructions && found.washingInstructions.length > 0 ? found.washingInstructions : SAMPLE_PRODUCT.washingInstructions,
-    manufacturingInfo: {
-      ...SAMPLE_PRODUCT.manufacturingInfo,
-      ...(found.manufacturingInfo || {}),
-      ...(found.brand ? { manufacturer: `${found.brand}` } : {})
-    },
+    idealForPills: found.idealForPills || (found.category ? [found.category] : []),
+    washingInstructions: found.washingInstructions || [],
+    reviews: getLiveReviews(String(found.id)),
   };
 };
+
+// ==========================================
+// REAL-TIME CUSTOMER REVIEWS MANAGEMENT
+// ==========================================
+export interface CustomerReviewItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage?: string;
+  author: string;
+  email: string;
+  rating: number;
+  comment: string;
+  date: string;
+  verified?: boolean;
+  status?: 'Approved' | 'Pending' | 'Rejected';
+  createdAt?: string;
+}
+
+const deletedReviewIds = new Set<string>();
+
+export const INITIAL_DEMO_REVIEWS: CustomerReviewItem[] = [];
+
+let liveReviews: CustomerReviewItem[] = [];
+const reviewListeners = new Set<() => void>();
+
+export const subscribeToReviewStore = (cb: () => void): (() => void) => {
+  reviewListeners.add(cb);
+  return () => {
+    reviewListeners.delete(cb);
+  };
+};
+
+
+const notifyReviewListeners = () => {
+  reviewListeners.forEach((cb) => {
+    try { cb(); } catch (e) {}
+  });
+};
+
+export const fetchLiveReviews = async (productId?: string): Promise<CustomerReviewItem[]> => {
+  try {
+    const url = productId ? `${API_BASE_URL}/reviews?productId=${productId}` : `${API_BASE_URL}/reviews`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const json = await res.json();
+      const list = json.data || json;
+      if (Array.isArray(list)) {
+        if (productId) {
+          const otherReviews = liveReviews.filter((r) => String(r.productId) !== String(productId));
+          liveReviews = [...list, ...otherReviews];
+        } else {
+          liveReviews = list;
+        }
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('awesome_admin_reviews', JSON.stringify(liveReviews));
+            await idbSet('awesome_admin_reviews', liveReviews);
+          } catch (e) {}
+        }
+        notifyReviewListeners();
+        return getLiveReviews(productId);
+      }
+    }
+  } catch (e) {
+    // API server offline fallback
+  }
+  return getLiveReviews(productId);
+};
+
+export const getLiveReviews = (productId?: string): CustomerReviewItem[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const deleted = localStorage.getItem('awesome_deleted_reviews') || localStorage.getItem('aaramly_deleted_reviews');
+      if (deleted) {
+        const parsedDel = JSON.parse(deleted);
+        if (Array.isArray(parsedDel)) {
+          parsedDel.forEach((id: string) => deletedReviewIds.add(String(id)));
+        }
+      }
+
+      const stored = localStorage.getItem('awesome_admin_reviews') || localStorage.getItem('aaramly_admin_reviews');
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          liveReviews = parsed.filter((r) => !deletedReviewIds.has(String(r.id)));
+        }
+      } else {
+        liveReviews = [];
+      }
+    } catch (e) {
+      liveReviews = [];
+    }
+  } else {
+    liveReviews = [];
+  }
+
+  if (productId) {
+    const prodRev = liveReviews.filter((r) => String(r.productId) === String(productId) && !deletedReviewIds.has(String(r.id)));
+    return prodRev;
+  }
+  return liveReviews.filter((r) => !deletedReviewIds.has(String(r.id)));
+};
+
+if (typeof window !== 'undefined') {
+  const handleLiveReviewSync = () => {
+    getLiveReviews();
+    notifyReviewListeners();
+    notifyListeners();
+  };
+  window.addEventListener("awesome_review_sync", handleLiveReviewSync);
+  window.addEventListener("aaramly_review_sync", handleLiveReviewSync);
+}
+
+export const addCustomerReview = async (review: Omit<CustomerReviewItem, 'id' | 'date'> & { id?: string; date?: string }) => {
+  const newRev: CustomerReviewItem = {
+    id: review.id || `rev-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    productId: String(review.productId),
+    productName: review.productName || 'Handcrafted Product',
+    productImage: review.productImage || '/images/category/Latkan.webp',
+    author: (review.author || 'Customer').trim().toUpperCase(),
+    email: (review.email || '').trim().toLowerCase(),
+    rating: Number(review.rating) || 5,
+    comment: (review.comment || '').trim(),
+    date: review.date || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    verified: true,
+    status: 'Approved',
+    createdAt: new Date().toISOString()
+  };
+
+  const existing = getLiveReviews();
+  const updated = [newRev, ...existing.filter((r) => r.id !== newRev.id)];
+  liveReviews = updated;
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('awesome_admin_reviews', JSON.stringify(updated));
+      await idbSet('awesome_admin_reviews', updated);
+      window.dispatchEvent(new Event('awesome_review_sync'));
+      window.dispatchEvent(new Event('aaramly_review_sync'));
+    } catch (e) {}
+  }
+
+  // Also attach to the live product
+  const prod = liveProducts.find((p) => String(p.id) === String(review.productId));
+  if (prod) {
+    const prodReviews = Array.isArray(prod.reviews) ? prod.reviews : [];
+    prod.reviews = [newRev, ...prodReviews.filter((r: any) => r.id !== newRev.id)];
+    prod.reviewCount = prod.reviews.length;
+    const sumRatings = prod.reviews.reduce((acc: number, r: any) => acc + (Number(r.rating) || 5), 0);
+    prod.rating = Number((sumRatings / prod.reviews.length).toFixed(1));
+    notifyListeners();
+  }
+
+  notifyReviewListeners();
+
+  // Call Server API to persist review in MySQL / Server Store
+  try {
+    const res = await fetch(`${API_BASE_URL}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newRev),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data) {
+        return json.data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend reviews API offline; review preserved in local live store.');
+  }
+
+  return newRev;
+};
+
+export const deleteCustomerReview = async (reviewId: string) => {
+  const existing = getLiveReviews();
+  const updated = existing.filter((r) => r.id !== reviewId);
+  liveReviews = updated;
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('awesome_admin_reviews', JSON.stringify(updated));
+      await idbSet('awesome_admin_reviews', updated);
+      window.dispatchEvent(new Event('awesome_review_sync'));
+      window.dispatchEvent(new Event('aaramly_review_sync'));
+    } catch (e) {}
+  }
+
+  // Also remove from live product reviews
+  liveProducts.forEach((prod) => {
+    if (Array.isArray(prod.reviews)) {
+      prod.reviews = prod.reviews.filter((r: any) => r.id !== reviewId);
+      prod.reviewCount = prod.reviews.length;
+      if (prod.reviews.length > 0) {
+        const sumRatings = prod.reviews.reduce((acc: number, r: any) => acc + (Number(r.rating) || 5), 0);
+        prod.rating = Number((sumRatings / prod.reviews.length).toFixed(1));
+      }
+    }
+  });
+
+  notifyListeners();
+  notifyReviewListeners();
+
+  // Call Server API
+  try {
+    await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+      method: 'DELETE',
+    });
+  } catch (err) {}
+};
+
 
 export const getLiveProductsList = () => {
   if (typeof window !== 'undefined') {
@@ -684,27 +946,136 @@ export const fetchLiveFilters = async () => {
 };
 
 export const getLiveFilters = () => {
-  const liveCats = getLiveCategories().map((c) => ({
-    name: c.name.toUpperCase(),
-    key: c.name,
-    count: c.productCount || 0,
+  const currentLiveProds = getLiveProductsList();
+
+  // 1. Dynamic Categories with Live Counts from actual products
+  const liveCats = getLiveCategories()
+    .map((c) => ({
+      name: c.name,
+      key: c.name,
+      count: c.productCount || 0,
+    }))
+    .filter((c) => c.count > 0);
+
+  // Also include any product categories not present in the default list
+  const catNamesSet = new Set(liveCats.map((c) => c.name.toLowerCase()));
+  currentLiveProds.forEach((p) => {
+    if (p.category && !catNamesSet.has(p.category.toLowerCase())) {
+      const cCount = currentLiveProds.filter(
+        (x) => (x.category || "").toLowerCase() === p.category.toLowerCase()
+      ).length;
+      liveCats.push({
+        name: p.category,
+        key: p.category,
+        count: cCount,
+      });
+      catNamesSet.add(p.category.toLowerCase());
+    }
+  });
+
+  // 2. Dynamic Colors extracted directly from live products
+  const colorMap = new Map<string, string>();
+  currentLiveProds.forEach((p) => {
+    if (Array.isArray(p.colors)) {
+      p.colors.forEach((col: any) => {
+        const name = typeof col === "string" ? col : col.colorName || col.name || col.color;
+        const hex = typeof col === "object" ? col.colorHex || col.hex || "#520618" : "#520618";
+        if (name && name.trim() && name.toLowerCase() !== "standard") {
+          colorMap.set(name.trim(), hex);
+        }
+      });
+    }
+    if (Array.isArray(p.variations)) {
+      p.variations.forEach((v: any) => {
+        const name = v.colorName || v.color;
+        const hex = v.colorHex || "#520618";
+        if (name && name.trim() && name.toLowerCase() !== "standard") {
+          colorMap.set(name.trim(), hex);
+        }
+      });
+    }
+  });
+
+  const dynamicColors = Array.from(colorMap.entries()).map(([name, hex]) => ({
+    name,
+    hex,
   }));
 
-  try {
-    const saved = localStorage.getItem('awesome_dynamic_filters') || localStorage.getItem('aaramly_dynamic_filters');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        categories: liveCats.length > 0 ? liveCats : (Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : DEFAULT_FILTER_CONFIG.categories),
-        colors: Array.isArray(parsed.colors) && parsed.colors.length > 0 ? parsed.colors : DEFAULT_FILTER_CONFIG.colors,
-        sizes: Array.isArray(parsed.sizes) && parsed.sizes.length > 0 ? parsed.sizes : DEFAULT_FILTER_CONFIG.sizes,
-        maxPrice: Number(parsed.maxPrice) || 3000,
-      };
+  // 3. Dynamic Sizes extracted directly from live products
+  const sizesSet = new Set<string>();
+  currentLiveProds.forEach((p) => {
+    if (Array.isArray(p.availableSizes)) {
+      p.availableSizes.forEach((s: string) => {
+        if (s && s.trim()) sizesSet.add(s.trim());
+      });
     }
-  } catch (e) {}
+    if (Array.isArray(p.sizes)) {
+      p.sizes.forEach((s: string) => {
+        if (s && s.trim()) sizesSet.add(s.trim());
+      });
+    }
+    if (Array.isArray(p.variations)) {
+      p.variations.forEach((v: any) => {
+        if (v.size && v.size.trim()) sizesSet.add(v.size.trim());
+        if (v.sizeName && v.sizeName.trim()) sizesSet.add(v.sizeName.trim());
+      });
+    }
+  });
+
+  const dynamicSizes = Array.from(sizesSet);
+
+  // 4. Dynamic Max Price from live products
+  const prices = currentLiveProds.map((p) => Number(p.price) || 0).filter((pr) => pr > 0);
+  const dynamicMaxPrice = prices.length > 0 ? Math.max(...prices, 1000) : 3000;
+
+  // 5. Dynamic Custom Attributes (Material, Craft, Occasion, etc.)
+  const attrMap = new Map<string, Set<string>>();
+  currentLiveProds.forEach((p) => {
+    if (Array.isArray(p.attributes)) {
+      p.attributes.forEach((attr: any) => {
+        const name = (attr.name || attr.key || "").trim();
+        if (name && !name.toLowerCase().includes("color") && !name.toLowerCase().includes("size")) {
+          if (!attrMap.has(name)) attrMap.set(name, new Set<string>());
+          (attr.values || []).forEach((v: string) => {
+            if (v && v.trim()) attrMap.get(name)!.add(v.trim());
+          });
+        }
+      });
+    }
+    if (Array.isArray(p.productOptions)) {
+      p.productOptions.forEach((opt: any) => {
+        const name = (opt.name || "").trim();
+        if (name && !name.toLowerCase().includes("color") && !name.toLowerCase().includes("size")) {
+          if (!attrMap.has(name)) attrMap.set(name, new Set<string>());
+          (opt.values || []).forEach((v: string) => {
+            if (v && v.trim()) attrMap.get(name)!.add(v.trim());
+          });
+        }
+      });
+    }
+    if (Array.isArray(p.specifications)) {
+      p.specifications.forEach((s: any) => {
+        const name = (s.key || "").trim();
+        const val = (s.value || "").trim();
+        if (name && val && !name.toLowerCase().includes("color") && !name.toLowerCase().includes("size")) {
+          if (!attrMap.has(name)) attrMap.set(name, new Set<string>());
+          attrMap.get(name)!.add(val);
+        }
+      });
+    }
+  });
+
+  const dynamicAttributes = Array.from(attrMap.entries()).map(([name, valSet]) => ({
+    name,
+    values: Array.from(valSet),
+  }));
+
   return {
-    ...DEFAULT_FILTER_CONFIG,
-    categories: liveCats.length > 0 ? liveCats : DEFAULT_FILTER_CONFIG.categories,
+    categories: liveCats,
+    colors: dynamicColors.length > 0 ? dynamicColors : DEFAULT_FILTER_CONFIG.colors,
+    sizes: dynamicSizes.length > 0 ? dynamicSizes : DEFAULT_FILTER_CONFIG.sizes,
+    attributes: dynamicAttributes,
+    maxPrice: dynamicMaxPrice,
   };
 };
 
@@ -796,11 +1167,14 @@ export const fetchLiveCategories = async (): Promise<any[]> => {
     const res = await fetch(`${API_BASE_URL}/taxonomies/categories`);
     if (res.ok) {
       const json = await res.json();
-      if (json?.data?.categories && Array.isArray(json.data.categories)) {
-        const subs = Array.isArray(json.data.subcategories) ? json.data.subcategories : [];
-        liveCategoryData = json.data.categories.map((cat: any) => {
+      if (json?.data && Array.isArray(json.data.categories)) {
+        const activeCategories = json.data.categories.filter((c: any) => c.isActive !== false);
+        const subs = (Array.isArray(json.data.subcategories) ? json.data.subcategories : []).filter((s: any) => s.isActive !== false);
+        liveCategoryData = activeCategories.map((cat: any) => {
           const parentSubs = subs.filter((s: any) => 
-            s.categoryId === cat.id || (s.categoryName && cat.name && s.categoryName.toLowerCase() === cat.name.toLowerCase())
+            s.categoryId === cat.id || s.parentId === cat.id || 
+            (s.categoryName && cat.name && s.categoryName.toLowerCase() === cat.name.toLowerCase()) ||
+            (s.parentName && cat.name && s.parentName.toLowerCase() === cat.name.toLowerCase())
           );
           return {
             ...cat,
@@ -845,13 +1219,20 @@ export const getLiveCategories = () => {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const adminParents = parsed.filter((c: any) => c.type !== 'sub' && c.isActive !== false);
-          baseCategories = adminParents.map((ac: any) => ({
-            id: ac.id,
-            name: ac.name,
-            slug: ac.slug || ac.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            image: ac.image || '/images/category/Latkan.webp',
-            subs: ac.subs || [],
-          }));
+          const adminSubs = parsed.filter((c: any) => c.type === 'sub' && c.isActive !== false);
+          baseCategories = adminParents.map((ac: any) => {
+            const mySubs = adminSubs.filter((s: any) => s.parentId === ac.id || s.parentName === ac.name || s.categoryName === ac.name);
+            return {
+              id: ac.id,
+              name: ac.name,
+              slug: ac.slug || ac.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              image: ac.image || '/images/category/Latkan.webp',
+              subs: mySubs.length > 0 ? mySubs.map((s: any) => ({
+                name: s.name,
+                slug: s.slug || s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+              })) : (ac.subs || []),
+            };
+          });
         }
       }
     } catch (e) {}
@@ -1185,14 +1566,14 @@ if (typeof window !== 'undefined') {
   }).catch(() => {});
 }
 
-// Trigger initial fetch
+// Trigger initial fetch once
 fetchLiveProducts();
 fetchLiveFilters();
 fetchLiveCategories();
 fetchLiveHeroSlides();
 fetchLivePromoBanner();
 
-// Auto refresh categories, products, and content periodically
+// Event-driven real-time refresh on window focus
 if (typeof window !== 'undefined') {
   window.addEventListener('focus', () => {
     fetchLiveProducts();
@@ -1200,11 +1581,6 @@ if (typeof window !== 'undefined') {
     fetchLiveHeroSlides();
     fetchLivePromoBanner();
   });
-  setInterval(() => {
-    fetchLiveCategories();
-    fetchLiveHeroSlides();
-    fetchLivePromoBanner();
-  }, 4000);
 }
 
 

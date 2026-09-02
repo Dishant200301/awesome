@@ -121,11 +121,27 @@ export const getAdminProducts = (): Product[] => {
 
 export const getGlobalVariantsList = (): Variant[] => {
   const globalList: Variant[] = [];
-  getAdminProducts().forEach((prod) => {
-    if (prod.variants && prod.variants.length > 0) {
-      prod.variants.forEach((v) => {
+  getAdminProducts().forEach((prod: any) => {
+    if (prod.variants && Array.isArray(prod.variants) && prod.variants.length > 0) {
+      prod.variants.forEach((v: any) => {
         globalList.push({
           ...v,
+          parentProductId: prod.id,
+          parentProductName: prod.name
+        });
+      });
+    } else if (prod.colorVariants && Array.isArray(prod.colorVariants) && prod.colorVariants.length > 0) {
+      prod.colorVariants.forEach((cv: any, idx: number) => {
+        globalList.push({
+          id: `${prod.id}-col-${idx}`,
+          color: cv.color,
+          colorHex: cv.colorCode || cv.colorHex || '#000000',
+          size: 'Standard',
+          sku: `${prod.sku || prod.defaultSku || 'SKU'}-${(cv.color || 'COL').toUpperCase().replace(/[^A-Z0-9]/g, '')}`,
+          price: prod.price || 0,
+          originalPrice: prod.originalPrice || prod.regularPrice || prod.price || 0,
+          stock: prod.stock || 0,
+          image: cv.defaultImage || (cv.images && cv.images[0]) || prod.mainImage || prod.image,
           parentProductId: prod.id,
           parentProductName: prod.name
         });

@@ -14,6 +14,7 @@ import authRoutes from "./modules/auth/routes/auth.routes.js";
 import cartRoutes from "./modules/cart/routes/cart.routes.js";
 import wishlistRoutes from "./modules/wishlist/routes/wishlist.routes.js";
 import contentRoutes from "./modules/product/routes/content.routes.js";
+import reviewRoutes from "./modules/product/routes/review.routes.js";
 import { connectDB } from "./database/index.js";
 
 const app: Express = express();
@@ -35,6 +36,7 @@ app.use("/api/v1/size-guides", sizeGuideRoutes);
 app.use("/api/v1/taxonomies", taxonomyRoutes);
 app.use("/api/v1/content", contentRoutes);
 app.use("/api/v1/contacts", contactRoutes);
+app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/cart", cartRoutes);

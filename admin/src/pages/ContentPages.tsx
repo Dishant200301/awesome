@@ -26,6 +26,7 @@ import { HeroSlide, HomepageBanner, ContentPageItem, BlogPost, FaqItem } from '.
 import { MOCK_HERO_SLIDES, MOCK_PROMO_BANNER } from '../data/mockAdminData';
 import { AdminApiService } from '../services/adminApi';
 import { idbGet, idbSet } from '../data/idbStorage';
+import RichTextEditor, { BRAND_FONTS } from '../components/RichTextEditor';
 
 interface ContentPagesProps {
   initialSubTab?: 'hero-slider' | 'homepage-banners' | 'content-pages' | 'content-blog' | 'content-faq';
@@ -143,6 +144,16 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const promoModalDesktopRef = useRef<HTMLInputElement | null>(null);
   const promoModalMobileRef = useRef<HTMLInputElement | null>(null);
+
+  // Custom Static Page Edit Modal State
+  const [editingPage, setEditingPage] = useState<ContentPageItem | null>(null);
+  const [isPageModalOpen, setIsPageModalOpen] = useState(false);
+
+  // Drag and Drop States for Modals
+  const [isDraggingSlideDesktop, setIsDraggingSlideDesktop] = useState(false);
+  const [isDraggingSlideMobile, setIsDraggingSlideMobile] = useState(false);
+  const [isDraggingPromoDesktop, setIsDraggingPromoDesktop] = useState(false);
+  const [isDraggingPromoMobile, setIsDraggingPromoMobile] = useState(false);
 
   // Fetch initial data from API and sync with state
   const loadContentData = async () => {
@@ -262,6 +273,38 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
     setTimeout(() => setIsSavedNotice(false), 2500);
   };
 
+  // Handle Global Clipboard Paste (Ctrl + V) for Banners & Slides
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            const compressed = await compressImage(file, 1920, 1080, 0.85);
+            if (compressed) {
+              if (editingSlide) {
+                setEditingSlide(prev => prev ? { ...prev, image: compressed, mobileImage: prev.mobileImage || compressed } : null);
+                showSaveToast();
+              } else if (editingPromoBanner) {
+                setEditingPromoBanner(prev => prev ? { ...prev, image: compressed, mobileImage: prev.mobileImage || compressed } : null);
+                showSaveToast();
+              }
+            }
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [editingSlide, editingPromoBanner]);
+
   // Handle Image Upload for Hero Slide (with automatic WebP compression)
   const handleSlideImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isMobile = false) => {
     const file = e.target.files?.[0];
@@ -301,6 +344,60 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
       setEditingPromoBanner((prev) => prev ? { ...prev, mobileImage: compressed } : null);
     } else {
       setEditingPromoBanner((prev) => prev ? { ...prev, image: compressed } : null);
+    }
+  };
+
+  // Drag & drop drop handlers for Hero Slide
+  const handleSlideDesktopDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingSlideDesktop(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/') && editingSlide) {
+      const compressed = await compressImage(file, 1920, 1080, 0.85);
+      if (compressed) {
+        setEditingSlide({ ...editingSlide, image: compressed, mobileImage: editingSlide.mobileImage || compressed });
+      }
+    }
+  };
+
+  const handleSlideMobileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingSlideMobile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/') && editingSlide) {
+      const compressed = await compressImage(file, 1080, 1920, 0.85);
+      if (compressed) {
+        setEditingSlide({ ...editingSlide, mobileImage: compressed });
+      }
+    }
+  };
+
+  // Drag & drop drop handlers for Promo Banner
+  const handlePromoDesktopDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingPromoDesktop(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/') && editingPromoBanner) {
+      const compressed = await compressImage(file, 1920, 1080, 0.85);
+      if (compressed) {
+        setEditingPromoBanner({ ...editingPromoBanner, image: compressed, mobileImage: editingPromoBanner.mobileImage || compressed });
+      }
+    }
+  };
+
+  const handlePromoMobileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingPromoMobile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/') && editingPromoBanner) {
+      const compressed = await compressImage(file, 1080, 1920, 0.85);
+      if (compressed) {
+        setEditingPromoBanner({ ...editingPromoBanner, mobileImage: compressed });
+      }
     }
   };
 
@@ -371,6 +468,22 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
     syncSlidesToBackend(newSlides);
     setIsModalOpen(false);
     setEditingSlide(null);
+  };
+
+  // Save Static Page Modal
+  const saveEditingPage = () => {
+    if (!editingPage) return;
+    const exists = pages.some((p) => p.id === editingPage.id);
+    let newPages: ContentPageItem[];
+    if (exists) {
+      newPages = pages.map((p) => (p.id === editingPage.id ? editingPage : p));
+    } else {
+      newPages = [...pages, editingPage];
+    }
+    setPages(newPages);
+    setIsPageModalOpen(false);
+    setEditingPage(null);
+    showSaveToast();
   };
 
   const filteredSlides = slides.filter((s) =>
@@ -763,23 +876,25 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   id: `page-${Date.now()}`,
                   title: 'New Store Page',
                   slug: `page-${Date.now()}`,
-                  content: 'Page content description here...',
+                  content: '<p>Enter rich page content here...</p>',
+                  metaTitle: '',
+                  metaDescription: '',
                   status: 'Published',
                   updatedAt: new Date().toISOString().split('T')[0]
                 };
-                setPages([...pages, newPage]);
-                showSaveToast();
+                setEditingPage(newPage);
+                setIsPageModalOpen(true);
               }}
               className="px-4 py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Add New Page</span>
+              <span>Add New Page</span>
             </button>
           </div>
 
           <div className="space-y-4">
             {pages.map((p) => (
-              <div key={p.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between gap-4">
+              <div key={p.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <h4 className="font-bold text-sm text-slate-900">{p.title}</h4>
                   <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -791,6 +906,17 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-full">
                     {p.status}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingPage({ ...p });
+                      setIsPageModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -850,14 +976,35 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   />
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed border-slate-300 hover:border-black cursor-pointer bg-slate-50 flex flex-col items-center justify-center group"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingSlideDesktop(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingSlideDesktop(false);
+                    }}
+                    onDrop={handleSlideDesktopDrop}
+                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                      isDraggingSlideDesktop
+                        ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
+                        : 'border-slate-300 hover:border-black'
+                    }`}
                   >
+                    {isDraggingSlideDesktop && (
+                      <div className="absolute inset-0 z-30 bg-amber-600/90 text-white flex flex-col items-center justify-center gap-1 pointer-events-none animate-in fade-in">
+                        <UploadCloud className="w-7 h-7 animate-bounce" />
+                        <span className="text-[11px] font-bold uppercase">Drop Desktop Image</span>
+                      </div>
+                    )}
                     {editingSlide.image ? (
                       <img src={editingSlide.image} alt="Desktop Preview" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-center p-2">
-                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1" />
-                        <span className="text-[11px] font-bold text-slate-600">Click to Upload Desktop Image</span>
+                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[11px] font-bold text-slate-600">Upload or Drop Desktop Image</span>
                       </div>
                     )}
                   </div>
@@ -884,14 +1031,35 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   />
                   <div
                     onClick={() => document.getElementById('mobile-slide-upload')?.click()}
-                    className="relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed border-slate-300 hover:border-black cursor-pointer bg-slate-50 flex flex-col items-center justify-center group"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingSlideMobile(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingSlideMobile(false);
+                    }}
+                    onDrop={handleSlideMobileDrop}
+                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                      isDraggingSlideMobile
+                        ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
+                        : 'border-slate-300 hover:border-black'
+                    }`}
                   >
+                    {isDraggingSlideMobile && (
+                      <div className="absolute inset-0 z-30 bg-amber-600/90 text-white flex flex-col items-center justify-center gap-1 pointer-events-none animate-in fade-in">
+                        <UploadCloud className="w-7 h-7 animate-bounce" />
+                        <span className="text-[11px] font-bold uppercase">Drop Mobile Image</span>
+                      </div>
+                    )}
                     {editingSlide.mobileImage ? (
                       <img src={editingSlide.mobileImage} alt="Mobile Preview" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-center p-2">
-                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1" />
-                        <span className="text-[11px] font-bold text-slate-600">Click to Upload Mobile Image</span>
+                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[11px] font-bold text-slate-600">Upload or Drop Mobile Image</span>
                       </div>
                     )}
                   </div>
@@ -934,17 +1102,15 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                 </div>
               </div>
 
-              {/* SUBTITLE */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Subtitle / Description
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Timeless ethnic wear crafted with love, precision and elegance."
+              {/* RICH TEXT SUBTITLE / DESCRIPTION */}
+              <div>
+                <RichTextEditor
                   value={editingSlide.subtitle || ''}
-                  onChange={(e) => setEditingSlide({ ...editingSlide, subtitle: e.target.value })}
-                  className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                  onChange={(val) => setEditingSlide({ ...editingSlide, subtitle: val })}
+                  label="Hero Slide Subtitle / Rich Description"
+                  placeholder="e.g. Timeless ethnic wear crafted with love, precision and elegance."
+                  minHeight="100px"
+                  showFontSelector={true}
                 />
               </div>
 
@@ -1100,8 +1266,29 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   />
                   <div
                     onClick={() => promoModalDesktopRef.current?.click()}
-                    className="relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed border-slate-300 hover:border-black cursor-pointer bg-slate-50 flex flex-col items-center justify-center group"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingPromoDesktop(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingPromoDesktop(false);
+                    }}
+                    onDrop={handlePromoDesktopDrop}
+                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                      isDraggingPromoDesktop
+                        ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
+                        : 'border-slate-300 hover:border-black'
+                    }`}
                   >
+                    {isDraggingPromoDesktop && (
+                      <div className="absolute inset-0 z-30 bg-amber-600/90 text-white flex flex-col items-center justify-center gap-1 pointer-events-none animate-in fade-in">
+                        <UploadCloud className="w-7 h-7 animate-bounce" />
+                        <span className="text-[11px] font-bold uppercase">Drop Desktop Banner</span>
+                      </div>
+                    )}
                     {editingPromoBanner.image ? (
                       <img
                         src={editingPromoBanner.image}
@@ -1110,8 +1297,8 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                       />
                     ) : (
                       <div className="text-center p-2">
-                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1" />
-                        <span className="text-[11px] font-bold text-slate-600">Click to Upload Desktop Image</span>
+                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[11px] font-bold text-slate-600">Upload or Drop Desktop Image</span>
                       </div>
                     )}
                   </div>
@@ -1140,8 +1327,29 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   />
                   <div
                     onClick={() => promoModalMobileRef.current?.click()}
-                    className="relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed border-slate-300 hover:border-black cursor-pointer bg-slate-50 flex flex-col items-center justify-center group"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingPromoMobile(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingPromoMobile(false);
+                    }}
+                    onDrop={handlePromoMobileDrop}
+                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                      isDraggingPromoMobile
+                        ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
+                        : 'border-slate-300 hover:border-black'
+                    }`}
                   >
+                    {isDraggingPromoMobile && (
+                      <div className="absolute inset-0 z-30 bg-amber-600/90 text-white flex flex-col items-center justify-center gap-1 pointer-events-none animate-in fade-in">
+                        <UploadCloud className="w-7 h-7 animate-bounce" />
+                        <span className="text-[11px] font-bold uppercase">Drop Mobile Banner</span>
+                      </div>
+                    )}
                     {editingPromoBanner.mobileImage ? (
                       <img
                         src={editingPromoBanner.mobileImage}
@@ -1150,8 +1358,8 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                       />
                     ) : (
                       <div className="text-center p-2">
-                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1" />
-                        <span className="text-[11px] font-bold text-slate-600">Click to Upload Mobile Image</span>
+                        <UploadCloud className="w-5 h-5 text-slate-400 mx-auto mb-1 group-hover:scale-110 transition-transform" />
+                        <span className="text-[11px] font-bold text-slate-600">Upload or Drop Mobile Image</span>
                       </div>
                     )}
                   </div>
@@ -1200,19 +1408,17 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                 </div>
               </div>
 
-              {/* SUBTITLE */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Subtitle / Description
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Crafted with colour, culture & love."
+              {/* RICH TEXT SUBTITLE / DESCRIPTION */}
+              <div>
+                <RichTextEditor
                   value={editingPromoBanner.subtitle || ''}
-                  onChange={(e) =>
-                    setEditingPromoBanner({ ...editingPromoBanner, subtitle: e.target.value })
+                  onChange={(val) =>
+                    setEditingPromoBanner({ ...editingPromoBanner, subtitle: val })
                   }
-                  className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                  label="Promo Banner Subtitle / Rich Description"
+                  placeholder="e.g. Crafted with colour, culture & love."
+                  minHeight="100px"
+                  showFontSelector={true}
                 />
               </div>
 
@@ -1294,6 +1500,130 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                 className="px-5 py-2.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md active:scale-95"
               >
                 Save Promo Banner
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STATIC PAGE ADD / EDIT MODAL */}
+      {isPageModalOpen && editingPage && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-black" />
+                <h3 className="text-sm font-black text-slate-900">
+                  {pages.some(p => p.id === editingPage.id) ? `Edit Page: ${editingPage.title}` : 'Add New Custom Page'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPageModalOpen(false);
+                  setEditingPage(null);
+                }}
+                className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Page Title *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. About Us or Craftsmanship Story"
+                    value={editingPage.title}
+                    onChange={(e) => setEditingPage({ ...editingPage, title: e.target.value })}
+                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-black"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    URL Slug
+                  </label>
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono">
+                    <span className="text-slate-400">/</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. about-us"
+                      value={editingPage.slug}
+                      onChange={(e) => setEditingPage({ ...editingPage, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+                      className="flex-1 bg-transparent font-bold text-slate-900 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* RICH TEXT PAGE CONTENT */}
+              <div>
+                <RichTextEditor
+                  value={editingPage.content || ''}
+                  onChange={(val) => setEditingPage({ ...editingPage, content: val })}
+                  label="Page Content (Rich Text Formatting & Custom Fonts)"
+                  placeholder="Write comprehensive story, policies, or brand details..."
+                  minHeight="220px"
+                  showFontSelector={true}
+                />
+              </div>
+
+              {/* SEO METADATA */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Meta Title (SEO)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. About Us - Awesome Handmade"
+                    value={editingPage.metaTitle || ''}
+                    onChange={(e) => setEditingPage({ ...editingPage, metaTitle: e.target.value })}
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Status
+                  </label>
+                  <select
+                    value={editingPage.status}
+                    onChange={(e) => setEditingPage({ ...editingPage, status: e.target.value as any })}
+                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-black bg-white"
+                  >
+                    <option value="Published">Published (Live)</option>
+                    <option value="Draft">Draft (Hidden)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPageModalOpen(false);
+                  setEditingPage(null);
+                }}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEditingPage}
+                className="px-5 py-2.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md active:scale-95"
+              >
+                Save Page
               </button>
             </div>
           </div>

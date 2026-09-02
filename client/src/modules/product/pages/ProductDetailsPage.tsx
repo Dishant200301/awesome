@@ -11,7 +11,9 @@ import { SizeChartModal } from "../components/SizeChartModal";
 import { MobileStickyBottomBar } from "../components/MobileStickyBottomBar";
 import { BenefitsSection } from "../components/BenefitsSection";
 import { ProductDescriptionSection } from "../components/ProductDescriptionSection";
+import { ProductVideosSection } from "../components/ProductVideosSection";
 import { CustomerReviewsSection } from "../components/CustomerReviewsSection";
+import { RelatedProductsSection } from "../components/RelatedProductsSection";
 import { ProductColorVariation } from "../types/product";
 import { getLiveProductById, fetchLiveProducts, subscribeToProductStore } from "@/modules/core/lib/apiStore";
 import { useRecentlyViewed } from "../context/RecentlyViewedContext";
@@ -59,16 +61,30 @@ export const ProductDetailsPage: React.FC = () => {
     );
 
     // Build color images (Main Image + Gallery Images for selected color)
-    const colorMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || colorObj?.galleryImages?.[0] || rootGallery[0] || "";
+    const colorMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || colorObj?.galleryImages?.[0] || "";
     const colorGallery = (colorMedia?.gallery && colorMedia.gallery.length > 0)
       ? colorMedia.gallery
-      : (colorObj?.galleryImages && colorObj.galleryImages.length > 0) ? colorObj.galleryImages : rootGallery;
-    const allUrls = Array.from(new Set([colorMain, ...colorGallery, ...rootGallery].filter(Boolean)));
+      : (colorObj?.galleryImages && colorObj.galleryImages.length > 0) ? colorObj.galleryImages : [];
+    const colorSpecificUrls = Array.from(new Set([colorMain, ...colorGallery].filter(Boolean)));
+    const allUrls = colorSpecificUrls.length > 0 ? colorSpecificUrls : rootGallery;
     const colorImages = allUrls.map((gUrl, idx) => ({
       id: `img-gal-${idx}`,
       url: gUrl,
       alt: `${product.name} - ${selectedColor} View ${idx + 1}`
     }));
+
+    const dedupeImages = (imgs: any[]): any[] => {
+      const seen = new Set<string>();
+      const res: any[] = [];
+      (imgs || []).forEach((img, idx) => {
+        const urlStr = typeof img === "string" ? img : img?.url;
+        if (urlStr && typeof urlStr === "string" && urlStr.trim() && !seen.has(urlStr.trim())) {
+          seen.add(urlStr.trim());
+          res.push(typeof img === "string" ? { id: `img-${idx}`, url: urlStr.trim(), alt: `${product.name} ${idx + 1}` } : { ...img, url: urlStr.trim() });
+        }
+      });
+      return res.length > 0 ? res : colorImages;
+    };
 
     if (!product.variations || product.variations.length === 0) {
       return {
@@ -96,9 +112,7 @@ export const ProductDetailsPage: React.FC = () => {
     );
 
     if (exactMatch) {
-      const finalImages = (exactMatch.images && exactMatch.images.length > 1)
-        ? exactMatch.images
-        : (colorImages.length > 0 ? colorImages : (exactMatch.images || []));
+      const finalImages = dedupeImages(exactMatch.images && exactMatch.images.length > 0 ? exactMatch.images : colorImages);
 
       return {
         ...exactMatch,
@@ -114,9 +128,7 @@ export const ProductDetailsPage: React.FC = () => {
     );
 
     if (colorMatch) {
-      const finalImages = (colorMatch.images && colorMatch.images.length > 1)
-        ? colorMatch.images
-        : (colorImages.length > 0 ? colorImages : (colorMatch.images || []));
+      const finalImages = dedupeImages(colorMatch.images && colorMatch.images.length > 0 ? colorMatch.images : colorImages);
 
       return {
         ...colorMatch,
@@ -143,7 +155,6 @@ export const ProductDetailsPage: React.FC = () => {
     };
   }, [product.colors, (product as any).colorMediaConfigs, product.variations, selectedColor, selectedSize, prodAny]);
 
-  const [hoverVariation, setHoverVariation] = useState<ProductColorVariation | null>(null);
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
 
   // Subscribe to live API product store updates from Admin
@@ -232,15 +243,13 @@ export const ProductDetailsPage: React.FC = () => {
     };
   }, []);
 
-  const displayedVariation = hoverVariation || activeVariation;
-
   return (
     <div className="min-h-screen bg-white text-neutral-900 font-sans selection:bg-black selection:text-white pb-16 md:pb-0 overflow-x-clip">
       {/* Top Navbar */}
       <Navbar />
 
       {/* Main Content Container */}
-      <div className="pt-10 md:pt-12">
+      <div className="pt-6 md:pt-6">
         {/* Dynamic Breadcrumb */}
         <ProductBreadcrumb
           category={product.category || product.categories?.[0] || "Handmade"}
@@ -249,15 +258,15 @@ export const ProductDetailsPage: React.FC = () => {
         />
 
         {/* TOP PRODUCT HERO SECTION */}
-        <div className="max-w-[1500px] mx-auto px-4 md:px-8 py-4 md:py-8">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-8 py-4 md:py-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
             {/* Left Column: Image Gallery (Sticky on Laptop & Desktop) */}
             <div className="w-full lg:sticky lg:top-24 h-fit">
               <VerticalGallery
-                images={displayedVariation.images && displayedVariation.images.length > 0 ? displayedVariation.images : [
+                images={activeVariation.images && activeVariation.images.length > 0 ? activeVariation.images : [
                   { id: "img-1", url: prodAny.image || "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=800", alt: product.name }
                 ]}
-                sku={displayedVariation.sku}
+                sku={activeVariation.sku}
               />
             </div>
 
@@ -270,7 +279,6 @@ export const ProductDetailsPage: React.FC = () => {
                 onSelectVariation={(v) => {
                   const targetCol = v.colorName || (v as any).color || "Standard";
                   setSelectedColor(targetCol);
-                  setHoverVariation(null);
                   const colorObj = (product.colors || []).find(
                     (c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === targetCol.toLowerCase()
                   );
@@ -284,7 +292,6 @@ export const ProductDetailsPage: React.FC = () => {
                     setSelectedSize(colorSizes[0]);
                   }
                 }}
-                onHoverVariation={setHoverVariation}
                 selectedSize={selectedSize}
                 onSelectSize={setSelectedSize}
                 onOpenSizeChart={() => setIsSizeChartOpen(true)}
@@ -293,22 +300,40 @@ export const ProductDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* BENEFITS SECTION */}
-        <BenefitsSection />
+
 
         {/* PRODUCT DESCRIPTION & FEATURE CARDS */}
         <ProductDescriptionSection
+          product={product}
           cards={product.descriptionCards}
           selectedColor={selectedColor}
           idealForPills={product.idealForPills}
           fullDescription={product.fullDescription}
           shortDescription={product.shortDescription}
+          specifications={(product as any).specifications}
+          features={(product as any).features}
+          customAttributes={(product as any).customAttributes}
+          dimensions={(product as any).dimensions}
+          weight={(product as any).weight}
+          material={(product as any).material || (product as any).extendedDetails?.materialDetails}
+          color={(product as any).color}
+          brand={product.brand}
+          highlights={product.highlights}
+          productAttributes={product.productAttributes}
+          careInstructions={product.extendedDetails?.careInstructions || (product as any).careInstructions}
+          reviewCount={product.reviewCount}
         />
+        {/* BENEFITS SECTION */}
+        {/* <BenefitsSection /> */}
+
+       
+        {/* RELATED PRODUCTS SECTION (Strictly matching current product's category/subcategory) */}
+        <RelatedProductsSection currentProduct={product} />
 
         {/* CUSTOMER REVIEWS */}
-        <div id="customer-reviews">
+        {/* <div id="customer-reviews">
           <CustomerReviewsSection />
-        </div>
+        </div> */}
       </div>
 
       {/* MOBILE STICKY BOTTOM ACTION BAR */}

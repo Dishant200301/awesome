@@ -1,1642 +1,2379 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft, 
-  Sparkles, 
-  Upload, 
-  Plus, 
-  Trash2, 
-  Layers, 
-  Check, 
-  Tag, 
-  DollarSign, 
-  Package, 
-  Globe, 
-  RefreshCw,
-  X,
-  Image as ImageIcon,
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  ChevronLeft,
   UploadCloud,
-  ChevronUp,
-  ChevronDown,
-  Palette,
-  Ruler,
-  FolderTree,
-  Wand2,
-  Loader2,
+  X,
+  Plus,
+  Trash2,
+  Eye,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Info,
+  Save,
+  Package,
+  Layers,
+  Palette,
+  Sliders,
+  ChevronDown,
+  Search,
+  Check,
+  Image as ImageIcon
 } from 'lucide-react';
-import { 
-  MOCK_CATEGORIES, 
-  MOCK_SUBCATEGORIES, 
-  MOCK_BRANDS, 
-  MOCK_COLLECTIONS, 
-  MOCK_PRODUCTS, 
-  broadcastAdminProductChange, 
-  getAdminProducts, 
-  fetchProductsFromBackend, 
-  getAdminCategoriesAndSubcategories 
+import {
+  getAdminCategoriesAndSubcategories,
+  broadcastAdminProductChange
 } from '../data/mockAdminData';
-import { Product, Variant, ProductColor, ProductDescriptionCard, ProductHighlight, ProductWashingInstruction, ProductManufacturingInfo, SizeGuide } from '../types/admin';
-import { ProductAttributeAssignment, ProductVariantConfig, ColorMediaConfig, ProductSizeChartConfig } from '../types/attribute.types';
-import { ProductAttributeSection } from '../components/ProductAttributeSection';
-import { ColorGallerySection } from '../components/ColorGallerySection';
-import { VariantGeneratorSection } from '../components/VariantGeneratorSection';
-import { ProductSizeChartSection } from '../components/ProductSizeChartSection';
+import {
+  Product,
+  ProductOptionItem,
+  ProductVariantDetail,
+  ProductAddonOption
+} from '../types/admin';
+import { AttributeMaster } from '../types/attribute.types';
+import { AttributeService } from '../services/attributeService';
 import { AdminApiService } from '../services/adminApi';
-import { idbGet } from '../data/idbStorage';
-import LucideIconPicker from '../components/LucideIconPicker';
-import { Select } from '../components/ui/select';
-import { Card } from '../components/ui/card';
+import { RichTextEditor } from '../components/RichTextEditor';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Input } from '../components/ui/input';
+import { getClosestColorName, findHexByColorName } from '../utils/colorMatcher';
 
 interface ProductCreatePageProps {
-  onNavigate: (tab: string) => void;
+  onNavigate?: (tab: string, productId?: string) => void;
   editingProductId?: string;
 }
 
+interface SpecItem {
+  id: string;
+  key: string;
+  value: string;
+}
+
+const DEFAULT_COLOR_PALETTES = [
+  { name: 'Maroon', hex: '#800000' },
+  { name: 'Gold', hex: '#D4AF37' },
+  { name: 'Royal Blue', hex: '#4169E1' },
+  { name: 'Emerald Green', hex: '#50C878' },
+  { name: 'Pink', hex: '#FF69B4' },
+  { name: 'Yellow', hex: '#FFD700' },
+  { name: 'Red', hex: '#DC2626' },
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Black', hex: '#18181B' },
+  { name: 'Purple', hex: '#9333EA' },
+  { name: 'Orange', hex: '#F97316' },
+  { name: 'Turquoise', hex: '#06B6D4' }
+];
+
 export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate, editingProductId }) => {
-  // Live Categories & Subcategories State
+  const params = useParams<{ id?: string }>();
+  const routerNavigate = useNavigate();
+  const effectiveProductId = editingProductId || params.id;
+  const isEditMode = Boolean(effectiveProductId);
+
+  const navigateBack = () => {
+    if (onNavigate) {
+      onNavigate('all-products');
+    } else {
+      routerNavigate('/products');
+    }
+  };
+
+  // Loading & Saving States
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(isEditMode);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
+  const [showFinalPreviewModal, setShowFinalPreviewModal] = useState<boolean>(false);
+
+  // Dynamic Categories from Store & Backend
   const [categoriesData, setCategoriesData] = useState(() => getAdminCategoriesAndSubcategories());
+  const mainCategories = categoriesData.mainCategories || [];
+  const allSubcategories = categoriesData.subcategories || [];
+
+  // Live Color Picker State
+  const [activePickerHex, setActivePickerHex] = useState<string>('#50C878');
+  const [activePickerName, setActivePickerName] = useState<string>('Emerald Green');
+
+  const handleColorPickerChange = (hex: string) => {
+    setActivePickerHex(hex);
+    const closest = getClosestColorName(hex);
+    setActivePickerName(closest.name);
+  };
+
+  // Dynamic Master Attributes
+  const [masterAttributes, setMasterAttributes] = useState<AttributeMaster[]>([]);
+  const [openValueDropdownId, setOpenValueDropdownId] = useState<string | null>(null);
+  const [valueSearchQueries, setValueSearchQueries] = useState<{ [optionId: string]: string }>({});
 
   useEffect(() => {
-    const handleCategorySync = () => {
-      setCategoriesData(getAdminCategoriesAndSubcategories());
+    AttributeService.getAttributes().then((attrs) => {
+      setMasterAttributes(attrs || []);
+    });
+
+    const handleAttrSync = () => {
+      AttributeService.getAttributes().then((attrs) => {
+        setMasterAttributes(attrs || []);
+      });
     };
-    window.addEventListener('awesome_category_sync', handleCategorySync);
-    window.addEventListener('aaramly_category_sync', handleCategorySync);
+    window.addEventListener('awesome_attribute_sync', handleAttrSync);
     return () => {
-      window.removeEventListener('awesome_category_sync', handleCategorySync);
-      window.removeEventListener('aaramly_category_sync', handleCategorySync);
+      window.removeEventListener('awesome_attribute_sync', handleAttrSync);
     };
   }, []);
 
-  // Form State
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [shortDescription, setShortDescription] = useState('');
-  const [fullDescription, setFullDescription] = useState('');
-  const [mainImage, setMainImage] = useState('');
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  useEffect(() => {
+    const handleTaxonomySync = () => {
+      setCategoriesData(getAdminCategoriesAndSubcategories());
+    };
+    window.addEventListener('awesome_category_sync', handleTaxonomySync);
+    window.addEventListener('aocind_category_sync', handleTaxonomySync);
+    return () => {
+      window.removeEventListener('awesome_category_sync', handleTaxonomySync);
+      window.removeEventListener('aocind_category_sync', handleTaxonomySync);
+    };
+  }, []);
 
-  // Product Type & Categories
+  // 1. BASIC DETAILS & CLASSIFICATION (Merged inside Product Details)
+  const [name, setName] = useState<string>('');
+  const [displayName, setDisplayName] = useState<string>('');
+  const [slug, setSlug] = useState<string>('');
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState<boolean>(false);
+  const [category, setCategory] = useState<string>(mainCategories[0]?.name || 'Latkan');
+  const [subcategory, setSubcategory] = useState<string>('');
+  const [brand, setBrand] = useState<string>('Awesome Handmade');
+  const [defaultKey, setDefaultKey] = useState<string>('Artisan Special');
+  const [status, setStatus] = useState<'Active' | 'Draft'>('Active');
+
+  // Available subcategories filtered by selected category
+  const filteredSubcategories = useMemo(() => {
+    const parentCat = mainCategories.find(
+      (c) => c.name.toLowerCase() === category.toLowerCase() || c.id === category
+    );
+    if (!parentCat) return [];
+    return allSubcategories.filter(
+      (s) =>
+        s.categoryId === parentCat.id ||
+        s.parentId === parentCat.id ||
+        (s.categoryName && s.categoryName.toLowerCase() === parentCat.name.toLowerCase()) ||
+        (s.parentName && s.parentName.toLowerCase() === parentCat.name.toLowerCase())
+    );
+  }, [category, mainCategories, allSubcategories]);
+
+  // Set subcategory default when category changes
+  useEffect(() => {
+    if (filteredSubcategories.length > 0 && !filteredSubcategories.some((s) => s.name === subcategory)) {
+      setSubcategory(filteredSubcategories[0].name);
+    }
+  }, [filteredSubcategories, category]);
+
+  // 2. PRODUCT TYPE (Simple vs Variable)
   const [productType, setProductType] = useState<'Simple' | 'Variable'>('Simple');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['Latkan']);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('Mirror Latkan');
-  const [brand, setBrand] = useState('Awesome Handmade');
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  // Pricing & Default Inventory
-  const [salePrice, setSalePrice] = useState<number>(799);
+  // 3. PRICING & INVENTORY (For Simple Product)
   const [regularPrice, setRegularPrice] = useState<number>(1299);
-  const [costPrice, setCostPrice] = useState<number>(350);
-  const [sku, setSku] = useState<string>('AWH-PRD-001');
-  const [barcode, setBarcode] = useState<string>('890123000001');
-  const [stockQuantity, setStockQuantity] = useState<number>(150);
-  const [lowStockAlert, setLowStockAlert] = useState<number>(10);
-  const [allowBackorders, setAllowBackorders] = useState<boolean>(false);
-  const [trackInventory, setTrackInventory] = useState<boolean>(true);
-  const [status, setStatus] = useState<'Published' | 'Draft' | 'Hidden'>('Published');
-  const [isPublished, setIsPublished] = useState<boolean>(true);
+  const [salePrice, setSalePrice] = useState<number>(799);
+  const [sku, setSku] = useState<string>('AH-PROD-001');
+  const [stock, setStock] = useState<number>(50);
 
-  // Colors & Variants State
-  const [colors, setColors] = useState<ProductColor[]>([
-    {
-      id: 'col-1',
-      colorName: 'Red',
-      colorHex: '#800000',
-      displayImage: '',
-      mainImage: '',
-      galleryImages: [],
-      sizes: ['Standard']
-    },
-    {
-      id: 'col-2',
-      colorName: 'Gold',
-      colorHex: '#D4AF37',
-      displayImage: '',
-      mainImage: '',
-      galleryImages: [],
-      sizes: ['Standard']
-    }
+  // 4. MEDIA (For Simple Product)
+  const [mainImage, setMainImage] = useState<string>('/images/category/Latkan.webp');
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [isMainDragOver, setIsMainDragOver] = useState(false);
+  const [isGalleryDragOver, setIsGalleryDragOver] = useState(false);
+
+  // Drag over states for variants
+  const [activeVarDragMain, setActiveVarDragMain] = useState<number | null>(null);
+  const [activeVarDragGal, setActiveVarDragGal] = useState<number | null>(null);
+
+  // Focus target for paste
+  const [activePasteTarget, setActivePasteTarget] = useState<
+    'root_main' | 'root_gallery' | { type: 'var_main' | 'var_gallery'; index: number }
+  >('root_main');
+
+  // 5. DESCRIPTIONS
+  const [shortDescription, setShortDescription] = useState<string>('');
+  const [longDescription, setLongDescription] = useState<string>('');
+
+  // 6. ADDITIONAL INFORMATION / SPECIFICATIONS (Dynamic Key-Value Pairs)
+  const [specifications, setSpecifications] = useState<SpecItem[]>([
+    { id: 'spec-1', key: 'Primary Material', value: 'Silk & Zari, Pure Cotton' },
+    { id: 'spec-2', key: 'Craft Technique', value: 'Handmade Mirror Work & Knotting' },
+    { id: 'spec-3', key: 'Origin / Made In', value: 'Surat, Gujarat, India' },
+    { id: 'spec-4', key: 'Care Instructions', value: 'Spot Clean Only / Dry in Shade' },
+    { id: 'spec-5', key: 'Package Contains', value: '1 Pair (2 Pieces)' }
   ]);
 
-  const [activeColorEditId, setActiveColorEditId] = useState<string | null>('col-1');
-  const [customSizeAdd, setCustomSizeAdd] = useState('');
-  const [generatedVariants, setGeneratedVariants] = useState<Variant[]>([]);
-  const [bulkPriceInput, setBulkPriceInput] = useState<number | ''>('');
-  const [bulkMrpInput, setBulkMrpInput] = useState<number | ''>('');
-  const [bulkStockInput, setBulkStockInput] = useState<number | ''>('');
-
-  // Size Guides & Custom Data
-  const [selectedSizeGuideId, setSelectedSizeGuideId] = useState<string>('');
-  const [sizeGuidesList, setSizeGuidesList] = useState<SizeGuide[]>([]);
-  const [showCreateSizeGuideModal, setShowCreateSizeGuideModal] = useState(false);
-  const [newGuideTitle, setNewGuideTitle] = useState('');
-  const [newGuideDesc, setNewGuideDesc] = useState('');
-  const [newGuideCategories, setNewGuideCategories] = useState<string[]>(['Choli']);
-
-  // Dynamic Content Cards
-  const [descriptionCards, setDescriptionCards] = useState<ProductDescriptionCard[]>([
+  // 7. VARIABLE PRODUCT: OPTIONS & VARIANTS
+  const [options, setOptions] = useState<ProductOptionItem[]>([
     {
-      id: 'card-1',
-      title: 'Authentic Traditional Craftsmanship',
-      description: 'Handcrafted with intricate mirror work and artisanal needlework by master craftswomen in Surat, Gujarat.',
-      image: '',
-      sortOrder: 1
+      id: 'opt-color',
+      name: 'Color',
+      values: []
     }
   ]);
-  const [highlights, setHighlights] = useState<ProductHighlight[]>([]);
-  const [washingInstructions, setWashingInstructions] = useState<ProductWashingInstruction[]>([]);
-  const [manufacturingInfo, setManufacturingInfo] = useState<ProductManufacturingInfo>({
-    countryOfOrigin: 'India',
-    manufacturer: 'Awesome Handmade Studio',
-    address: 'Surat, Gujarat, India',
-    packedBy: 'Awesome Handmade Studio',
-    importedBy: '',
-    material: 'Mirror & Cotton Silk',
-    careEmail: 'support@awesomehandmade.com',
-    carePhone: '+91 98765 43210'
-  });
-  const [idealForPills, setIdealForPills] = useState<string[]>(['Festive', 'Navratri', 'Bridal & Gifting']);
-  const [productAttributes, setProductAttributes] = useState<ProductAttributeAssignment[]>([]);
-  const [colorMediaConfigs, setColorMediaConfigs] = useState<ColorMediaConfig[]>([]);
-  const [sizeChart, setSizeChart] = useState<ProductSizeChartConfig | undefined>(undefined);
+  const [newOptionValueInputs, setNewOptionValueInputs] = useState<{ [optionId: string]: string }>({});
 
-  // Shipping & SEO
-  const [weight, setWeight] = useState(0.2);
-  const [length, setLength] = useState(25);
-  const [width, setWidth] = useState(20);
-  const [height, setHeight] = useState(3);
-  const [metaTitle, setMetaTitle] = useState('');
-  const [metaDescription, setMetaDescription] = useState('');
-  const [keywords, setKeywords] = useState('');
-  const [canonicalUrl, setCanonicalUrl] = useState('');
+  const [variants, setVariants] = useState<ProductVariantDetail[]>([]);
 
-  // Form submission status
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  // 8. ADDONS (Optional props)
+  const [addons] = useState<ProductAddonOption[]>([]);
 
-  // AI Auto-Fill State
-  const [aiImagePreview, setAiImagePreview] = useState<string>('');
-  const [aiHint, setAiHint] = useState<string>('');
-  const [isGeneratingAi, setIsGeneratingAi] = useState<boolean>(false);
-  const [aiSuccessMessage, setAiSuccessMessage] = useState<string>('');
-  const [aiErrorMessage, setAiErrorMessage] = useState<string>('');
-  const [isTargetLoading, setIsTargetLoading] = useState<boolean>(!!editingProductId);
-
-  const handleAiAutoFill = async (imageInput?: string) => {
-    const targetImage = imageInput || aiImagePreview || mainImage;
-    if (!targetImage) {
-      setAiErrorMessage('Please select or upload a product photo first.');
-      return;
+  // Auto-generate slug from name
+  useEffect(() => {
+    if (!isSlugManuallyEdited && name) {
+      const generated = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+      setSlug(generated);
     }
+  }, [name, isSlugManuallyEdited]);
 
-    setIsGeneratingAi(true);
-    setAiErrorMessage('');
-    setAiSuccessMessage('');
+  // Auto-generate SKU when title or category changes
+  useEffect(() => {
+    if (!isEditMode && name && (!sku || sku === 'AH-PROD-001')) {
+      const catCode = category ? category.slice(0, 3).toUpperCase() : 'PRD';
+      const cleanName = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase();
+      setSku(`AH-${catCode}-${cleanName || '001'}`);
+    }
+  }, [name, category, isEditMode]);
 
-    try {
-      const genData = await AdminApiService.generateProductDetailsFromImage(targetImage, aiHint);
-      if (genData) {
-        // 1. Basic info
-        if (genData.name) setName(genData.name);
-        if (genData.slug) setSlug(genData.slug);
-        if (genData.shortDescription) setShortDescription(genData.shortDescription);
-        if (genData.fullDescription) setFullDescription(genData.fullDescription);
-        
-        // 2. Images
-        setMainImage(targetImage);
-        
-        // 3. Category & Taxonomy
-        if (genData.category) setSelectedCategories([genData.category]);
-        if (genData.subcategory) setSelectedSubcategory(genData.subcategory);
-        if (genData.brand) setBrand(genData.brand);
-        if (genData.collections && genData.collections.length > 0) setSelectedCollections(genData.collections);
-        if (genData.tags && genData.tags.length > 0) setSelectedTags(genData.tags);
+  // Global Clipboard Paste (Ctrl + V) Handler
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
 
-        // 4. Pricing & Inventory
-        if (genData.price) setSalePrice(genData.price);
-        if (genData.originalPrice) setRegularPrice(genData.originalPrice);
-        if (genData.costPrice) setCostPrice(genData.costPrice);
-        if (genData.sku) setSku(genData.sku);
-        if (genData.barcode) setBarcode(genData.barcode);
-        if (genData.stock) setStockQuantity(genData.stock);
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (reader.result) {
+                const dataUrl = reader.result as string;
 
-        // 5. Colors & Swatches
-        if (genData.colors && genData.colors.length > 0) {
-          const updatedColors: ProductColor[] = genData.colors.map((c: any, idx: number) => ({
-            id: c.id || `col-${idx + 1}`,
-            colorName: c.colorName || 'Royal Blue',
-            colorHex: c.colorHex || '#1A3B8B',
-            displayImage: targetImage,
-            mainImage: targetImage,
-            galleryImages: [],
-            sizes: c.sizes || ['Free Size']
-          }));
-          setColors(updatedColors);
-          setColorMediaConfigs(
-            updatedColors.map((c) => ({
-              colorValueId: c.id,
-              colorName: c.colorName,
-              colorCode: c.colorHex,
-              mainImage: targetImage,
-              gallery: []
+                if (activePasteTarget === 'root_main' || activePasteTarget === 'root_gallery') {
+                  handleSimpleAddImages([dataUrl]);
+                  showToast('Product photo pasted from clipboard!');
+                } else if (typeof activePasteTarget === 'object') {
+                  const { type, index } = activePasteTarget;
+                  if (type === 'var_main' || type === 'var_gallery') {
+                    handleVariantAddImages(index, [dataUrl]);
+                    showToast(`Variant ${variants[index]?.optionValue || index + 1} photo pasted from clipboard!`);
+                  }
+                }
+                setIsDirty(true);
+              }
+            };
+            reader.readAsDataURL(file);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [activePasteTarget, variants, mainImage]);
+
+  // Fetch Existing Product in Edit Mode
+  useEffect(() => {
+    if (!effectiveProductId) return;
+
+    let isMounted = true;
+    const loadProduct = async () => {
+      setIsInitialLoading(true);
+      try {
+        const prod = await AdminApiService.getProductById(effectiveProductId);
+        if (!prod || !isMounted) return;
+
+        setName(prod.name || '');
+        setDisplayName(prod.displayName || prod.name || '');
+        setSlug(prod.slug || '');
+        setIsSlugManuallyEdited(true);
+        setCategory(prod.category || mainCategories[0]?.name || 'Latkan');
+        setSubcategory(prod.subcategory || prod.subCategory || '');
+        setBrand(prod.brand || 'Awesome Handmade');
+        setDefaultKey(prod.defaultKey || 'Artisan Special');
+        setShortDescription(prod.shortDescription || prod.subtitle || '');
+        setLongDescription(prod.fullDescription || prod.longDescription || '');
+        setStatus(prod.status === 'Draft' ? 'Draft' : 'Active');
+        setProductType(prod.type === 'Variable' ? 'Variable' : 'Simple');
+
+        setRegularPrice(prod.regularPrice || prod.originalPrice || prod.price || 1299);
+        setSalePrice(prod.price || 799);
+        setSku(prod.sku || prod.defaultSku || 'AH-PROD-001');
+        setStock(prod.stock !== undefined ? prod.stock : 50);
+
+        if (prod.mainImage || prod.image) {
+          setMainImage(prod.mainImage || prod.image || '/images/category/Latkan.webp');
+        }
+        if (Array.isArray(prod.galleryImages) && prod.galleryImages.length > 0) {
+          setGalleryImages(prod.galleryImages.filter((g: any) => typeof g === 'string'));
+        } else if (Array.isArray(prod.images) && prod.images.length > 1) {
+          setGalleryImages(prod.images.slice(1).map((g: any) => (typeof g === 'string' ? g : g.url)));
+        }
+
+        // Load specifications
+        if (Array.isArray(prod.specifications) && prod.specifications.length > 0) {
+          setSpecifications(
+            prod.specifications.map((s, idx) => ({
+              id: `spec-${idx}`,
+              key: s.key,
+              value: s.value
             }))
           );
         }
 
-        // 6. Content & Highlights
-        if (genData.descriptionCards && genData.descriptionCards.length > 0) {
-          setDescriptionCards(genData.descriptionCards);
-        }
-        if (genData.highlights && genData.highlights.length > 0) {
-          setHighlights(genData.highlights);
-        }
-        if (genData.washingInstructions && genData.washingInstructions.length > 0) {
-          setWashingInstructions(genData.washingInstructions);
-        }
-        if (genData.manufacturingInfo) {
-          setManufacturingInfo(genData.manufacturingInfo);
-        }
-        if (genData.idealForPills && genData.idealForPills.length > 0) {
-          setIdealForPills(genData.idealForPills);
+        // Load options & variants
+        if (prod.productOptions && prod.productOptions.length > 0) {
+          setOptions(prod.productOptions);
         }
 
-        // 7. SEO
-        if (genData.metaTitle) setMetaTitle(genData.metaTitle);
-        if (genData.metaDescription) setMetaDescription(genData.metaDescription);
-        if (genData.keywords) setKeywords(genData.keywords);
-
-        setAiSuccessMessage(`✨ Generated details for "${genData.name}"! All form fields have been auto-populated.`);
+        if (prod.variantDetails && prod.variantDetails.length > 0) {
+          setVariants(prod.variantDetails);
+        } else if (prod.variants && prod.variants.length > 0) {
+          const mapped: ProductVariantDetail[] = prod.variants.map((v, i) => {
+            const vMain = v.image || (v.galleryImages && v.galleryImages[0]) || prod.mainImage || '/images/category/Latkan.webp';
+            const vGal = v.galleryImages && v.galleryImages.length > 0 ? v.galleryImages : [];
+            return {
+              id: v.id || `var-${i}`,
+              name: `Variant: ${v.colorName || v.title || v.sku}`,
+              optionValue: v.colorName || v.title || `Variant ${i + 1}`,
+              price: v.price || prod.price || 799,
+              salePrice: v.originalPrice || prod.originalPrice || 1299,
+              quantity: v.stock !== undefined ? v.stock : 15,
+              sku: v.sku || `AH-VAR-${i + 1}`,
+              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
+              mainImage: vMain,
+              galleryImages: vGal,
+              images: vGal.length > 0 ? [vMain, ...vGal] : [vMain]
+            };
+          });
+          setVariants(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to load product for editing:', err);
+      } finally {
+        if (isMounted) setIsInitialLoading(false);
       }
-    } catch (err: any) {
-      console.error(err);
-      setAiErrorMessage(err.message || 'Failed to auto-generate details from image.');
-    } finally {
-      setIsGeneratingAi(false);
-    }
+    };
+
+    loadProduct();
+    return () => {
+      isMounted = false;
+    };
+  }, [effectiveProductId]);
+
+  // Toast Helper
+  const showToast = (msg: string) => {
+    setSaveSuccessMsg(msg);
+    setTimeout(() => {
+      setSaveSuccessMsg(null);
+    }, 4000);
   };
 
-  const handleAiImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Image Upload Handlers for Simple Product
+  const handleProcessMainImageFile = (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const base64 = uploadEvent.target?.result as string;
-      setAiImagePreview(base64);
-      handleAiAutoFill(base64);
+    reader.onload = () => {
+      if (reader.result) {
+        setMainImage(reader.result as string);
+        setIsDirty(true);
+        showToast('Main product image updated');
+      }
     };
     reader.readAsDataURL(file);
   };
 
-  // Load existing product when editing
-  useEffect(() => {
-    const loadTarget = async () => {
-      if (editingProductId) {
-        setIsTargetLoading(true);
-        try {
-          let target: Product | null | undefined = await AdminApiService.getProductById(editingProductId);
-          if (!target) {
-            let allProds = getAdminProducts();
-            target = allProds.find((p) => p.id === editingProductId);
-          }
-          if (!target) {
-            const stored = await idbGet<any>('awesome_admin_sync');
-            if (stored && Array.isArray(stored.products)) {
-              target = stored.products.find((p: any) => p.id === editingProductId);
-            }
-          }
-          if (!target) {
-            const live = await fetchProductsFromBackend();
-            target = live.find((p) => p.id === editingProductId);
-          }
-
-          if (target) {
-            setName(target.name || '');
-            setSlug(target.slug || '');
-            setShortDescription(target.shortDescription || (target as any).subtitle || '');
-            setFullDescription(target.fullDescription || (target as any).description || '');
-            
-            const primaryImg = target.image || (target as any).mainImage || (target.images && target.images[0]) || '';
-            setMainImage(primaryImg);
-            setAiImagePreview(primaryImg);
-
-            // Collect all gallery images without dropping any
-            const galList: string[] = [];
-            if (Array.isArray((target as any).galleryImages)) {
-              (target as any).galleryImages.forEach((img: any) => {
-                const u = typeof img === 'string' ? img : img?.url;
-                if (u && typeof u === 'string' && u.trim() && !galList.includes(u.trim())) galList.push(u.trim());
-              });
-            }
-            if (Array.isArray(target.images)) {
-              target.images.forEach((img: any) => {
-                const u = typeof img === 'string' ? img : img?.url;
-                if (u && typeof u === 'string' && u.trim() && !galList.includes(u.trim())) galList.push(u.trim());
-              });
-            }
-            setGalleryImages(galList);
-            
-            const isSimple = target.productType === 'simple' || target.type === 'Simple';
-            setProductType(isSimple ? 'Simple' : 'Variable');
-
-            const targetCategories = Array.isArray(target.categories) && target.categories.length > 0
-              ? target.categories
-              : (target.category ? [target.category] : ['Latkan']);
-            setSelectedCategories(targetCategories);
-            if (target.subcategory) {
-              setSelectedSubcategory(target.subcategory);
-            }
-            setBrand(target.brand || 'Awesome Handmade');
-            if (target.collections) setSelectedCollections(target.collections);
-            if (target.tags) setSelectedTags(target.tags);
-
-            setSalePrice(target.price ?? 799);
-            setRegularPrice(target.originalPrice ?? 1299);
-            setCostPrice(target.costPrice ?? 350);
-            setSku(target.sku || (target as any).defaultSku || '');
-            if (target.inventory?.barcode || target.barcode) setBarcode(target.inventory?.barcode || target.barcode || '');
-            setStockQuantity(target.stock ?? 100);
-            if (target.inventory?.lowStockAlert !== undefined) setLowStockAlert(target.inventory.lowStockAlert);
-            if (target.inventory?.allowBackorders !== undefined) setAllowBackorders(target.inventory.allowBackorders);
-            if (target.inventory?.trackInventory !== undefined) setTrackInventory(target.inventory.trackInventory);
-
-            setStatus(target.status === 'Published' || target.isPublished ? 'Published' : 'Draft');
-            setIsPublished(target.isPublished ?? true);
-
-            if (target.colors && target.colors.length > 0) {
-              const loadedColors = target.colors.map((c: any, idx: number) => ({
-                id: c.id || c.colorValueId || `col-${idx + 1}`,
-                colorName: c.colorName || (c as any).name || (c as any).color || 'Standard',
-                colorHex: c.colorHex || c.colorCode || '#000000',
-                displayImage: c.displayImage || c.mainImage || (c.galleryImages && c.galleryImages[0]) || primaryImg,
-                mainImage: c.mainImage || c.displayImage || (c.galleryImages && c.galleryImages[0]) || primaryImg,
-                galleryImages: Array.isArray(c.galleryImages) ? c.galleryImages.map((g: any) => typeof g === 'string' ? g : g.url).filter(Boolean) : (Array.isArray(c.gallery) ? c.gallery : []),
-                sizes: Array.isArray(c.sizes) && c.sizes.length > 0 ? c.sizes : ['Standard Pair']
-              }));
-              setColors(loadedColors);
-              setActiveColorEditId(loadedColors[0].id);
-            }
-
-            if (target.colorMediaConfigs && target.colorMediaConfigs.length > 0) {
-              setColorMediaConfigs(target.colorMediaConfigs);
-            } else if (target.colors && target.colors.length > 0) {
-              setColorMediaConfigs(
-                target.colors.map((c: any) => ({
-                  colorValueId: c.id || `cm-${c.colorName}`,
-                  colorName: c.colorName || (c as any).name || 'Standard',
-                  colorCode: c.colorHex || c.colorCode || '#000000',
-                  title: c.title || '',
-                  productInfo: c.productInfo || '',
-                  mainImage: c.mainImage || c.displayImage || primaryImg,
-                  gallery: c.galleryImages || c.gallery || []
-                }))
-              );
-            }
-
-            if (target.variants && target.variants.length > 0) {
-              setGeneratedVariants(target.variants);
-            }
-
-            if (target.sizeGuideId) {
-              setSelectedSizeGuideId(target.sizeGuideId);
-            }
-
-            if (target.sizeChart) {
-              setSizeChart(target.sizeChart);
-            }
-
-            if (target.descriptionCards && target.descriptionCards.length > 0) {
-              setDescriptionCards(target.descriptionCards);
-            }
-
-            if (target.highlights && target.highlights.length > 0) {
-              setHighlights(target.highlights);
-            } else if ((target as any).keyFeatures && (target as any).keyFeatures.length > 0) {
-              setHighlights((target as any).keyFeatures);
-            }
-
-            if (target.washingInstructions && target.washingInstructions.length > 0) {
-              setWashingInstructions(target.washingInstructions);
-            }
-
-            if (target.manufacturingInfo) {
-              setManufacturingInfo(target.manufacturingInfo);
-            }
-
-            if (target.idealForPills && target.idealForPills.length > 0) {
-              setIdealForPills(target.idealForPills);
-            }
-
-            if (target.shipping) {
-              if (target.shipping.weight !== undefined) setWeight(target.shipping.weight);
-              if (target.shipping.length !== undefined) setLength(target.shipping.length);
-              if (target.shipping.width !== undefined) setWidth(target.shipping.width);
-              if (target.shipping.height !== undefined) setHeight(target.shipping.height);
-            }
-
-            if (target.seo) {
-              if (target.seo.metaTitle) setMetaTitle(target.seo.metaTitle);
-              if (target.seo.metaDescription) setMetaDescription(target.seo.metaDescription);
-              if (target.seo.keywords) setKeywords(target.seo.keywords);
-              if (target.seo.canonicalUrl) setCanonicalUrl(target.seo.canonicalUrl);
-            } else {
-              if ((target as any).metaTitle) setMetaTitle((target as any).metaTitle);
-              if ((target as any).metaDescription) setMetaDescription((target as any).metaDescription);
-              if ((target as any).keywords) setKeywords((target as any).keywords);
-            }
-
-            if (target.productAttributes && Array.isArray(target.productAttributes) && target.productAttributes.length > 0) {
-              setProductAttributes(target.productAttributes);
-            } else if (target.colors && target.colors.length > 0) {
-              const colorAttr: ProductAttributeAssignment = {
-                attributeId: 'attr-color',
-                attributeName: 'Color',
-                attributeSlug: 'color',
-                type: 'SWATCH',
-                sortOrder: 1,
-                useForVariants: true,
-                selectedValues: target.colors.map((c) => c.colorName)
-              };
-
-              const allSizes = Array.from(new Set(target.colors.flatMap((c) => c.sizes || [])));
-              const sizeAttr: ProductAttributeAssignment = {
-                attributeId: 'attr-size',
-                attributeName: 'Size',
-                attributeSlug: 'size',
-                type: 'BUTTON',
-                sortOrder: 2,
-                useForVariants: true,
-                selectedValues: allSizes
-              };
-
-              setProductAttributes([colorAttr, sizeAttr]);
-            }
-          }
-        } finally {
-          setIsTargetLoading(false);
-        }
-      }
-    };
-    loadTarget();
-  }, [editingProductId]);
-
-  // Load Size Guides from API
-  useEffect(() => {
-    const fetchGuides = async () => {
-      const guides = await AdminApiService.getSizeGuides();
-      if (guides && guides.length > 0) {
-        setSizeGuidesList(guides);
-        if (!selectedSizeGuideId) {
-          setSelectedSizeGuideId(guides[0].id);
-        }
-      }
-    };
-    fetchGuides();
-  }, []);
-
-  // Auto-generate Variant Matrix when Colors & Sizes change
-  useEffect(() => {
-    if (isTargetLoading) return;
-    if (editingProductId && generatedVariants.length > 0) {
-      return; // Preserve pre-loaded custom target variants when editing!
-    }
-    if (colors.length === 0) {
-      setGeneratedVariants([]);
-      return;
-    }
-
-    const newVariants: Variant[] = [];
-    colors.forEach((col) => {
-      const colSizes = col.sizes && col.sizes.length > 0 ? col.sizes : ['S', 'M', 'L', 'XL'];
-      colSizes.forEach((sz) => {
-        const existing = generatedVariants.find(
-          (v) => (v.color?.toLowerCase() === col.colorName.toLowerCase() || v.colorName?.toLowerCase() === col.colorName.toLowerCase()) &&
-                 (v.size?.toLowerCase() === sz.toLowerCase() || v.sizeName?.toLowerCase() === sz.toLowerCase())
-        );
-
-        if (existing) {
-          newVariants.push({
-            ...existing,
-            color: col.colorName,
-            colorName: col.colorName,
-            colorHex: col.colorHex || '#000000',
-            size: sz,
-            sizeName: sz,
-            image: col.mainImage || col.displayImage || col.galleryImages?.[0] || existing.image || '',
-            thumbnail: col.displayImage || col.mainImage || col.galleryImages?.[0] || existing.thumbnail || '',
-            galleryImages: col.galleryImages || existing.galleryImages || []
-          });
-        } else {
-          newVariants.push({
-            id: `var-${col.colorName}-${sz}-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-            sku: `${sku || 'AAR'}-${col.colorName.substring(0, 3).toUpperCase()}-${sz}`,
-            color: col.colorName,
-            colorName: col.colorName,
-            colorHex: col.colorHex || '#000000',
-            size: sz,
-            sizeName: sz,
-            price: salePrice || 799,
-            originalPrice: regularPrice || 1299,
-            costPrice: costPrice || 350,
-            discountPercentage: regularPrice > 0 ? Math.round(((regularPrice - salePrice) / regularPrice) * 100) : 0,
-            stock: stockQuantity || 100,
-            image: col.mainImage || col.displayImage || col.galleryImages?.[0] || '',
-            thumbnail: col.displayImage || col.mainImage || col.galleryImages?.[0] || '',
-            galleryImages: col.galleryImages || [],
-            barcode: barcode || '890123000000',
-            status: 'Active'
-          });
-        }
-      });
-    });
-
-    setGeneratedVariants(newVariants);
-  }, [colors, salePrice, regularPrice, costPrice, stockQuantity, sku, barcode, editingProductId]);
-
-  // Name change handler auto-slug
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setName(val);
-    if (!editingProductId) {
-      setSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
-    }
-  };
-
-  // Helper read image data URL
-  const readFileAsDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
+  const handleProcessGalleryFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
+      reader.onload = () => {
+        if (reader.result) {
+          setGalleryImages((prev) => [...prev, reader.result as string]);
+          setIsDirty(true);
+        }
+      };
       reader.readAsDataURL(file);
     });
+    showToast('Gallery image(s) uploaded');
   };
 
-  // Color Handlers
-  const handleAddColor = () => {
-    const newColor: ProductColor = {
-      id: `col-${Date.now()}`,
-      colorName: `New Color ${colors.length + 1}`,
-      colorHex: '#000000',
-      displayImage: '',
-      mainImage: '',
-      galleryImages: [],
-      sizes: ['S', 'M', 'L', 'XL']
-    };
-    setColors([...colors, newColor]);
-    setActiveColorEditId(newColor.id);
+  const handleRemoveGalleryImage = (idx: number) => {
+    setGalleryImages((prev) => prev.filter((_, i) => i !== idx));
+    setIsDirty(true);
   };
 
-  const handleRemoveColor = (id: string) => {
-    if (colors.length <= 1) {
-      alert('Product must have at least 1 color.');
+  // Specification Handlers
+  const handleAddSpecRow = () => {
+    setSpecifications((prev) => [
+      ...prev,
+      { id: `spec-${Date.now()}`, key: 'New Attribute', value: 'Details' }
+    ]);
+    setIsDirty(true);
+  };
+
+  const handleUpdateSpecRow = (idx: number, field: 'key' | 'value', val: string) => {
+    setSpecifications((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: val };
+      return next;
+    });
+    setIsDirty(true);
+  };
+
+  const handleRemoveSpecRow = (idx: number) => {
+    setSpecifications((prev) => prev.filter((_, i) => i !== idx));
+    setIsDirty(true);
+  };
+
+  // Sync Variants when Options change
+  const syncVariantsFromOptions = (newOpts: ProductOptionItem[]) => {
+    if (newOpts.length === 0) {
+      setVariants([]);
       return;
     }
-    setColors(colors.filter((c) => c.id !== id));
-    if (activeColorEditId === id) {
-      setActiveColorEditId(colors.find((c) => c.id !== id)?.id || null);
-    }
-  };
 
-  const handleUpdateColorField = (id: string, field: keyof ProductColor, value: any) => {
-    setColors(colors.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
-  };
-
-  const handleToggleColorSize = (colorId: string, sizeName: string) => {
-    setColors(
-      colors.map((c) => {
-        if (c.id === colorId) {
-          const currentSizes = c.sizes || [];
-          const exists = currentSizes.includes(sizeName);
-          const updated = exists ? currentSizes.filter((s) => s !== sizeName) : [...currentSizes, sizeName];
-          return { ...c, sizes: updated };
-        }
-        return c;
-      })
-    );
-  };
-
-  // Upload Handlers
-  const handleUploadColorMainImage = async (colorId: string, file: File) => {
-    if (!file) return;
-    const dataUrl = await readFileAsDataURL(file);
-    handleUpdateColorField(colorId, 'mainImage', dataUrl);
-    handleUpdateColorField(colorId, 'displayImage', dataUrl);
-  };
-
-  const handleUploadColorGalleryImages = async (colorId: string, files: FileList) => {
-    if (!files || files.length === 0) return;
-    const newPhotos: string[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const dataUrl = await readFileAsDataURL(files[i]);
-      newPhotos.push(dataUrl);
-    }
-    const color = colors.find((c) => c.id === colorId);
-    if (color) {
-      const combined = [...(color.galleryImages || []), ...newPhotos];
-      const mainImg = combined[0] || '';
-      const updatedColors = colors.map((c) =>
-        c.id === colorId
-          ? { ...c, galleryImages: combined, mainImage: mainImg, displayImage: mainImg }
-          : c
+    const cartesian = (arrays: string[][]): string[][] => {
+      return arrays.reduce<string[][]>(
+        (acc, curr) => acc.flatMap((d) => curr.map((e) => [...d, e])),
+        [[]]
       );
-      setColors(updatedColors);
-
-      const firstColorFirstImg = updatedColors[0]?.galleryImages?.[0] || updatedColors[0]?.mainImage || '';
-      if (firstColorFirstImg) {
-        setMainImage(firstColorFirstImg);
-      }
-    }
-  };
-
-  const handleRemoveGalleryImageFromColor = (colorId: string, imgIdx: number) => {
-    const color = colors.find((c) => c.id === colorId);
-    if (color && color.galleryImages) {
-      const updatedGallery = color.galleryImages.filter((_, idx) => idx !== imgIdx);
-      const newMain = updatedGallery[0] || '';
-
-      const updatedColors = colors.map((c) => {
-        if (c.id === colorId) {
-          return {
-            ...c,
-            galleryImages: updatedGallery,
-            mainImage: newMain,
-            displayImage: newMain
-          };
-        }
-        return c;
-      });
-
-      setColors(updatedColors);
-
-      const firstColorFirstImg = updatedColors[0]?.galleryImages?.[0] || updatedColors[0]?.mainImage || '';
-      setMainImage(firstColorFirstImg);
-    }
-  };
-
-  const handleUploadDescriptionCardImage = async (cardId: string, file: File) => {
-    if (!file) return;
-    const dataUrl = await readFileAsDataURL(file);
-    setDescriptionCards((prev) =>
-      prev.map((c) => (c.id === cardId ? { ...c, image: dataUrl } : c))
-    );
-  };
-
-  // Variant Field update
-  const handleUpdateVariantField = (id: string, field: keyof Variant, value: any) => {
-    setGeneratedVariants((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
-    );
-  };
-
-  const handleApplyBulkVariantValues = () => {
-    setGeneratedVariants((prev) =>
-      prev.map((v) => ({
-        ...v,
-        price: typeof bulkPriceInput === 'number' && bulkPriceInput > 0 ? bulkPriceInput : v.price,
-        originalPrice: typeof bulkMrpInput === 'number' && bulkMrpInput > 0 ? bulkMrpInput : v.originalPrice,
-        stock: typeof bulkStockInput === 'number' && bulkStockInput >= 0 ? bulkStockInput : v.stock
-      }))
-    );
-    setBulkPriceInput('');
-    setBulkMrpInput('');
-    setBulkStockInput('');
-  };
-
-  // Inline Size Guide Save
-  const handleSaveInlineSizeGuide = async () => {
-    if (!newGuideTitle.trim()) {
-      alert('Please enter Size Guide title.');
-      return;
-    }
-
-    const createdGuide: SizeGuide = {
-      id: `sg-${Date.now()}`,
-      title: newGuideTitle.trim(),
-      description: newGuideDesc.trim() || 'Custom Size Guide',
-      categoryIds: newGuideCategories,
-      subcategoryIds: [],
-      countries: [
-        { id: 'c1', name: 'India', code: 'IN', displayOrder: 1 },
-        { id: 'c2', name: 'United States', code: 'US', displayOrder: 2 }
-      ],
-      columns: [
-        { id: 'col1', key: 'brandSize', name: 'Brand Size', displayOrder: 1 },
-        { id: 'col2', key: 'bust', name: 'Bust / Chest', displayOrder: 2 },
-        { id: 'col3', key: 'waist', name: 'Waist', displayOrder: 3 }
-      ],
-      rows: [
-        {
-          id: 'r1',
-          brandSize: 'S',
-          displayOrder: 1,
-          values: { bust: { cm: '81-86', inch: '32-34' }, waist: { cm: '66-71', inch: '26-28' } }
-        },
-        {
-          id: 'r2',
-          brandSize: 'M',
-          displayOrder: 2,
-          values: { bust: { cm: '86-91', inch: '34-36' }, waist: { cm: '71-76', inch: '28-30' } }
-        }
-      ]
     };
 
-    const saved = await AdminApiService.createSizeGuide(createdGuide);
-    if (saved) {
-      setSizeGuidesList([...sizeGuidesList, saved]);
-      setSelectedSizeGuideId(saved.id);
-    } else {
-      setSizeGuidesList([...sizeGuidesList, createdGuide]);
-      setSelectedSizeGuideId(createdGuide.id);
-    }
-
-    setShowCreateSizeGuideModal(false);
-    setNewGuideTitle('');
-    setNewGuideDesc('');
-  };
-
-  // Save Product Handler
-  const handleSubmitProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      alert('Please enter product name.');
+    const validOpts = newOpts.filter((o) => o.values && o.values.length > 0);
+    if (validOpts.length === 0) {
+      setVariants([]);
       return;
     }
 
-    // Merge colors with colorMediaConfigs so images uploaded in ColorGallerySection are 100% saved into colors and variants
-    const mergedColors: ProductColor[] = (colors.length > 0 ? colors : colorMediaConfigs.map((cm, idx) => ({
-      id: cm.colorValueId || `col-${idx + 1}`,
-      colorName: cm.colorName,
-      colorHex: cm.colorCode || '#000000',
-      displayImage: cm.mainImage || '',
-      mainImage: cm.mainImage || '',
-      galleryImages: cm.gallery || [],
-      sizes: ['Standard']
-    }))).map((col) => {
-      const matchMedia = colorMediaConfigs.find((cm) => (cm.colorName || '').toLowerCase() === (col.colorName || '').toLowerCase());
-      if (matchMedia) {
-        const cMain = matchMedia.mainImage || col.mainImage || col.displayImage || '';
-        const cGal = (matchMedia.gallery && matchMedia.gallery.length > 0) ? matchMedia.gallery : (col.galleryImages || []);
+    const valueCombos = cartesian(validOpts.map((o) => o.values));
+
+    const updatedVariants: ProductVariantDetail[] = valueCombos.map((combo, idx) => {
+      const comboName = combo.join(' / ');
+      const existing = variants.find((v) => v.optionValue === comboName || v.name.includes(comboName));
+
+      const skuSuffix = combo
+        .map((s) => s.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase())
+        .join('-');
+
+      const variantColorHex = findHexByColorName(combo[0] || '');
+
+      const vMainImg = existing?.mainImage || existing?.images?.[0] || mainImage || '/images/category/Latkan.webp';
+      const vGals = existing?.galleryImages || [];
+
+      return (
+        existing || {
+          id: `var-${Date.now()}-${idx}`,
+          name: `Variant: ${comboName}`,
+          optionValue: comboName,
+          price: salePrice || 799,
+          salePrice: regularPrice || 1299,
+          quantity: 20,
+          sku: `${sku}-${skuSuffix || idx + 1}`,
+          colorHex: variantColorHex,
+          mainImage: vMainImg,
+          galleryImages: vGals,
+          images: [vMainImg, ...vGals]
+        }
+      );
+    });
+
+    setVariants(updatedVariants);
+  };
+
+  // Option Handlers
+  const handleAddOption = () => {
+    const newId = `opt-${Date.now()}`;
+    const updated = [
+      ...options,
+      {
+        id: newId,
+        name: `Option ${options.length + 1}`,
+        values: []
+      }
+    ];
+    setOptions(updated);
+    setIsDirty(true);
+  };
+
+  const handleAddOptionFromMaster = (attr: AttributeMaster) => {
+    const existing = options.find(
+      (o) => o.name.toLowerCase() === attr.name.toLowerCase()
+    );
+    if (existing) {
+      showToast(`Attribute "${attr.name}" already added`);
+      return;
+    }
+    const newId = `opt-${Date.now()}`;
+    const updated = [
+      ...options,
+      {
+        id: newId,
+        name: attr.name,
+        values: []
+      }
+    ];
+    setOptions(updated);
+    setIsDirty(true);
+    showToast(`Added attribute "${attr.name}"`);
+  };
+
+  const handleAddAllValuesFromMaster = (optionId: string, attr: AttributeMaster) => {
+    if (!attr.values || attr.values.length === 0) return;
+    const toAdd = attr.values.map((v) => (v.label || v.value).trim()).filter(Boolean);
+    const updated = options.map((opt) => {
+      if (opt.id === optionId) {
+        const set = new Set([...opt.values, ...toAdd]);
         return {
-          ...col,
-          mainImage: cMain,
-          displayImage: cMain,
-          galleryImages: cGal
+          ...opt,
+          values: Array.from(set)
         };
       }
-      return col;
+      return opt;
     });
-
-    // Also add any color present in colorMediaConfigs that wasn't in colors
-    colorMediaConfigs.forEach((cm) => {
-      const exists = mergedColors.some((c) => (c.colorName || '').toLowerCase() === (cm.colorName || '').toLowerCase());
-      if (!exists && cm.colorName) {
-        mergedColors.push({
-          id: cm.colorValueId || `col-${cm.colorName.toLowerCase().replace(/\s+/g, '-')}`,
-          colorName: cm.colorName,
-          colorHex: cm.colorCode || '#000000',
-          displayImage: cm.mainImage || '',
-          mainImage: cm.mainImage || '',
-          galleryImages: cm.gallery || [],
-          sizes: ['Standard']
-        });
-      }
-    });
-
-    let finalVariants = (generatedVariants.length > 0 ? generatedVariants : []).map((v) => {
-      const matchingMedia = colorMediaConfigs.find((cm) => (cm.colorName || '').toLowerCase() === (v.color || v.colorName || '').toLowerCase());
-      const matchingCol = mergedColors.find((c) => (c.colorName || '').toLowerCase() === (v.color || v.colorName || '').toLowerCase());
-      const vImg = matchingMedia?.mainImage || matchingCol?.mainImage || matchingCol?.displayImage || v.image || '';
-      const vGal = (matchingMedia?.gallery && matchingMedia.gallery.length > 0) ? matchingMedia.gallery : (matchingCol?.galleryImages || v.galleryImages || []);
-      return {
-        ...v,
-        image: vImg,
-        thumbnail: vImg,
-        galleryImages: vGal
-      };
-    });
-
-    if (finalVariants.length === 0 && mergedColors.length > 0) {
-      finalVariants = [];
-      mergedColors.forEach((col) => {
-        const colSizes = col.sizes && col.sizes.length > 0 ? col.sizes : ['Standard'];
-        colSizes.forEach((sz) => {
-          finalVariants.push({
-            id: `v-${col.colorName}-${sz}-${Date.now()}`,
-            sku: `${sku || 'AWH'}-${col.colorName.substring(0, 3).toUpperCase()}-${sz}-${Math.floor(100 + Math.random() * 900)}`,
-            color: col.colorName,
-            colorName: col.colorName,
-            colorHex: col.colorHex || '#000000',
-            size: sz,
-            sizeName: sz,
-            price: salePrice || 799,
-            originalPrice: regularPrice || 1299,
-            costPrice: costPrice || 350,
-            discountPercentage: regularPrice > 0 ? Math.round(((regularPrice - salePrice) / regularPrice) * 100) : 0,
-            stock: stockQuantity || 100,
-            image: col.mainImage || col.displayImage || col.galleryImages?.[0] || '',
-            thumbnail: col.displayImage || col.mainImage || col.galleryImages?.[0] || '',
-            galleryImages: col.galleryImages || [],
-            barcode: barcode || '890123000000',
-            status: 'Active'
-          });
-        });
-      });
-    }
-
-    const firstColorMain = colorMediaConfigs[0]?.mainImage || mergedColors[0]?.mainImage || mergedColors[0]?.displayImage || mergedColors[0]?.galleryImages?.[0];
-    const primaryImage = mainImage || firstColorMain || galleryImages[0] || '/images/category/Latkan.webp';
-    const allColorGalleryImages = [
-      ...mergedColors.flatMap((c) => c.galleryImages || []),
-      ...colorMediaConfigs.flatMap((c) => c.gallery || [])
-    ];
-    const combinedGallery = Array.from(new Set([primaryImage, ...galleryImages, ...allColorGalleryImages])).filter(Boolean);
-
-    const newProductObj: Product = {
-      id: editingProductId || `prod-${Date.now()}`,
-      name: name.trim(),
-      slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
-      sku: sku || 'AWH-SKU-NEW',
-      category: selectedCategories[0] || 'Latkan',
-      categories: selectedCategories,
-      subcategory: selectedSubcategory,
-      brand: brand || 'Awesome Handmade',
-      collections: selectedCollections,
-      tags: selectedTags,
-      price: salePrice,
-      originalPrice: regularPrice,
-      costPrice: costPrice,
-      stock: stockQuantity,
-      rating: 4.8,
-      salesCount: 0,
-      status: isPublished ? 'Published' : 'Draft',
-      isPublished: isPublished,
-      type: productType,
-      shortDescription: shortDescription,
-      fullDescription: fullDescription,
-      image: primaryImage,
-      mainImage: primaryImage,
-      galleryImages: combinedGallery,
-      images: combinedGallery,
-      colors: mergedColors,
-      colorMediaConfigs: colorMediaConfigs,
-      productType: productType === 'Simple' ? 'simple' : 'variant',
-      sizeGuideId: selectedSizeGuideId,
-      inventory: {
-        sku: sku,
-        barcode: barcode,
-        stock: stockQuantity,
-        lowStockAlert: lowStockAlert,
-        allowBackorders: allowBackorders,
-        trackInventory: trackInventory
-      },
-      attributes: [
-        { name: 'Color', values: mergedColors.map((c) => c.colorName) },
-        { name: 'Size', values: Array.from(new Set(mergedColors.flatMap((c) => c.sizes || []))) }
-      ],
-      productAttributes: productAttributes,
-      variants: finalVariants,
-      descriptionCards: descriptionCards,
-      highlights: highlights,
-      washingInstructions: washingInstructions,
-      manufacturingInfo: manufacturingInfo,
-      idealForPills: idealForPills,
-      shipping: { weight, length, width, height },
-      seo: { metaTitle, metaDescription, keywords, canonicalUrl },
-      sizeChart: sizeChart,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-
-    if (editingProductId) {
-      await AdminApiService.updateProduct(editingProductId, newProductObj);
-    } else {
-      await AdminApiService.createProduct(newProductObj);
-    }
-
-    broadcastAdminProductChange(newProductObj);
-    setSubmitSuccess(true);
-
-    setTimeout(() => {
-      onNavigate('all-products');
-    }, 1200);
+    setOptions(updated);
+    syncVariantsFromOptions(updated);
+    setIsDirty(true);
   };
 
-  const currentMainCategory = selectedCategories[0] || categoriesData.mainCategories[0]?.name || 'Latkan';
+  const handleRemoveOption = (index: number) => {
+    const updated = options.filter((_, i) => i !== index);
+    setOptions(updated);
+    syncVariantsFromOptions(updated);
+    setIsDirty(true);
+  };
+
+  const handleOptionNameChange = (index: number, newName: string) => {
+    const updated = [...options];
+    updated[index].name = newName;
+    setOptions(updated);
+    setIsDirty(true);
+  };
+
+  const getColorHex = (nameOrVal: string): string => {
+    return findHexByColorName(nameOrVal);
+  };
+
+  const handleAddOptionValue = (optionId: string, customVal?: string) => {
+    const rawVal = (customVal !== undefined ? customVal : newOptionValueInputs[optionId])?.trim();
+    if (!rawVal) return;
+
+    const updated = options.map((opt) => {
+      if (opt.id === optionId) {
+        if (opt.values.includes(rawVal)) return opt;
+        return {
+          ...opt,
+          values: [...opt.values, rawVal]
+        };
+      }
+      return opt;
+    });
+
+    setOptions(updated);
+    setNewOptionValueInputs((prev) => ({ ...prev, [optionId]: '' }));
+    syncVariantsFromOptions(updated);
+    setIsDirty(true);
+  };
+
+  const handleRemoveOptionValue = (optionId: string, valIndex: number) => {
+    const updated = options.map((opt) => {
+      if (opt.id === optionId) {
+        return {
+          ...opt,
+          values: opt.values.filter((_, i) => i !== valIndex)
+        };
+      }
+      return opt;
+    });
+
+    setOptions(updated);
+    syncVariantsFromOptions(updated);
+    setIsDirty(true);
+  };
+
+  // Variant Field & Image Handlers
+  const handleUpdateVariantField = (
+    variantIndex: number,
+    field: keyof ProductVariantDetail,
+    value: any
+  ) => {
+    const updated = [...variants];
+    updated[variantIndex] = {
+      ...updated[variantIndex],
+      [field]: value
+    };
+    setVariants(updated);
+    setIsDirty(true);
+  };
+
+  // Simple Product Media Handlers
+  const handleSimpleAddImages = (newImgs: string[]) => {
+    const existing = [mainImage, ...galleryImages].filter(Boolean);
+    const combined = Array.from(new Set([...existing, ...newImgs].filter(Boolean))) as string[];
+    setMainImage(combined[0] || '');
+    setGalleryImages(combined.slice(1));
+    setIsDirty(true);
+  };
+
+  const handleSimpleRemoveImage = (imgIndex: number) => {
+    const existing = [mainImage, ...galleryImages].filter(Boolean);
+    const filtered = existing.filter((_, idx) => idx !== imgIndex) as string[];
+    setMainImage(filtered[0] || '');
+    setGalleryImages(filtered.slice(1));
+    setIsDirty(true);
+  };
+
+  const handleSimpleSetMainImage = (imgIndex: number) => {
+    const existing = [mainImage, ...galleryImages].filter(Boolean);
+    if (imgIndex < 0 || imgIndex >= existing.length) return;
+    const selected = existing.splice(imgIndex, 1)[0];
+    const reordered = [selected, ...existing] as string[];
+    setMainImage(reordered[0] || '');
+    setGalleryImages(reordered.slice(1));
+    setIsDirty(true);
+    showToast('Main cover image updated');
+  };
+
+  const handleSimpleGalleryFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.result) {
+          const dataUrl = reader.result as string;
+          handleSimpleAddImages([dataUrl]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    showToast('Product photos updated');
+  };
+
+  const handleVariantAddImages = (variantIndex: number, newImgs: string[]) => {
+    setVariants((prev) => {
+      const next = [...prev];
+      const target = next[variantIndex];
+      const existing = (target.images && target.images.length > 0)
+        ? target.images
+        : ([target.mainImage, ...(target.galleryImages || [])].filter(Boolean) as string[]);
+      const combined = Array.from(new Set([...existing, ...newImgs].filter(Boolean))) as string[];
+      next[variantIndex] = {
+        ...target,
+        mainImage: combined[0] || '',
+        galleryImages: combined.slice(1),
+        images: combined
+      };
+      return next;
+    });
+    setIsDirty(true);
+  };
+
+  const handleVariantRemoveImage = (variantIndex: number, imgIndex: number) => {
+    setVariants((prev) => {
+      const next = [...prev];
+      const target = next[variantIndex];
+      const existing = (target.images && target.images.length > 0)
+        ? target.images
+        : ([target.mainImage, ...(target.galleryImages || [])].filter(Boolean) as string[]);
+      const filtered = existing.filter((_, idx) => idx !== imgIndex) as string[];
+      next[variantIndex] = {
+        ...target,
+        mainImage: filtered[0] || '',
+        galleryImages: filtered.slice(1),
+        images: filtered
+      };
+      return next;
+    });
+    setIsDirty(true);
+  };
+
+  const handleVariantSetMainImage = (variantIndex: number, imgIndex: number) => {
+    setVariants((prev) => {
+      const next = [...prev];
+      const target = next[variantIndex];
+      const existing = (target.images && target.images.length > 0)
+        ? [...target.images]
+        : ([target.mainImage, ...(target.galleryImages || [])].filter(Boolean) as string[]);
+      if (imgIndex < 0 || imgIndex >= existing.length) return prev;
+      const selected = existing.splice(imgIndex, 1)[0];
+      const reordered = [selected, ...existing] as string[];
+      next[variantIndex] = {
+        ...target,
+        mainImage: reordered[0] || '',
+        galleryImages: reordered.slice(1),
+        images: reordered
+      };
+      return next;
+    });
+    setIsDirty(true);
+    showToast('Variant cover photo updated');
+  };
+
+  const handleVariantGalleryFiles = (variantIndex: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.result) {
+          const dataUrl = reader.result as string;
+          handleVariantAddImages(variantIndex, [dataUrl]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    showToast(`Variant ${variants[variantIndex]?.optionValue || variantIndex + 1} photos updated`);
+  };
+
+  // Validation
+  const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+    if (!name.trim()) errors.name = 'Product Title / Name is required.';
+    if (!category.trim()) errors.category = 'Please select a Category.';
+
+    if (productType === 'Simple') {
+      if (!salePrice || salePrice <= 0) errors.price = 'Please enter a valid selling price.';
+      if (!mainImage) errors.mainImage = 'Please upload or provide a Main Product Image.';
+    } else {
+      if (variants.length === 0) {
+        errors.variants = 'At least one variant must be configured for a Variable Product.';
+      }
+      const hasAnyImage = variants.some((v) => v.mainImage || (v.images && v.images.length > 0)) || Boolean(mainImage);
+      if (!hasAnyImage) {
+        errors.mainImage = 'Please add a Main Image for at least one variant.';
+      }
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Submit & Save
+  const handleSaveProduct = async (statusOverride?: 'Draft' | 'Active') => {
+    if (!validateForm()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsSaving(true);
+    const finalStatus = statusOverride || status;
+    const isLive = finalStatus === 'Active';
+
+    // In Variable mode, derive root main image and galleries from first variant if not explicitly set
+    const effectiveMainImage =
+      productType === 'Variable' && variants.length > 0
+        ? variants[0].mainImage || variants[0].images?.[0] || mainImage
+        : mainImage;
+
+    const effectiveGalleryImages =
+      productType === 'Variable' && variants.length > 0
+        ? variants.flatMap((v) => v.galleryImages || [])
+        : galleryImages;
+
+    const allRootImages = Array.from(new Set([effectiveMainImage, ...effectiveGalleryImages].filter(Boolean)));
+
+    // Calculate effective selling and regular price
+    const finalSellingPrice =
+      productType === 'Variable' && variants.length > 0
+        ? Math.min(...variants.map((v) => Number(v.price) || salePrice))
+        : Number(salePrice) || 799;
+
+    const finalOriginalPrice =
+      productType === 'Variable' && variants.length > 0
+        ? Math.max(...variants.map((v) => Number(v.salePrice || v.price) || regularPrice))
+        : Number(regularPrice) || 1299;
+
+    const totalStock =
+      productType === 'Variable' && variants.length > 0
+        ? variants.reduce((acc, v) => acc + (Number(v.quantity) || 0), 0)
+        : Number(stock) || 50;
+
+    const cleanSpecs = specifications
+      .filter((s) => s.key.trim() && s.value.trim())
+      .map((s) => ({ key: s.key.trim(), value: s.value.trim() }));
+
+    // Generate colors list for storefront color swatches
+    const formattedColors =
+      productType === 'Variable'
+        ? variants.map((v, i) => {
+            const vMain = v.mainImage || v.images?.[0] || effectiveMainImage;
+            const vGals = v.galleryImages && v.galleryImages.length > 0 ? v.galleryImages : allRootImages;
+            return {
+              id: `col-${v.id || i}`,
+              colorName: v.optionValue || v.name || `Color ${i + 1}`,
+              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
+              displayImage: vMain,
+              mainImage: vMain,
+              galleryImages: vGals,
+              sizes: ['Free Size', 'Standard Pair']
+            };
+          })
+        : [
+            {
+              id: 'col-main',
+              colorName: 'Standard',
+              colorHex: '#C89B3C',
+              displayImage: effectiveMainImage,
+              mainImage: effectiveMainImage,
+              galleryImages: effectiveGalleryImages,
+              sizes: ['Free Size', 'Standard Pair']
+            }
+          ];
+
+    // Generate formatted variations
+    const formattedVariations =
+      productType === 'Variable'
+        ? variants.map((v, i) => {
+            const vMain = v.mainImage || v.images?.[0] || effectiveMainImage;
+            const vGals = v.galleryImages && v.galleryImages.length > 0 ? v.galleryImages : allRootImages;
+            const vImagesAll = Array.from(new Set([vMain, ...vGals].filter(Boolean)));
+
+            return {
+              id: v.id || `var-${i}`,
+              colorName: v.optionValue || v.name,
+              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
+              size: 'Free Size',
+              sizeName: 'Free Size',
+              price: Number(v.price),
+              originalPrice: Number(v.salePrice || v.price),
+              discountPercentage: Math.round(
+                (((Number(v.salePrice || v.price) - Number(v.price)) / Number(v.salePrice || v.price)) * 100) || 0
+              ),
+              sku: v.sku || `${sku}-${i + 1}`,
+              stock: Number(v.quantity),
+              thumbnail: vMain,
+              status: Number(v.quantity) > 0 ? ('Active' as const) : ('Out of Stock' as const),
+              images: vImagesAll.map((url, idx) => ({
+                id: `img-var-${i}-${idx}`,
+                url,
+                alt: `${name} - ${v.optionValue}`
+              }))
+            };
+          })
+        : [];
+
+    const payload: Partial<Product> = {
+      name: name.trim(),
+      displayName: (displayName || name).trim(),
+      slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      defaultKey: defaultKey.trim() || 'Artisan Special',
+      sku: sku.trim() || 'AH-PROD-001',
+      defaultSku: sku.trim() || 'AH-PROD-001',
+      category: category.trim(),
+      categories: [category.trim()],
+      subcategory: (subcategory || '').trim(),
+      subCategory: (subcategory || '').trim(),
+      brand: brand.trim() || 'Awesome Handmade',
+      shortDescription: shortDescription.trim(),
+      subtitle: shortDescription.trim(),
+      fullDescription: longDescription.trim(),
+      longDescription: longDescription.trim(),
+      status: isLive ? 'Active' : 'Draft',
+      isPublished: isLive,
+      type: productType,
+      price: finalSellingPrice,
+      originalPrice: finalOriginalPrice,
+      regularPrice: finalOriginalPrice,
+      discountPercentage: Math.round((((finalOriginalPrice - finalSellingPrice) / finalOriginalPrice) * 100) || 0),
+      stock: totalStock,
+      stockStatus: totalStock > 0 ? 'in_stock' : 'out_of_stock',
+      image: effectiveMainImage,
+      mainImage: effectiveMainImage,
+      galleryImages: effectiveGalleryImages,
+      images: allRootImages,
+      specifications: cleanSpecs,
+      attributes: options.filter(o => o.name && o.values && o.values.length > 0).map(o => ({ name: o.name, values: o.values })),
+      customAttributes: [
+        ...cleanSpecs.map((s) => ({ name: s.key, values: [s.value] })),
+        ...options.filter(o => o.name && o.values && o.values.length > 0).map(o => ({ name: o.name, values: o.values }))
+      ],
+      productOptions: productType === 'Variable' ? options : [],
+      variantDetails: productType === 'Variable' ? variants : [],
+      addonOptions: addons,
+      colors: formattedColors,
+      variations: formattedVariations,
+      availableSizes: (options.find(o => o.name.toLowerCase().includes('size'))?.values) || ['Free Size', 'Standard Pair'],
+      rating: 4.9,
+      reviewCount: 14
+    };
+
+    try {
+      let savedProduct: Product | null = null;
+      if (isEditMode && effectiveProductId) {
+        savedProduct = await AdminApiService.updateProduct(effectiveProductId, payload);
+        showToast('Product updated successfully!');
+      } else {
+        savedProduct = await AdminApiService.createProduct(payload);
+        showToast('Product created and published successfully!');
+      }
+
+      broadcastAdminProductChange(savedProduct || (payload as Product));
+      setIsDirty(false);
+
+      setTimeout(() => {
+        navigateBack();
+      }, 1000);
+    } catch (err: any) {
+      console.error('Failed to save product:', err);
+      alert('Error saving product: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <RefreshCw className="w-8 h-8 animate-spin text-neutral-800 mx-auto" />
+          <p className="text-xs text-neutral-500 font-medium">Loading product details...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <form onSubmit={handleSubmitProduct} className="max-w-full mx-auto space-y-6 pb-24 font-sans selection:bg-black selection:text-white">
-      {/* SUCCESS BANNER */}
-      {submitSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-emerald-600" />
-            <span>Product saved successfully! Redirecting to products list...</span>
-          </div>
+    <div className="font-sans text-neutral-900 bg-[#fbfbfc] min-h-screen pb-24">
+      {/* SUCCESS TOAST */}
+      {saveSuccessMsg && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-neutral-950 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-neutral-800 animate-in fade-in slide-in-from-top-4">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="text-xs font-semibold">{saveSuccessMsg}</span>
         </div>
       )}
 
-      {/* HEADER BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-neutral-200 shadow-2xs">
+      {/* TOP STICKY BAR */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-neutral-200 shadow-2xs px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button
-            type="button"
             variant="outline"
             size="sm"
-            onClick={() => onNavigate('products')}
-            className="text-xs text-black border-neutral-200 hover:bg-neutral-50"
+            onClick={() => {
+              if (isDirty) setShowDiscardModal(true);
+              else navigateBack();
+            }}
+            className="h-8 w-8 p-0 rounded-lg border-neutral-200 hover:bg-neutral-100 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
+            <ArrowLeft className="w-4 h-4 text-neutral-700" />
           </Button>
+
           <div>
-            <h1 className="text-lg font-bold text-black tracking-tight flex items-center gap-2">
-              <Package className="w-5 h-5 text-black" />
-              <span>{editingProductId ? `Edit Product: ${name}` : 'Create New Product'}</span>
+            <h1 className="text-sm sm:text-base font-bold text-neutral-950 tracking-tight">
+              {isEditMode ? `Edit Product: ${name || 'Untitled'}` : 'Add New Product'}
             </h1>
-            <p className="text-xs text-neutral-500 font-normal mt-0.5">
-              Configure product details, color swatches, size options, and size guide.
+            <p className="text-[11px] text-neutral-400">
+              Configure product details, category, pricing, media gallery, and variations.
             </p>
           </div>
         </div>
-
-        <Button
-          type="submit"
-          className="bg-black hover:bg-neutral-800 text-white font-semibold text-xs px-6 py-2 rounded-md shadow-2xs transition-all flex items-center gap-2 cursor-pointer"
-        >
-          <Check className="w-4 h-4 text-emerald-400" />
-          <span>{editingProductId ? 'Update Product' : 'Save Product'}</span>
-        </Button>
       </div>
 
-      {/* ========================================================================= */}
-      {/* PRODUCT ARCHITECTURE SELECTOR */}
-      {/* ========================================================================= */}
-      <Card className="p-5 bg-white border border-neutral-200 shadow-2xs rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-bold text-black uppercase tracking-tight flex items-center gap-2">
-            <Layers className="w-4 h-4 text-black" />
-            <span>Product Architecture Type</span>
-          </h3>
-          <p className="text-xs text-neutral-500 font-normal mt-0.5">
-            Choose whether this is a simple single-option product or has dynamic attributes &amp; variants.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 p-1.5 bg-neutral-100 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setProductType('Simple')}
-            className={`px-5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              productType === 'Simple'
-                ? 'bg-black text-white shadow-2xs'
-                : 'text-neutral-600 hover:text-black hover:bg-white/60'
-            }`}
-          >
-            Simple Product
-          </button>
-          <button
-            type="button"
-            onClick={() => setProductType('Variable')}
-            className={`px-5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              productType === 'Variable'
-                ? 'bg-black text-white shadow-2xs'
-                : 'text-neutral-600 hover:text-black hover:bg-white/60'
-            }`}
-          >
-            Product with Variants
-          </button>
-        </div>
-      </Card>
-
-      {/* ========================================================================= */}
-      {/* 🌟 1-CLICK AI PRODUCT AUTO-FILL WIDGET                                    */}
-      {/* ========================================================================= */}
-      <Card className="p-6 sm:p-7 bg-gradient-to-br from-[#FFFDF9] via-white to-[#FAF6EE] border-2 border-amber-300/80 shadow-md rounded-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-amber-200/60 pb-4 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm shrink-0">
-              <Sparkles className="w-5 h-5 text-amber-100 animate-pulse" />
-            </div>
+      {/* VALIDATION ERRORS BANNER */}
+      {Object.keys(formErrors).length > 0 && (
+        <div className="max-w-6xl mx-auto mt-6 px-4">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-3 animate-in fade-in">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-neutral-900 tracking-tight flex items-center gap-1.5">
-                  1-Click AI Auto-Fill from Product Image
-                </h2>
-                <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-semibold text-[10px] uppercase px-2 py-0.5">
-                  AI Powered
-                </Badge>
-              </div>
-              <p className="text-xs text-neutral-600 mt-0.5">
-                Simply upload a photo. The AI recognizes your product, crafts the title, generates rich descriptions, categories, pricing, tags, story cards &amp; SEO in 1 click!
-              </p>
+              <span className="font-bold block mb-1">Please fix the following before saving:</span>
+              <ul className="list-disc list-inside space-y-0.5 text-rose-700">
+                {Object.values(formErrors).map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
-
-        {/* AI SUCCESS NOTIFICATION */}
-        {aiSuccessMessage && (
-          <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2.5 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{aiSuccessMessage}</span>
-          </div>
-        )}
-
-        {/* AI ERROR NOTIFICATION */}
-        {aiErrorMessage && (
-          <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-xl flex items-center gap-2.5 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{aiErrorMessage}</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-          {/* IMAGE DROPZONE / PICKER */}
-          <div className="md:col-span-4">
-            <label className="relative flex flex-col items-center justify-center w-full aspect-[4/3] rounded-xl border-2 border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-50/70 transition-all cursor-pointer overflow-hidden group">
-              {aiImagePreview || mainImage ? (
-                <div className="relative w-full h-full">
-                  <img
-                    src={aiImagePreview || mainImage}
-                    alt="AI Preview"
-                    className="w-full h-full object-cover rounded-lg"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-medium gap-1">
-                    <UploadCloud className="w-5 h-5" />
-                    <span>Change Photo</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center p-4 text-center">
-                  <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <UploadCloud className="w-5 h-5" />
-                  </div>
-                  <span className="text-xs font-bold text-neutral-800">Upload Product Image</span>
-                  <span className="text-[10px] text-neutral-500 mt-0.5">PNG, JPG, WEBP</span>
-                </div>
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAiImageUpload}
-                disabled={isGeneratingAi}
-                className="hidden"
-              />
-            </label>
-          </div>
-
-          {/* AI CONTROLS & HINT INPUT */}
-          <div className="md:col-span-8 flex flex-col gap-3 justify-center">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                Optional Artisan Hint / Specific Note:
-              </label>
-              <Input
-                type="text"
-                value={aiHint}
-                onChange={(e) => setAiHint(e.target.value)}
-                placeholder="e.g. Royal Blue Saree Tassel with mirrors, or Kids festive choli for Navratri..."
-                disabled={isGeneratingAi}
-                className="text-xs bg-white border-neutral-300 focus:border-amber-500 focus:ring-amber-500/20"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <Button
-                type="button"
-                onClick={() => handleAiAutoFill()}
-                disabled={isGeneratingAi || (!aiImagePreview && !mainImage)}
-                className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isGeneratingAi ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    <span>Analyzing Image &amp; Writing Details...</span>
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-4 h-4 text-amber-200" />
-                    <span>✨ Auto-Fill All Product Details with AI</span>
-                  </>
-                )}
-              </Button>
-
-              {(aiImagePreview || mainImage) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAiImagePreview('');
-                    setAiSuccessMessage('');
-                    setAiErrorMessage('');
-                  }}
-                  disabled={isGeneratingAi}
-                  className="text-xs text-neutral-500 hover:text-neutral-800 underline cursor-pointer"
-                >
-                  Clear image
-                </button>
-              )}
-            </div>
-
-            <p className="text-[11px] text-neutral-500 italic">
-              💡 Tip: Click the button above to auto-fill the entire product form instantly. You can review and tweak any field before saving!
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {/* ========================================================================= */}
-      {/* CARD 1: BASIC INFORMATION */}
-      {/* ========================================================================= */}
-      <Card className="p-6 sm:p-8 bg-white border border-neutral-200 shadow-2xs rounded-xl space-y-6">
-        <div className="flex items-center gap-2.5 border-b border-neutral-100 pb-3">
-          <FolderTree className="w-4 h-4 text-black shrink-0" />
-          <h2 className="text-sm font-bold text-black tracking-tight uppercase">Basic Product Information</h2>
-        </div>
-
-        <div className="space-y-4 text-xs">
-          {/* PRODUCT NAME */}
-          <div>
-            <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-              Product Title *
-            </label>
-            <Input
-              type="text"
-              required
-              placeholder="e.g. Ultra-Soft Wireless Padded Contour Bralette"
-              value={name}
-              onChange={handleNameChange}
-              className="bg-white border-neutral-200 text-xs font-medium text-black"
-            />
-          </div>
-
-          {/* URL SLUG */}
-          <div>
-            <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-              URL Slug (Auto-generated)
-            </label>
-            <div className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 text-xs font-mono">
-              <span className="text-neutral-400 text-[11px]">/product/</span>
-              <input
-                type="text"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="flex-1 bg-transparent text-black font-bold focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* CATEGORIES GRID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Main Category *
-              </label>
-              <Select
-                value={currentMainCategory}
-                onValueChange={(val) => {
-                  setSelectedCategories([val]);
-                  const matchingSub = categoriesData.subcategories.find(
-                    (s: any) => s.parentName?.toLowerCase() === val.toLowerCase() ||
-                                s.parentId === categoriesData.mainCategories.find((c: any) => c.name.toLowerCase() === val.toLowerCase())?.id
-                  );
-                  setSelectedSubcategory(matchingSub ? matchingSub.name : 'General');
-                }}
-                options={categoriesData.mainCategories.map((cat: any) => ({ value: cat.name, label: cat.name }))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Subcategory *
-              </label>
-              <Select
-                value={selectedSubcategory || 'General'}
-                onValueChange={(val) => setSelectedSubcategory(val)}
-                options={(() => {
-                  const filtered = categoriesData.subcategories.filter(
-                    (s: any) => s.parentName?.toLowerCase() === currentMainCategory.toLowerCase() ||
-                                s.parentId === categoriesData.mainCategories.find((c: any) => c.name.toLowerCase() === currentMainCategory.toLowerCase())?.id
-                  );
-                  if (filtered.length > 0) {
-                    return filtered.map((sub: any) => ({ value: sub.name, label: sub.name }));
-                  }
-                  return [{ value: 'General', label: 'General' }, ...categoriesData.subcategories.map((sub: any) => ({ value: sub.name, label: sub.name }))];
-                })()}
-              />
-            </div>
-          </div>
-
-          {/* SKU & PRODUCT TYPE GRID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Base SKU *
-              </label>
-              <Input
-                type="text"
-                required
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                className="bg-white border-neutral-200 text-xs font-mono font-semibold text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Product Type *
-              </label>
-              <Select
-                value={productType}
-                onValueChange={(val) => setProductType(val as any)}
-                options={[
-                  { value: 'Variable', label: 'Variable (Multiple Colors & Sizes)' },
-                  { value: 'Simple', label: 'Simple (Single Option Product)' }
-                ]}
-              />
-            </div>
-          </div>
-
-          {/* SHORT & FULL DESCRIPTION */}
-          <div>
-            <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-              Short Summary Description
-            </label>
-            <textarea
-              rows={2}
-              value={shortDescription}
-              onChange={(e) => setShortDescription(e.target.value)}
-              placeholder="Brief 1-2 sentence description shown in quick view..."
-              className="w-full bg-white text-xs font-normal text-black p-3 rounded-lg border border-neutral-200 focus:outline-none focus:border-black transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-              Detailed Product Description
-            </label>
-            <textarea
-              rows={4}
-              value={fullDescription}
-              onChange={(e) => setFullDescription(e.target.value)}
-              placeholder="Detailed description, fabric blend composition, care details..."
-              className="w-full bg-white text-xs font-normal text-black p-3 rounded-lg border border-neutral-200 focus:outline-none focus:border-black transition-all"
-            />
-          </div>
-        </div>
-      </Card>
-
-      {/* ========================================================================= */}
-      {/* SIMPLE PRODUCT PRICING & STOCK (Only when productType === 'Simple') */}
-      {/* ========================================================================= */}
-      {productType === 'Simple' && (
-        <Card className="p-6 sm:p-8 bg-white border border-neutral-200 shadow-2xs rounded-xl space-y-6">
-          <div className="flex items-center gap-2.5 border-b border-neutral-100 pb-3">
-            <DollarSign className="w-4 h-4 text-black shrink-0" />
-            <h2 className="text-sm font-bold text-black tracking-tight uppercase">
-              2. Simple Product Pricing &amp; Stock Setup
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Sale Price (₹) *
-              </label>
-              <Input
-                type="number"
-                required
-                value={salePrice}
-                onChange={(e) => setSalePrice(Number(e.target.value))}
-                className="bg-white border-neutral-200 text-xs font-bold text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Regular MRP (₹)
-              </label>
-              <Input
-                type="number"
-                value={regularPrice}
-                onChange={(e) => setRegularPrice(Number(e.target.value))}
-                className="bg-white border-neutral-200 text-xs font-bold text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Cost Price (₹)
-              </label>
-              <Input
-                type="number"
-                value={costPrice}
-                onChange={(e) => setCostPrice(Number(e.target.value))}
-                className="bg-white border-neutral-200 text-xs font-bold text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Stock Quantity *
-              </label>
-              <Input
-                type="number"
-                required
-                value={stockQuantity}
-                onChange={(e) => setStockQuantity(Number(e.target.value))}
-                className="bg-white border-neutral-200 text-xs font-bold text-black"
-              />
-            </div>
-          </div>
-        </Card>
       )}
 
-      {/* ========================================================================= */}
-      {/* PRODUCT ATTRIBUTES & VARIANT DYNAMIC CONFIGURATION (Simple & Variable) */}
-      {/* ========================================================================= */}
-      <ProductAttributeSection
-        value={productAttributes}
-        onChange={setProductAttributes}
-      />
+      {/* MAIN FORM CONTAINER */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-10">
 
-      <ColorGallerySection
-        productAttributes={productAttributes}
-        colorMediaConfigs={colorMediaConfigs}
-        onChangeColorMediaConfigs={setColorMediaConfigs}
-        colors={colors}
-        onSyncRootMedia={(main, gal) => {
-          if (main) {
-            setMainImage(main);
-            setAiImagePreview(main);
-          }
-          if (gal && gal.length > 0) {
-            setGalleryImages(gal);
-          }
-        }}
-      />
-
-      <VariantGeneratorSection
-        productAttributes={productAttributes}
-        variants={generatedVariants as any[]}
-        onChangeVariants={(vars) => setGeneratedVariants(vars as any[])}
-        baseSku={sku}
-        defaultPrice={salePrice}
-        defaultMrp={regularPrice}
-        defaultStock={stockQuantity}
-      />
-
-      <ProductSizeChartSection
-        productAttributes={productAttributes}
-        sizeChart={sizeChart}
-        onChangeSizeChart={setSizeChart}
-      />
-
-      {/* ========================================================================= */}
-      {/* CARD 3: CATEGORY SIZE GUIDE */}
-      {/* ========================================================================= */}
-      <Card className="p-6 sm:p-8 bg-white border border-neutral-200 shadow-2xs rounded-xl space-y-5">
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <Ruler className="w-4 h-4 text-black shrink-0" />
-            <h2 className="text-sm font-bold text-black tracking-tight uppercase">Size Guide Assignment</h2>
+        {/* 1. PRODUCT DETAILS (INCLUDING CATEGORY, SUBCATEGORY & BRAND) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
+          <div className="lg:col-span-3 space-y-1">
+            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">Product Details</h2>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Define the title, category classification, display subtitle, and storefront visibility status
+            </p>
           </div>
 
-          <Button
-            type="button"
-            onClick={() => setShowCreateSizeGuideModal(true)}
-            variant="outline"
-            size="sm"
-            className="text-xs text-black border-neutral-200 hover:bg-neutral-50"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create New Size Guide</span>
-          </Button>
+          <div className="lg:col-span-9">
+            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-5">
+              
+              {/* Product Title / Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">
+                  Product Title / Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g. Royal Mirror Latkan Pair with Golden Tassels"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all font-medium"
+                />
+              </div>
+
+              {/* Category & Subcategory Dropdowns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                {/* Main Category */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700">
+                    Category <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={category}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      setIsDirty(true);
+                    }}
+                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all cursor-pointer font-medium"
+                  >
+                    {mainCategories.map((c) => (
+                      <option key={c.id || c.name} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Subcategory */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700">
+                    Subcategory
+                  </label>
+                  <select
+                    value={subcategory}
+                    onChange={(e) => {
+                      setSubcategory(e.target.value);
+                      setIsDirty(true);
+                    }}
+                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all cursor-pointer font-medium"
+                  >
+                    <option value="">None / General</option>
+                    {filteredSubcategories.map((s) => (
+                      <option key={s.id || s.name} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* URL Slug */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">
+                  URL Slug <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={slug}
+                    onChange={(e) => {
+                      setSlug(e.target.value);
+                      setIsSlugManuallyEdited(true);
+                      setIsDirty(true);
+                    }}
+                    placeholder="royal-mirror-latkan-pair"
+                    className="w-full pl-3.5 pr-8 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all font-mono"
+                  />
+                  {slug && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSlug('');
+                        setIsSlugManuallyEdited(true);
+                        setIsDirty(true);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 p-0.5 cursor-pointer"
+                      title="Clear slug"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* STOREFRONT VISIBILITY TOGGLE SWITCH */}
+              <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-semibold text-neutral-900 block">
+                    Storefront Visibility
+                  </label>
+                  <p className="text-[11px] text-neutral-400">
+                    {status === 'Active'
+                      ? 'Product is Active and visible on the website store'
+                      : 'Product is saved as Draft and hidden from the website store'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-xs font-semibold ${
+                      status === 'Active' ? 'text-emerald-700' : 'text-neutral-500'
+                    }`}
+                  >
+                    {status === 'Active' ? 'Active (Live)' : 'Draft (Hidden)'}
+                  </span>
+
+                  {/* Toggle Switch */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={status === 'Active'}
+                    onClick={() => {
+                      setStatus(status === 'Active' ? 'Draft' : 'Active');
+                      setIsDirty(true);
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      status === 'Active' ? 'bg-emerald-600' : 'bg-neutral-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        status === 'Active' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-            Assigned Category Size Guide
-          </label>
-          <Select
-            value={selectedSizeGuideId || ''}
-            onValueChange={setSelectedSizeGuideId}
-            options={[
-              { value: '', label: '-- No Size Guide Assigned --' },
-              ...sizeGuidesList.map((g) => ({
-                value: g.id,
-                label: `${g.title} (${(g.categoryIds || []).join(', ')})`
-              }))
-            ]}
-          />
-        </div>
-      </Card>
-
-      {/* ========================================================================= */}
-      {/* CARD 5: DYNAMIC DESCRIPTION CARDS */}
-      {/* ========================================================================= */}
-      <Card className="p-6 sm:p-8 bg-white border border-neutral-200 shadow-2xs rounded-xl space-y-6">
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-black shrink-0" />
-            <h2 className="text-sm font-bold text-black tracking-tight uppercase">Product Description Feature Cards</h2>
+        {/* 2. PRODUCT TYPE & MEDIA / PRICING CONFIGURATION (SIMPLE vs VARIABLE) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
+          <div className="lg:col-span-3 space-y-1">
+            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">Type &amp; Configuration</h2>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Choose between a Simple Product (Single item with media) or Variable Product (Multiple color/size variations with photos)
+            </p>
           </div>
 
-          <Button
-            type="button"
-            onClick={() => {
-              const newCard: ProductDescriptionCard = {
-                id: `card-${Date.now()}`,
-                title: 'New Feature Card',
-                description: 'Card details...',
-                image: '',
-                sortOrder: descriptionCards.length + 1
-              };
-              setDescriptionCards([...descriptionCards, newCard]);
-            }}
-            variant="outline"
-            size="sm"
-            className="text-xs text-black border-neutral-200 hover:bg-neutral-50"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Card</span>
-          </Button>
+          <div className="lg:col-span-9 space-y-6">
+            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-6">
+              
+              {/* TYPE SWITCHER */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-neutral-900 uppercase tracking-wider block">
+                  Product Classification Type
+                </label>
+                <div className="grid grid-cols-2 gap-3 p-1.5 bg-neutral-100 rounded-xl border border-neutral-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductType('Simple');
+                      setIsDirty(true);
+                    }}
+                    className={`py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      productType === 'Simple'
+                        ? 'bg-white text-neutral-950 shadow-sm border border-neutral-200/80'
+                        : 'text-neutral-600 hover:text-neutral-950'
+                    }`}
+                  >
+                    <Package className="w-4 h-4" />
+                    <span>Simple Product (Single Item)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductType('Variable');
+                      setIsDirty(true);
+                    }}
+                    className={`py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      productType === 'Variable'
+                        ? 'bg-white text-neutral-950 shadow-sm border border-neutral-200/80'
+                        : 'text-neutral-600 hover:text-neutral-950'
+                    }`}
+                  >
+                    <Layers className="w-4 h-4" />
+                    <span>Variable Product (With Variations)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ============================================================ */}
+              {/* A. SIMPLE PRODUCT SECTION (Pricing + Inventory + Media) */}
+              {/* ============================================================ */}
+              {productType === 'Simple' && (
+                <div className="space-y-6 pt-2">
+                  
+                  {/* Pricing & Inventory */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                      Pricing &amp; Inventory Details
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      {/* Sale Price */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-neutral-700">
+                          Selling Price (₹) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={salePrice}
+                          onChange={(e) => {
+                            setSalePrice(Number(e.target.value));
+                            setIsDirty(true);
+                          }}
+                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-semibold"
+                        />
+                      </div>
+
+                      {/* Regular / M.R.P. Price */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-neutral-700">
+                          Regular / M.R.P. (₹)
+                        </label>
+                        <input
+                          type="number"
+                          value={regularPrice}
+                          onChange={(e) => {
+                            setRegularPrice(Number(e.target.value));
+                            setIsDirty(true);
+                          }}
+                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                        />
+                      </div>
+
+                      {/* SKU */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-neutral-700">
+                          SKU
+                        </label>
+                        <input
+                          type="text"
+                          value={sku}
+                          onChange={(e) => {
+                            setSku(e.target.value);
+                            setIsDirty(true);
+                          }}
+                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-mono"
+                        />
+                      </div>
+
+                      {/* Stock Quantity */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-neutral-700">
+                          Stock Quantity
+                        </label>
+                        <input
+                          type="number"
+                          value={stock}
+                          onChange={(e) => {
+                            setStock(Number(e.target.value));
+                            setIsDirty(true);
+                          }}
+                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Simple Product Photos & Gallery (Unified Uploader: 1st image is Main Cover Image) */}
+                  {(() => {
+                    const allSimpleImages = [mainImage, ...galleryImages].filter(Boolean);
+                    const [simpleUrlInput, setSimpleUrlInput] = [
+                      newOptionValueInputs['simple-url'] || '',
+                      (val: string) => setNewOptionValueInputs((prev) => ({ ...prev, 'simple-url': val }))
+                    ];
+
+                    return (
+                      <div className="space-y-4 pt-4 border-t border-neutral-100">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <label className="text-xs font-bold text-neutral-900 flex items-center gap-1.5 uppercase tracking-wider">
+                              <ImageIcon className="w-4 h-4 text-neutral-700" />
+                              <span>Product Photos &amp; Gallery ({allSimpleImages.length})</span>
+                              <span className="text-rose-500">*</span>
+                            </label>
+                            <p className="text-[11px] text-neutral-500">
+                              First photo is automatically used as the <strong>Main Display Thumbnail</strong> on the store.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <label className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-black text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-2xs transition-all">
+                              <UploadCloud className="w-3.5 h-3.5" />
+                              <span>Upload Photos</span>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={(e) => handleSimpleGalleryFiles(e.target.files)}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* URL Input & Paste Row */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Paste image URL here or press Ctrl + V..."
+                            value={simpleUrlInput}
+                            onFocus={() => setActivePasteTarget('root_gallery')}
+                            onChange={(e) => setSimpleUrlInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (simpleUrlInput.trim()) {
+                                  handleSimpleAddImages([simpleUrlInput.trim()]);
+                                  setSimpleUrlInput('');
+                                }
+                              }
+                            }}
+                            className="flex-1 h-8 text-xs bg-white px-3 border border-neutral-300 rounded-lg focus:outline-none focus:border-black font-medium"
+                          />
+                          {simpleUrlInput.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleSimpleAddImages([simpleUrlInput.trim()]);
+                                setSimpleUrlInput('');
+                              }}
+                              className="h-8 px-3 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-lg cursor-pointer shrink-0"
+                            >
+                              Add URL
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Drag & Drop Zone */}
+                        <div
+                          tabIndex={0}
+                          onFocus={() => setActivePasteTarget('root_gallery')}
+                          onClick={() => setActivePasteTarget('root_gallery')}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsGalleryDragOver(true);
+                          }}
+                          onDragLeave={() => setIsGalleryDragOver(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsGalleryDragOver(false);
+                            if (e.dataTransfer.files) handleSimpleGalleryFiles(e.dataTransfer.files);
+                          }}
+                          className={`border-2 border-dashed rounded-xl p-4 text-center transition-colors cursor-pointer outline-none bg-white ${
+                            isGalleryDragOver
+                              ? 'border-neutral-900 bg-neutral-100'
+                              : 'border-neutral-200 hover:border-neutral-300'
+                          }`}
+                        >
+                          <p className="text-xs text-neutral-500 font-medium">
+                            Drag &amp; drop multiple product photos here, click "Upload Photos" or press <span className="font-mono bg-neutral-100 px-1 py-0.5 rounded border">Ctrl + V</span>
+                          </p>
+                        </div>
+
+                        {/* Uploaded Photos Grid */}
+                        {allSimpleImages.length > 0 && (
+                          <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-3 pt-1">
+                            {allSimpleImages.map((img, imgIdx) => (
+                              <div
+                                key={imgIdx}
+                                className={`relative aspect-square rounded-xl border-2 overflow-hidden bg-neutral-100 group shadow-2xs ${
+                                  imgIdx === 0 ? 'border-neutral-900 ring-2 ring-neutral-900/20' : 'border-neutral-200'
+                                }`}
+                              >
+                                <img
+                                  src={img}
+                                  alt={`Product Image ${imgIdx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+
+                                {/* First Image Main Badge */}
+                                {imgIdx === 0 && (
+                                  <div className="absolute top-1 left-1 bg-neutral-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                                    ★ Main Cover
+                                  </div>
+                                )}
+
+                                {/* Hover Actions */}
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                                  {imgIdx !== 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSimpleSetMainImage(imgIdx)}
+                                      className="text-[9px] bg-white text-black font-bold px-1.5 py-0.5 rounded hover:bg-neutral-100 cursor-pointer w-full text-center"
+                                    >
+                                      Set as Main
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSimpleRemoveImage(imgIdx)}
+                                    className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded hover:bg-rose-700 cursor-pointer w-full text-center"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                </div>
+              )}
+
+              {/* ============================================================ */}
+              {/* B. VARIABLE PRODUCT SECTION (Options + Variants with Media) */}
+              {/* ============================================================ */}
+              {productType === 'Variable' && (
+                <div className="space-y-6 pt-2">
+                  <div className="bg-[#eff6ff] border border-[#dbeafe] text-[#2563eb] rounded-xl p-4 flex items-center gap-3 text-xs font-medium shadow-2xs">
+                    <Info className="w-4 h-4 shrink-0 text-[#2563eb]" />
+                    <span>
+                      Variable Product Mode: Configure options and variants below. Each variation has its own Main Photo, Gallery Photos (Drag &amp; Drop / Ctrl + V), Color Swatch, Price, SKU, and Stock.
+                    </span>
+                  </div>
+
+                  {/* Variation Options Editor */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                        VARIATION ATTRIBUTES
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={handleAddOption}
+                        className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Custom Option</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Add from Master Attributes */}
+                    {masterAttributes.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap p-3 bg-white border border-neutral-200 rounded-xl">
+                        <span className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider flex items-center gap-1 shrink-0">
+                          <Sliders className="w-3.5 h-3.5 text-neutral-500" /> Pre-built Attributes:
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {masterAttributes.map((attr) => {
+                            const isAdded = options.some(
+                              (o) => o.name.toLowerCase() === attr.name.toLowerCase()
+                            );
+                            return (
+                              <button
+                                key={attr.id}
+                                type="button"
+                                onClick={() => handleAddOptionFromMaster(attr)}
+                                disabled={isAdded}
+                                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                                  isAdded
+                                    ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed'
+                                    : 'bg-[#FAF8F4] text-neutral-800 border-neutral-200 hover:border-black hover:bg-neutral-100 shadow-2xs'
+                                }`}
+                              >
+                                <Plus className="w-3 h-3 text-neutral-500" />
+                                <span>{attr.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Options List */}
+                    {options.map((opt, optIdx) => {
+                      const matchedMasterAttr = masterAttributes.find(
+                        (ma) => ma.name.toLowerCase() === opt.name.toLowerCase()
+                      );
+
+                      const isDropdownOpen = openValueDropdownId === opt.id;
+                      const searchQuery = (valueSearchQueries[opt.id] || '').toLowerCase();
+                      const availableMasterValues = matchedMasterAttr?.values || [];
+                      const filteredMasterValues = availableMasterValues.filter((v) =>
+                        (v.label || v.value).toLowerCase().includes(searchQuery)
+                      );
+
+                      return (
+                        <div
+                          key={opt.id}
+                          className="bg-neutral-50/90 border border-neutral-200 rounded-xl p-4 sm:p-5 space-y-4 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between border-b border-neutral-200/80 pb-3">
+                            <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                              Option {optIdx + 1}
+                            </span>
+                            {options.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOption(optIdx)}
+                                className="text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remove Option</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                            {/* Attribute Name* Dropdown */}
+                            <div className="md:col-span-4 space-y-1.5">
+                              <label className="text-xs font-bold text-neutral-800 flex items-center gap-1">
+                                <span>Attribute Name*</span>
+                              </label>
+                              
+                              <div className="space-y-2">
+                                <select
+                                  value={
+                                    masterAttributes.some((ma) => ma.name.toLowerCase() === opt.name.toLowerCase())
+                                      ? masterAttributes.find((ma) => ma.name.toLowerCase() === opt.name.toLowerCase())?.name
+                                      : '__custom__'
+                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '__custom__') {
+                                      handleOptionNameChange(optIdx, 'Custom Attribute');
+                                    } else {
+                                      handleOptionNameChange(optIdx, val);
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-none focus:border-black font-medium cursor-pointer shadow-2xs"
+                                >
+                                  <option value="" disabled>Select Attribute Name...</option>
+                                  {masterAttributes.map((ma) => (
+                                    <option key={ma.id} value={ma.name}>
+                                      {ma.name}
+                                    </option>
+                                  ))}
+                                  <option value="__custom__">+ Custom Attribute...</option>
+                                </select>
+
+                                {!masterAttributes.some((ma) => ma.name.toLowerCase() === opt.name.toLowerCase()) && (
+                                  <input
+                                    type="text"
+                                    value={opt.name}
+                                    onChange={(e) => handleOptionNameChange(optIdx, e.target.value)}
+                                    placeholder="Enter custom attribute name..."
+                                    className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-none focus:border-black"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Attribute Value* Searchable Multi-Select Dropdown */}
+                            <div className="md:col-span-8 space-y-1.5 relative">
+                              <label className="text-xs font-bold text-neutral-800 flex items-center justify-between">
+                                <span>Attribute Value*</span>
+                                {opt.values.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = options.map((o) =>
+                                        o.id === opt.id ? { ...o, values: [] } : o
+                                      );
+                                      setOptions(updated);
+                                      syncVariantsFromOptions(updated);
+                                      setIsDirty(true);
+                                    }}
+                                    className="text-[10px] text-neutral-500 hover:text-rose-600 font-semibold cursor-pointer"
+                                  >
+                                    Clear all ({opt.values.length})
+                                  </button>
+                                )}
+                              </label>
+
+                              {/* Multi-Select Input Trigger Box */}
+                              <div
+                                onClick={() => setOpenValueDropdownId(isDropdownOpen ? null : opt.id)}
+                                className="min-h-[38px] p-2 bg-white border border-neutral-300 rounded-lg cursor-pointer flex items-center justify-between gap-2 flex-wrap shadow-2xs hover:border-neutral-400 transition-colors"
+                              >
+                                {opt.values.length === 0 ? (
+                                  <span className="text-xs text-neutral-400 select-none pl-1">Select...</span>
+                                ) : (
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {opt.values.map((val, valIdx) => (
+                                      <span
+                                        key={valIdx}
+                                        className="inline-flex items-center gap-1.5 bg-neutral-900 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md shadow-2xs"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {opt.name.toLowerCase().includes('color') && (
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-xs shrink-0 inline-block"
+                                            style={{ backgroundColor: getColorHex(val) }}
+                                          />
+                                        )}
+                                        <span>{val}</span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveOptionValue(opt.id, valIdx);
+                                          }}
+                                          className="hover:bg-neutral-700 rounded-full p-0.5 cursor-pointer ml-0.5"
+                                        >
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                <ChevronDown className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                              </div>
+
+                              {/* Dropdown Menu Popover */}
+                              {isDropdownOpen && (
+                                <div
+                                  className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-neutral-200 rounded-xl shadow-xl p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-100"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {/* Search & Actions Bar */}
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-neutral-400" />
+                                      <input
+                                        type="text"
+                                        placeholder="Search or type value..."
+                                        value={valueSearchQueries[opt.id] || ''}
+                                        onChange={(e) =>
+                                          setValueSearchQueries((prev) => ({
+                                            ...prev,
+                                            [opt.id]: e.target.value
+                                          }))
+                                        }
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const v = (valueSearchQueries[opt.id] || '').trim();
+                                            if (v) {
+                                              handleAddOptionValue(opt.id, v);
+                                              setValueSearchQueries((prev) => ({ ...prev, [opt.id]: '' }));
+                                            }
+                                          }
+                                        }}
+                                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-neutral-50 border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-medium"
+                                        autoFocus
+                                      />
+                                    </div>
+                                    {(valueSearchQueries[opt.id] || '').trim() && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const v = (valueSearchQueries[opt.id] || '').trim();
+                                          if (v) {
+                                            handleAddOptionValue(opt.id, v);
+                                            setValueSearchQueries((prev) => ({ ...prev, [opt.id]: '' }));
+                                          }
+                                        }}
+                                        className="text-xs bg-neutral-900 text-white font-bold px-3 py-1.5 rounded-lg cursor-pointer shrink-0"
+                                      >
+                                        + Add
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Quick Select All from Master */}
+                                  {matchedMasterAttr && matchedMasterAttr.values && matchedMasterAttr.values.length > 0 && (
+                                    <div className="flex items-center justify-between border-b border-neutral-100 pb-1.5 text-[11px]">
+                                      <span className="text-neutral-500 font-medium">
+                                        Available from {matchedMasterAttr.name}:
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddAllValuesFromMaster(opt.id, matchedMasterAttr)}
+                                        className="text-neutral-900 font-bold hover:underline cursor-pointer"
+                                      >
+                                        + Select All
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* Values List */}
+                                  <div className="max-h-52 overflow-y-auto space-y-1 divide-y divide-neutral-100 pr-1">
+                                    {filteredMasterValues.length > 0 ? (
+                                      filteredMasterValues.map((v) => {
+                                        const valStr = (v.label || v.value).trim();
+                                        const isSelected = opt.values.includes(valStr);
+
+                                        return (
+                                          <div
+                                            key={v.id || valStr}
+                                            onClick={() => {
+                                              if (isSelected) {
+                                                const idx = opt.values.indexOf(valStr);
+                                                if (idx !== -1) handleRemoveOptionValue(opt.id, idx);
+                                              } else {
+                                                handleAddOptionValue(opt.id, valStr);
+                                              }
+                                            }}
+                                            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                              isSelected
+                                                ? 'bg-neutral-900 text-white'
+                                                : 'hover:bg-neutral-100 text-neutral-800'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              {v.colorCode ? (
+                                                <span
+                                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
+                                                  style={{ backgroundColor: v.colorCode }}
+                                                />
+                                              ) : opt.name.toLowerCase().includes('color') ? (
+                                                <span
+                                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
+                                                  style={{ backgroundColor: getColorHex(valStr) }}
+                                                />
+                                              ) : null}
+                                              <span>{valStr}</span>
+                                            </div>
+                                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <div className="p-3 text-center text-xs text-neutral-400">
+                                        No matching values. Press "Enter" to add custom value.
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center justify-end pt-1 border-t border-neutral-100">
+                                    <button
+                                      type="button"
+                                      onClick={() => setOpenValueDropdownId(null)}
+                                      className="text-xs bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold px-3 py-1 rounded-md cursor-pointer"
+                                    >
+                                      Done
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Live Color Picker for Color Attribute */}
+                          {opt.name.toLowerCase().includes('color') && (
+                            <div className="bg-white border border-neutral-200/90 rounded-xl p-3.5 space-y-3 shadow-2xs">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                                  <Palette className="w-4 h-4 text-brand-maroon" />
+                                  <span>Color Code Picker &amp; Live Name Detection</span>
+                                </span>
+                                <span className="text-[11px] text-neutral-400">
+                                  Pick any color — name will detect automatically
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-3 flex-wrap bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/80">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={activePickerHex}
+                                    onChange={(e) => handleColorPickerChange(e.target.value)}
+                                    className="w-9 h-9 rounded-lg border border-neutral-300 cursor-pointer p-0.5 bg-white shadow-2xs shrink-0"
+                                    title="Click to open color spectrum picker"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={activePickerHex}
+                                    onChange={(e) => handleColorPickerChange(e.target.value)}
+                                    placeholder="#000000"
+                                    className="w-24 px-2.5 py-1.5 text-xs font-mono font-semibold bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
+                                  />
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                                  <span className="text-[11px] font-semibold text-neutral-500 shrink-0">
+                                    Color Name:
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={activePickerName}
+                                    onChange={(e) => setActivePickerName(e.target.value)}
+                                    placeholder="Color name"
+                                    className="w-full px-3 py-1.5 text-xs font-bold text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nameToAdd = (activePickerName || '').trim() || getClosestColorName(activePickerHex).name;
+                                    handleAddOptionValue(opt.id, nameToAdd);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-lg shadow-2xs transition-all cursor-pointer shrink-0"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Add Color</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Add an option Button (Styled as in user screenshot) */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleAddOption}
+                        className="inline-flex items-center gap-2 bg-neutral-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add an option</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Configured Variants Matrix */}
+                  <div className="border-t border-dashed border-neutral-300 pt-6 space-y-6">
+                    <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                      CONFIGURED VARIANTS ({variants.length})
+                    </h4>
+
+                    <div className="space-y-6">
+                      {variants.map((v, vIdx) => {
+                        const vMainImg = v.mainImage || v.images?.[0] || mainImage || '/images/category/Latkan.webp';
+                        const vGals = v.galleryImages || [];
+
+                        return (
+                          <div
+                            key={v.id || vIdx}
+                            className="border border-neutral-200 rounded-xl p-5 space-y-5 bg-neutral-50/60 shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                              <div className="flex items-center gap-2.5">
+                                <span
+                                  className="w-4 h-4 rounded-full border border-neutral-300 shadow-2xs shrink-0"
+                                  style={{ backgroundColor: (v as any).colorHex || '#800000' }}
+                                />
+                                <h5 className="text-xs font-bold text-neutral-900">
+                                  {v.name || v.optionValue}
+                                </h5>
+                              </div>
+                            </div>
+
+                            {/* 4-Column Pricing & Inventory */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                              {/* Variant Selling Price */}
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-semibold text-neutral-700">
+                                  Selling Price (₹) *
+                                </label>
+                                <input
+                                  type="number"
+                                  value={v.price}
+                                  onChange={(e) =>
+                                    handleUpdateVariantField(vIdx, 'price', Number(e.target.value))
+                                  }
+                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-semibold"
+                                />
+                              </div>
+
+                              {/* Variant Regular Price */}
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-semibold text-neutral-700">
+                                  Regular Price (₹)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={v.salePrice || ''}
+                                  onChange={(e) =>
+                                    handleUpdateVariantField(
+                                      vIdx,
+                                      'salePrice',
+                                      e.target.value ? Number(e.target.value) : undefined
+                                    )
+                                  }
+                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
+                                />
+                              </div>
+
+                              {/* Variant SKU */}
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-semibold text-neutral-700">
+                                  SKU
+                                </label>
+                                <input
+                                  type="text"
+                                  value={v.sku}
+                                  onChange={(e) =>
+                                    handleUpdateVariantField(vIdx, 'sku', e.target.value)
+                                  }
+                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-mono"
+                                />
+                              </div>
+
+                              {/* Variant Stock */}
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-semibold text-neutral-700">
+                                  Stock Qty *
+                                </label>
+                                <input
+                                  type="number"
+                                  value={v.quantity}
+                                  onChange={(e) =>
+                                    handleUpdateVariantField(vIdx, 'quantity', Number(e.target.value))
+                                  }
+                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
+                                />
+                              </div>
+                            </div>
+
+                            {/* VARIANT GALLERY & PHOTOS (Unified Uploader: 1st image is Main Image) */}
+                            {(() => {
+                              const variantImages = (v.images && v.images.length > 0)
+                                ? v.images
+                                : [v.mainImage, ...(v.galleryImages || [])].filter(Boolean);
+                              const [varUrlInput, setVarUrlInput] = [newOptionValueInputs[`var-url-${vIdx}`] || '', (val: string) => setNewOptionValueInputs((prev) => ({ ...prev, [`var-url-${vIdx}`]: val }))];
+
+                              return (
+                                <div className="space-y-3 pt-3 border-t border-neutral-200/80">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div>
+                                      <label className="text-xs font-bold text-neutral-900 flex items-center gap-1.5 uppercase tracking-wider">
+                                        <ImageIcon className="w-4 h-4 text-neutral-700" />
+                                        <span>Variant Photos &amp; Gallery ({variantImages.length})</span>
+                                      </label>
+                                      <p className="text-[11px] text-neutral-500">
+                                        First photo is automatically used as the <strong>Main Product Image</strong> for this variant.
+                                      </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <label className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-black text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-2xs transition-all">
+                                        <UploadCloud className="w-3.5 h-3.5" />
+                                        <span>Upload Variant Photos</span>
+                                        <input
+                                          type="file"
+                                          multiple
+                                          accept="image/*"
+                                          onChange={(e) => handleVariantGalleryFiles(vIdx, e.target.files)}
+                                          className="hidden"
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+
+                                  {/* URL Input & Paste Row */}
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Paste image URL here or press Ctrl + V..."
+                                      value={varUrlInput}
+                                      onFocus={() => setActivePasteTarget({ type: 'var_gallery', index: vIdx })}
+                                      onChange={(e) => setVarUrlInput(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          if (varUrlInput.trim()) {
+                                            handleVariantAddImages(vIdx, [varUrlInput.trim()]);
+                                            setVarUrlInput('');
+                                          }
+                                        }
+                                      }}
+                                      className="flex-1 h-8 text-xs bg-white px-3 border border-neutral-300 rounded-lg focus:outline-none focus:border-black"
+                                    />
+                                    {varUrlInput.trim() && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleVariantAddImages(vIdx, [varUrlInput.trim()]);
+                                          setVarUrlInput('');
+                                        }}
+                                        className="h-8 px-3 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-lg cursor-pointer shrink-0"
+                                      >
+                                        Add URL
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Drag & Drop Zone */}
+                                  <div
+                                    tabIndex={0}
+                                    onFocus={() => setActivePasteTarget({ type: 'var_gallery', index: vIdx })}
+                                    onClick={() => setActivePasteTarget({ type: 'var_gallery', index: vIdx })}
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      setActiveVarDragGal(vIdx);
+                                    }}
+                                    onDragLeave={() => setActiveVarDragGal(null)}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      setActiveVarDragGal(null);
+                                      if (e.dataTransfer.files) handleVariantGalleryFiles(vIdx, e.dataTransfer.files);
+                                    }}
+                                    className={`border-2 border-dashed rounded-xl p-3 text-center transition-colors cursor-pointer outline-none bg-white ${
+                                      activeVarDragGal === vIdx
+                                        ? 'border-neutral-900 bg-neutral-100'
+                                        : 'border-neutral-200 hover:border-neutral-300'
+                                    }`}
+                                  >
+                                    <p className="text-[11px] text-neutral-500">
+                                      Drag &amp; drop photos here, or click to activate clipboard <span className="font-mono bg-neutral-100 px-1 py-0.5 rounded border">Ctrl + V</span>
+                                    </p>
+                                  </div>
+
+                                  {/* Uploaded Photos Grid */}
+                                  {variantImages.length > 0 && (
+                                    <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2.5 pt-1">
+                                      {variantImages.map((img, imgIdx) => (
+                                        <div
+                                          key={imgIdx}
+                                          className={`relative aspect-square rounded-xl border-2 overflow-hidden bg-neutral-100 group shadow-2xs ${
+                                            imgIdx === 0 ? 'border-neutral-900 ring-2 ring-neutral-900/20' : 'border-neutral-200'
+                                          }`}
+                                        >
+                                          <img
+                                            src={img}
+                                            alt={`Variant ${v.optionValue} image ${imgIdx + 1}`}
+                                            className="w-full h-full object-cover"
+                                          />
+
+                                          {/* First Image Main Badge */}
+                                          {imgIdx === 0 && (
+                                            <div className="absolute top-1 left-1 bg-neutral-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                                              ★ Main Cover
+                                            </div>
+                                          )}
+
+                                          {/* Hover Actions */}
+                                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                                            {imgIdx !== 0 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleVariantSetMainImage(vIdx, imgIdx)}
+                                                className="text-[9px] bg-white text-black font-bold px-1.5 py-0.5 rounded hover:bg-neutral-100 cursor-pointer w-full text-center"
+                                              >
+                                                Set as Main
+                                              </button>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVariantRemoveImage(vIdx, imgIdx)}
+                                              className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded hover:bg-rose-700 cursor-pointer w-full text-center"
+                                            >
+                                              Delete
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          {descriptionCards.map((card, idx) => (
-            <div key={card.id} className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/50 space-y-3">
+        {/* 3. DESCRIPTIONS SECTION */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
+          <div className="lg:col-span-3 space-y-1">
+            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">Descriptions</h2>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Write engaging overview text and detailed rich product specifications for customer education
+            </p>
+          </div>
+
+          <div className="lg:col-span-9 space-y-6">
+            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-5">
+              
+              {/* Short Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">
+                  Short Description / Overview Summary
+                </label>
+                <textarea
+                  rows={3}
+                  value={shortDescription}
+                  onChange={(e) => {
+                    setShortDescription(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="Concise 1-2 sentence overview shown near the Buy buttons..."
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-normal leading-relaxed"
+                />
+              </div>
+
+              {/* Rich Product Description */}
+              <div className="space-y-1.5 pt-2">
+                <label className="text-xs font-semibold text-neutral-700">
+                  Full Product Description (Detailed Content Tab)
+                </label>
+                <RichTextEditor
+                  value={longDescription}
+                  onChange={(val) => {
+                    setLongDescription(val);
+                    setIsDirty(true);
+                  }}
+                  minHeight="200px"
+                  placeholder="Write complete product specifications, materials, highlights, and care details..."
+                />
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {/* 4. ADDITIONAL INFORMATION / SPECIFICATIONS TABLE */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-10">
+          <div className="lg:col-span-3 space-y-1">
+            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">
+              Additional Information
+            </h2>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Define custom attribute rows (Material, Dimensions, Weight, Craft Type, Care Instructions) displayed in the website's Additional Information table
+            </p>
+          </div>
+
+          <div className="lg:col-span-9">
+            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-black">Feature Card #{idx + 1}</span>
+                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                  SPECIFICATIONS &amp; ATTRIBUTES TABLE ({specifications.length})
+                </h4>
                 <button
                   type="button"
-                  onClick={() => setDescriptionCards(descriptionCards.filter((c) => c.id !== card.id))}
-                  className="text-xs text-neutral-400 hover:text-red-600 font-medium cursor-pointer"
+                  onClick={handleAddSpecRow}
+                  className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
-                  Remove
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Attribute Row</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">Title</label>
-                  <Input
-                    type="text"
-                    value={card.title}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setDescriptionCards(descriptionCards.map((c) => (c.id === card.id ? { ...c, title: val } : c)));
-                    }}
-                    className="bg-white border-neutral-200 text-xs font-semibold text-black"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">Assign Color</label>
-                  <Select
-                    value={card.colorName || 'All'}
-                    onValueChange={(val) => {
-                      setDescriptionCards(descriptionCards.map((c) => (c.id === card.id ? { ...c, colorName: val } : c)));
-                    }}
-                    options={[
-                      { value: 'All', label: '✨ All Colors (General)' },
-                      ...colors.map((c) => ({ value: c.colorName, label: `🎨 ${c.colorName}` })),
-                      ...colorMediaConfigs.map((c) => ({ value: c.colorName, label: `🎨 ${c.colorName}` }))
-                    ].filter((opt, idx, self) => self.findIndex((o) => o.value === opt.value) === idx)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">Feature Image</label>
-                  <div className="flex items-center gap-2.5">
-                    {card.image ? (
-                      <div className="relative group shrink-0">
-                        <img
-                          src={card.image}
-                          alt={card.title}
-                          className="w-12 h-14 object-cover rounded-lg border border-neutral-200 bg-white shadow-2xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDescriptionCards((prev) =>
-                              prev.map((c) => (c.id === card.id ? { ...c, image: '' } : c))
-                            );
-                          }}
-                          className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white w-5 h-5 rounded-full flex items-center justify-center shadow-xs transition-all cursor-pointer z-10"
-                          title="Remove image"
-                        >
-                          <X className="w-3 h-3 text-white" />
-                        </button>
-                      </div>
-                    ) : null}
-
-                    <label className="px-3.5 py-1.5 bg-black hover:bg-neutral-800 text-white text-xs font-semibold rounded-md shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 h-9">
-                      <Upload className="w-3.5 h-3.5 text-white" />
-                      <span>Upload Image</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files?.[0]) {
-                            handleUploadDescriptionCardImage(card.id, e.target.files[0]);
-                          }
-                        }}
-                      />
-                    </label>
+              <div className="space-y-2.5 pt-2">
+                {specifications.map((spec, sIdx) => (
+                  <div key={spec.id || sIdx} className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={spec.key}
+                      onChange={(e) => handleUpdateSpecRow(sIdx, 'key', e.target.value)}
+                      placeholder="Attribute (e.g. Material, Dimensions)"
+                      className="w-1/3 px-3 py-2 text-xs bg-white border border-neutral-200 rounded-lg font-semibold text-neutral-800 focus:outline-none focus:border-black"
+                    />
+                    <input
+                      type="text"
+                      value={spec.value}
+                      onChange={(e) => handleUpdateSpecRow(sIdx, 'value', e.target.value)}
+                      placeholder="Value (e.g. Pure Silk, 15x10 cm)"
+                      className="flex-1 px-3 py-2 text-xs bg-white border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:border-black"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSpecRow(sIdx)}
+                      className="text-neutral-400 hover:text-rose-600 p-2 cursor-pointer transition-colors"
+                      title="Delete row"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-neutral-600 mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={card.description}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setDescriptionCards(descriptionCards.map((c) => (c.id === card.id ? { ...c, description: val } : c)));
-                  }}
-                  className="w-full bg-white text-xs font-normal text-black p-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-black"
-                />
+                ))}
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      </Card>
 
-      {/* ========================================================================= */}
-      {/* INLINE CREATE SIZE GUIDE MODAL */}
-      {/* ========================================================================= */}
-      {showCreateSizeGuideModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <Card className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-neutral-200 p-6 space-y-4 font-sans">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-              <h3 className="font-bold text-black text-sm flex items-center gap-2">
-                <Ruler className="w-4 h-4 text-black" />
-                <span>Create Category Size Guide</span>
-              </h3>
+      </div>
+
+      {/* STICKY BOTTOM ACTION FOOTER */}
+      <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-neutral-200 px-6 py-4 shadow-lg flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            if (isDirty) setShowDiscardModal(true);
+            else navigateBack();
+          }}
+          className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 flex items-center gap-1.5 px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span>Back</span>
+        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => handleSaveProduct('Draft')}
+            disabled={isSaving}
+            className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer"
+          >
+            Save Draft
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSaveProduct('Active')}
+            disabled={isSaving}
+            className="text-xs font-semibold bg-neutral-950 hover:bg-black text-white px-6 py-2 rounded-lg shadow-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <span>{isEditMode ? 'Update Product' : 'Publish Product'}</span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* DISCARD CONFIRMATION MODAL */}
+      {showDiscardModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-neutral-200">
+            <h3 className="text-sm font-bold text-neutral-900">Discard unsaved changes?</h3>
+            <p className="text-xs text-neutral-500">
+              You have unsaved changes on this product. Are you sure you want to leave without saving?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setShowCreateSizeGuideModal(false)}
-                className="text-neutral-400 hover:text-black font-bold text-xs cursor-pointer"
+                onClick={() => setShowDiscardModal(false)}
+                className="text-xs px-3 py-2 rounded-lg border border-neutral-200 text-neutral-700 hover:bg-neutral-50"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDiscardModal(false);
+                  navigateBack();
+                }}
+                className="text-xs px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+              >
+                Discard &amp; Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIVE PREVIEW MODAL */}
+      {showFinalPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-neutral-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-neutral-800" />
+                <h3 className="text-sm font-bold text-neutral-900">Product Live Preview</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFinalPreviewModal(false)}
+                className="text-neutral-400 hover:text-neutral-600 p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-black mb-1">Title *</label>
-                <Input
-                  type="text"
-                  placeholder="e.g. Women's Bra & Bralette Size Guide"
-                  value={newGuideTitle}
-                  onChange={(e) => setNewGuideTitle(e.target.value)}
-                  className="bg-white border-neutral-200 text-xs font-semibold text-black"
-                />
+            <div className="space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="w-24 h-24 rounded-xl border border-neutral-200 overflow-hidden bg-neutral-100 shrink-0">
+                  <img
+                    src={productType === 'Variable' ? variants[0]?.mainImage || variants[0]?.images?.[0] || mainImage : mainImage}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
+                    {category} {subcategory ? `› ${subcategory}` : ''}
+                  </span>
+                  <h4 className="text-sm font-bold text-neutral-900">{name || 'Untitled Product'}</h4>
+                  <p className="text-xs text-neutral-500 font-mono">SKU: {sku}</p>
+                  <p className="text-sm font-bold text-neutral-950">
+                    ₹{productType === 'Variable' ? variants[0]?.price || salePrice : salePrice}{' '}
+                    {regularPrice > salePrice && (
+                      <span className="text-xs text-neutral-400 line-through font-normal">
+                        ₹{regularPrice}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-black mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  placeholder="Measurement guidance details..."
-                  value={newGuideDesc}
-                  onChange={(e) => setNewGuideDesc(e.target.value)}
-                  className="w-full bg-white text-xs font-normal text-black p-2.5 rounded-lg border border-neutral-200"
-                />
-              </div>
+              {/* Short description preview */}
+              {shortDescription && (
+                <div className="p-3 bg-neutral-50 rounded-lg text-xs text-neutral-700">
+                  <p>{shortDescription}</p>
+                </div>
+              )}
+
+              {/* Specifications preview */}
+              {specifications.length > 0 && (
+                <div className="space-y-2 border-t border-neutral-100 pt-3">
+                  <h5 className="text-xs font-bold text-neutral-800">Additional Information Table</h5>
+                  <div className="border border-neutral-200 rounded-lg overflow-hidden text-xs">
+                    <table className="w-full text-left divide-y divide-neutral-200">
+                      <tbody>
+                        {specifications.map((s, i) => (
+                          <tr key={i} className="divide-x divide-neutral-200">
+                            <td className="p-2 bg-neutral-50 font-semibold text-neutral-700 w-1/3">{s.key}</td>
+                            <td className="p-2 text-neutral-800">{s.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Full description preview */}
+              {longDescription && (
+                <div className="border-t border-neutral-100 pt-3">
+                  <h5 className="text-xs font-bold text-neutral-800 mb-2">Full Description</h5>
+                  <div
+                    className="text-xs text-neutral-700 leading-relaxed prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: longDescription }}
+                  />
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
-              <Button
+            <div className="flex items-center justify-end border-t border-neutral-100 pt-3">
+              <button
                 type="button"
-                variant="outline"
-                onClick={() => setShowCreateSizeGuideModal(false)}
-                className="text-xs border-neutral-200 text-neutral-700"
+                onClick={() => setShowFinalPreviewModal(false)}
+                className="text-xs px-4 py-2 bg-neutral-900 text-white rounded-lg font-semibold hover:bg-black cursor-pointer"
               >
-                Cancel
-              </Button>
-
-              <Button
-                type="button"
-                onClick={handleSaveInlineSizeGuide}
-                className="bg-black text-white hover:bg-neutral-800 text-xs font-semibold"
-              >
-                Save Size Guide
-              </Button>
+                Close Preview
+              </button>
             </div>
-          </Card>
+          </div>
         </div>
       )}
-    </form>
+    </div>
   );
 };
 

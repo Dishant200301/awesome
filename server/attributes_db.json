@@ -1,20 +1,5 @@
 [
   {
-    "id": "attr-material",
-    "name": "Material Composition",
-    "slug": "material-composition",
-    "type": "text",
-    "usage": "PRODUCT",
-    "showInHighlights": true,
-    "isRequired": false,
-    "displayOrder": 1,
-    "isActive": true,
-    "options": [],
-    "createdAt": "2026-08-08T05:20:02.502Z",
-    "updatedAt": "2026-08-08T05:36:09.398Z",
-    "status": "active"
-  },
-  {
     "id": "attr-style",
     "name": "Style",
     "slug": "style",
@@ -101,53 +86,6 @@
         "attributeId": "attr-underwire",
         "label": "Convertible Wire",
         "value": "Convertible Wire",
-        "displayOrder": 4,
-        "isActive": true
-      }
-    ],
-    "createdAt": "2026-08-08T05:20:02.504Z",
-    "updatedAt": "2026-08-08T05:20:02.504Z"
-  },
-  {
-    "id": "attr-padding",
-    "name": "Padding",
-    "slug": "padding",
-    "type": "select",
-    "usage": "PRODUCT",
-    "showInHighlights": true,
-    "isRequired": false,
-    "displayOrder": 4,
-    "isActive": true,
-    "options": [
-      {
-        "id": "opt-pd-1",
-        "attributeId": "attr-padding",
-        "label": "CloudSoft Removable Pads",
-        "value": "CloudSoft Removable Pads",
-        "displayOrder": 1,
-        "isActive": true
-      },
-      {
-        "id": "opt-pd-2",
-        "attributeId": "attr-padding",
-        "label": "Fixed Moulded Contour Pads",
-        "value": "Fixed Moulded Contour Pads",
-        "displayOrder": 2,
-        "isActive": true
-      },
-      {
-        "id": "opt-pd-3",
-        "attributeId": "attr-padding",
-        "label": "Non-Padded Double Layered",
-        "value": "Non-Padded Double Layered",
-        "displayOrder": 3,
-        "isActive": true
-      },
-      {
-        "id": "opt-pd-4",
-        "attributeId": "attr-padding",
-        "label": "UltraSoft Memory Foam",
-        "value": "UltraSoft Memory Foam",
         "displayOrder": 4,
         "isActive": true
       }
@@ -263,7 +201,7 @@
     "usage": "BOTH",
     "showInHighlights": true,
     "isRequired": false,
-    "sortOrder": 8,
+    "sortOrder": 10,
     "status": "active",
     "isActive": true,
     "values": [
@@ -296,7 +234,8 @@
       }
     ],
     "createdAt": "2026-08-08T05:38:44.666Z",
-    "updatedAt": "2026-08-08T10:33:15.559Z"
+    "updatedAt": "2026-09-01T11:18:41.005Z",
+    "displayName": "color"
   },
   {
     "id": "attr-1786168137017",

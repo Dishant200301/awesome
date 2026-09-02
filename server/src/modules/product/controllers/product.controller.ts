@@ -3,15 +3,36 @@ import { productStore } from "../store/productStore.js";
 import { AiProductGeneratorService } from "../services/aiProductGenerator.service.js";
 
 export class ProductController {
-  // GET /api/v1/products (with pagination & search)
+  // GET /api/v1/products (with comprehensive multi-filter, search, sort & pagination)
   public static getAllProducts(req: Request, res: Response): void {
-    if (req.query.page || req.query.limit || req.query.search || req.query.category || req.query.status || req.query.sort) {
+    const hasFilterParams = Boolean(
+      req.query.page || 
+      req.query.limit || 
+      req.query.search || 
+      req.query.category || 
+      req.query.subcategory ||
+      req.query.brand ||
+      req.query.stockStatus ||
+      req.query.status || 
+      req.query.minPrice ||
+      req.query.maxPrice ||
+      req.query.dateFilter ||
+      req.query.sort
+    );
+
+    if (hasFilterParams) {
       const result = productStore.queryProducts({
         page: req.query.page ? Number(req.query.page) : 1,
         limit: req.query.limit ? Number(req.query.limit) : 10,
         search: req.query.search as string,
         category: req.query.category as string,
+        subcategory: req.query.subcategory as string,
+        brand: req.query.brand as string,
+        stockStatus: req.query.stockStatus as string,
         status: req.query.status as string,
+        minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
+        maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
+        dateFilter: req.query.dateFilter as string,
         sort: req.query.sort as string
       });
       res.status(200).json({
@@ -26,7 +47,44 @@ export class ProductController {
     res.status(200).json({
       success: true,
       count: products.length,
-      data: products
+      data: products,
+      items: products,
+      products: products,
+      total: products.length,
+      page: 1,
+      limit: products.length,
+      totalPages: 1
+    });
+  }
+
+  // POST /api/v1/products/:id/duplicate
+  public static duplicateProduct(req: Request, res: Response): void {
+    const { id } = req.params;
+    const duplicated = productStore.duplicate(id);
+    if (!duplicated) {
+      res.status(404).json({ success: false, message: "Product to duplicate not found" });
+      return;
+    }
+    res.status(201).json({
+      success: true,
+      message: "Product duplicated successfully",
+      data: duplicated
+    });
+  }
+
+  // PATCH /api/v1/products/:id/status
+  public static updateStatus(req: Request, res: Response): void {
+    const { id } = req.params;
+    const { status, isPublished } = req.body;
+    const updated = productStore.toggleStatus(id, status !== undefined ? status : (isPublished !== undefined ? (isPublished ? 'Published' : 'Inactive') : undefined));
+    if (!updated) {
+      res.status(404).json({ success: false, message: "Product not found" });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      message: "Product status updated successfully",
+      data: updated
     });
   }
 
@@ -43,12 +101,12 @@ export class ProductController {
 
   // POST /api/v1/products/bulk-status
   public static bulkUpdateStatus(req: Request, res: Response): void {
-    const { ids, isPublished } = req.body;
+    const { ids, isPublished, status } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ success: false, message: "Invalid product IDs array" });
       return;
     }
-    const count = productStore.bulkStatus(ids, isPublished !== false);
+    const count = productStore.bulkStatus(ids, isPublished !== false, status);
     res.status(200).json({ success: true, count, message: `Successfully updated ${count} products` });
   }
 
@@ -80,6 +138,10 @@ export class ProductController {
   // POST /api/v1/products (Admin API)
   public static createProduct(req: Request, res: Response): void {
     try {
+      if (!req.body || !req.body.name) {
+        res.status(400).json({ success: false, message: "Product Name is required" });
+        return;
+      }
       const newProduct = productStore.add(req.body);
       res.status(201).json({
         success: true,
@@ -143,13 +205,17 @@ export class ProductController {
   // POST /api/v1/products/ai-generate (AI Image to Product Generator)
   public static async generateFromImage(req: Request, res: Response): Promise<void> {
     try {
-      const { image, hint } = req.body;
-      if (!image) {
-        res.status(400).json({ success: false, message: "Product image is required for AI generation" });
+      const { image, images, hint, apiKey } = req.body;
+      const rawImages: string[] = Array.isArray(images) && images.length > 0 
+        ? images 
+        : (image ? [image] : []);
+
+      if (rawImages.length === 0) {
+        res.status(400).json({ success: false, message: "At least one product image is required for AI generation" });
         return;
       }
 
-      const generatedData = await AiProductGeneratorService.generateFromImage(image, hint);
+      const generatedData = await AiProductGeneratorService.generateFromImages(rawImages, hint, apiKey);
       res.status(200).json({
         success: true,
         data: generatedData,

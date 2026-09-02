@@ -23,7 +23,8 @@ import {
   Filter,
   CheckCircle2,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Star
 } from 'lucide-react';
 import {
   AreaChart,
@@ -62,12 +63,22 @@ const SALES_DATA_WEEKLY = [
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [reviewsCount, setReviewsCount] = useState<number>(0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const loadStats = React.useCallback(async () => {
     setLoading(true);
     const res = await AdminApiService.getDashboardStats();
     setStats(res);
+    try {
+      const stored = localStorage.getItem('awesome_admin_reviews') || localStorage.getItem('aaramly_admin_reviews');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setReviewsCount(parsed.length);
+        }
+      }
+    } catch (e) {}
     setLoading(false);
   }, []);
 
@@ -81,14 +92,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
     window.addEventListener('awesome_category_sync', handleRealtimeSync);
     window.addEventListener('awesome_product_sync', handleRealtimeSync);
+    window.addEventListener('awesome_review_sync', handleRealtimeSync);
+    window.addEventListener('aaramly_review_sync', handleRealtimeSync);
     window.addEventListener('awesome_inventory_sync', handleRealtimeSync);
+    window.addEventListener('awesome_attribute_sync', handleRealtimeSync);
+    window.addEventListener('aaramly_attribute_sync', handleRealtimeSync);
     window.addEventListener('storage', handleRealtimeSync);
     window.addEventListener('focus', handleRealtimeSync);
 
     return () => {
       window.removeEventListener('awesome_category_sync', handleRealtimeSync);
       window.removeEventListener('awesome_product_sync', handleRealtimeSync);
+      window.removeEventListener('awesome_review_sync', handleRealtimeSync);
+      window.removeEventListener('aaramly_review_sync', handleRealtimeSync);
       window.removeEventListener('awesome_inventory_sync', handleRealtimeSync);
+      window.removeEventListener('awesome_attribute_sync', handleRealtimeSync);
+      window.removeEventListener('aaramly_attribute_sync', handleRealtimeSync);
       window.removeEventListener('storage', handleRealtimeSync);
       window.removeEventListener('focus', handleRealtimeSync);
     };
@@ -206,7 +225,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         {/* 4. Total Product Variants */}
         <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
           <Card
-            onClick={() => onNavigate('variants')}
+            onClick={() => onNavigate('attributes')}
             className="hover:border-neutral-300 transition-all cursor-pointer group rounded-xl bg-white border border-neutral-200 shadow-2xs"
           >
             <CardHeader className="p-4 pb-3">
@@ -279,21 +298,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </Card>
         </motion.div>
 
-        {/* 8. Low Stock Products */}
+        {/* 8. Customer Reviews */}
         <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
           <Card
-            onClick={() => onNavigate('inventory')}
+            onClick={() => onNavigate('reviews')}
             className="hover:border-neutral-300 transition-all cursor-pointer group rounded-xl bg-white border border-neutral-200 shadow-2xs"
           >
             <CardHeader className="p-4 pb-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-amber-700">Low Stock Products</span>
-                <div className="w-7 h-7 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 group-hover:scale-105 transition-transform">
-                  <AlertTriangle className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium text-amber-700">Customer Reviews</span>
+                <div className="w-7 h-7 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200 group-hover:scale-105 transition-transform">
+                  <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
                 </div>
               </div>
-              <CardTitle className="text-2xl font-semibold mt-1">{lowStockCount}</CardTitle>
-              <CardDescription className="text-[11px] text-amber-700 font-medium">&le; 20 units remaining</CardDescription>
+              <CardTitle className="text-2xl font-semibold mt-1">{reviewsCount}</CardTitle>
+              <CardDescription className="text-[11px] text-amber-700 font-medium">Live customer ratings</CardDescription>
             </CardHeader>
           </Card>
         </motion.div>
@@ -427,7 +446,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-black">{msg.name}</span>
-                    <Badge variant={msg.status === 'New' ? "default" : "secondary"} className="text-[9px] bg-black text-white px-2">
+                    <Badge
+                      variant={msg.status === 'New' ? "default" : "secondary"}
+                      className="text-[9px] px-2"
+                    >
                       {msg.status || 'New'}
                     </Badge>
                   </div>

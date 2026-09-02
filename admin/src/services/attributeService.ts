@@ -16,12 +16,16 @@ export const INITIAL_DEFAULT_ATTRIBUTES: AttributeMaster[] = [
     status: "active",
     isActive: true,
     values: [
-      { id: "val-c1", attributeId: "attr-color", label: "Black", value: "Black", colorCode: "#000000", status: "active", sortOrder: 1 },
-      { id: "val-c2", attributeId: "attr-color", label: "White", value: "White", colorCode: "#FFFFFF", status: "active", sortOrder: 2 },
-      { id: "val-c3", attributeId: "attr-color", label: "Beige", value: "Beige", colorCode: "#E8D3C3", status: "active", sortOrder: 3 },
-      { id: "val-c4", attributeId: "attr-color", label: "Blush Pink", value: "Blush Pink", colorCode: "#FFB6C1", status: "active", sortOrder: 4 },
-      { id: "val-c5", attributeId: "attr-color", label: "Denim Blue", value: "Denim Blue", colorCode: "#3B5998", status: "active", sortOrder: 5 },
-      { id: "val-c6", attributeId: "attr-color", label: "Red", value: "Red", colorCode: "#FF0000", status: "active", sortOrder: 6 }
+      { id: "val-c1", attributeId: "attr-color", label: "Maroon", value: "Maroon", colorCode: "#800000", status: "active", sortOrder: 1 },
+      { id: "val-c2", attributeId: "attr-color", label: "Gold", value: "Gold", colorCode: "#D4AF37", status: "active", sortOrder: 2 },
+      { id: "val-c3", attributeId: "attr-color", label: "Royal Blue", value: "Royal Blue", colorCode: "#4169E1", status: "active", sortOrder: 3 },
+      { id: "val-c4", attributeId: "attr-color", label: "Emerald Green", value: "Emerald Green", colorCode: "#50C878", status: "active", sortOrder: 4 },
+      { id: "val-c5", attributeId: "attr-color", label: "Pink", value: "Pink", colorCode: "#FF69B4", status: "active", sortOrder: 5 },
+      { id: "val-c6", attributeId: "attr-color", label: "Yellow", value: "Yellow", colorCode: "#FFD700", status: "active", sortOrder: 6 },
+      { id: "val-c7", attributeId: "attr-color", label: "Red", value: "Red", colorCode: "#DC2626", status: "active", sortOrder: 7 },
+      { id: "val-c8", attributeId: "attr-color", label: "White", value: "White", colorCode: "#FFFFFF", status: "active", sortOrder: 8 },
+      { id: "val-c9", attributeId: "attr-color", label: "Black", value: "Black", colorCode: "#18181B", status: "active", sortOrder: 9 },
+      { id: "val-c10", attributeId: "attr-color", label: "Purple", value: "Purple", colorCode: "#9333EA", status: "active", sortOrder: 10 }
     ]
   },
   {
@@ -36,33 +40,37 @@ export const INITIAL_DEFAULT_ATTRIBUTES: AttributeMaster[] = [
     status: "active",
     isActive: true,
     values: [
-      { id: "val-s1", attributeId: "attr-size", label: "S", value: "S", status: "active", sortOrder: 1 },
-      { id: "val-s2", attributeId: "attr-size", label: "M", value: "M", status: "active", sortOrder: 2 },
-      { id: "val-s3", attributeId: "attr-size", label: "L", value: "L", status: "active", sortOrder: 3 },
-      { id: "val-s4", attributeId: "attr-size", label: "XL", value: "XL", status: "active", sortOrder: 4 },
-      { id: "val-s5", attributeId: "attr-size", label: "XXL", value: "XXL", status: "active", sortOrder: 5 }
+      { id: "val-s1", attributeId: "attr-size", label: "Standard Pair", value: "Standard Pair", status: "active", sortOrder: 1 },
+      { id: "val-s2", attributeId: "attr-size", label: "Free Size", value: "Free Size", status: "active", sortOrder: 2 },
+      { id: "val-s3", attributeId: "attr-size", label: "S", value: "S", status: "active", sortOrder: 3 },
+      { id: "val-s4", attributeId: "attr-size", label: "M", value: "M", status: "active", sortOrder: 4 },
+      { id: "val-s5", attributeId: "attr-size", label: "L", value: "L", status: "active", sortOrder: 5 },
+      { id: "val-s6", attributeId: "attr-size", label: "XL", value: "XL", status: "active", sortOrder: 6 }
     ]
   },
   {
     id: "attr-material",
-    name: "Material Composition",
-    slug: "material-composition",
-    type: "TEXT",
-    usage: "PRODUCT",
+    name: "Material",
+    slug: "material",
+    type: "SELECT",
+    usage: "BOTH",
     showInHighlights: true,
     isRequired: false,
     sortOrder: 3,
     status: "active",
     isActive: true,
     values: [
-      { id: "val-m1", attributeId: "attr-material", label: "64% Nylon + 36% Spandex", value: "64% Nylon + 36% Spandex", status: "active", sortOrder: 1 },
-      { id: "val-m2", attributeId: "attr-material", label: "100% Micro-Polyamide", value: "100% Micro-Polyamide", status: "active", sortOrder: 2 }
+      { id: "val-m1", attributeId: "attr-material", label: "Silk Thread & Pearls", value: "Silk Thread & Pearls", status: "active", sortOrder: 1 },
+      { id: "val-m2", attributeId: "attr-material", label: "Mirror & Glass Beads", value: "Mirror & Glass Beads", status: "active", sortOrder: 2 },
+      { id: "val-m3", attributeId: "attr-material", label: "Macrame Cotton Cord", value: "Macrame Cotton Cord", status: "active", sortOrder: 3 },
+      { id: "val-m4", attributeId: "attr-material", label: "Brass & Ghungroo", value: "Brass & Ghungroo", status: "active", sortOrder: 4 },
+      { id: "val-m5", attributeId: "attr-material", label: "Velvet & Zari", value: "Velvet & Zari", status: "active", sortOrder: 5 }
     ]
   },
   {
-    id: "attr-fabric",
-    name: "Fabric",
-    slug: "fabric",
+    id: "attr-craft",
+    name: "Craft Technique",
+    slug: "craft-technique",
     type: "SELECT",
     usage: "PRODUCT",
     showInHighlights: true,
@@ -71,41 +79,28 @@ export const INITIAL_DEFAULT_ATTRIBUTES: AttributeMaster[] = [
     status: "active",
     isActive: true,
     values: [
-      { id: "val-f1", attributeId: "attr-fabric", label: "Microfiber Nylon Knit", value: "Microfiber Nylon Knit", status: "active", sortOrder: 1 },
-      { id: "val-f2", attributeId: "attr-fabric", label: "4-Way Stretch Cotton", value: "4-Way Stretch Cotton", status: "active", sortOrder: 2 }
+      { id: "val-cr1", attributeId: "attr-craft", label: "Kutchi Mirror Embroidery", value: "Kutchi Mirror Embroidery", status: "active", sortOrder: 1 },
+      { id: "val-cr2", attributeId: "attr-craft", label: "Hand-knotted Macrame", value: "Hand-knotted Macrame", status: "active", sortOrder: 2 },
+      { id: "val-cr3", attributeId: "attr-craft", label: "Thread Tassel Weaving", value: "Thread Tassel Weaving", status: "active", sortOrder: 3 },
+      { id: "val-cr4", attributeId: "attr-craft", label: "Handcrafted Beading", value: "Handcrafted Beading", status: "active", sortOrder: 4 }
     ]
   },
   {
-    id: "attr-style",
-    name: "Style",
-    slug: "style",
+    id: "attr-occasion",
+    name: "Occasion",
+    slug: "occasion",
     type: "SELECT",
-    usage: "PRODUCT",
+    usage: "BOTH",
     showInHighlights: true,
     isRequired: false,
     sortOrder: 5,
     status: "active",
     isActive: true,
     values: [
-      { id: "val-st1", attributeId: "attr-style", label: "Contemporary Seamless", value: "Contemporary Seamless", status: "active", sortOrder: 1 },
-      { id: "val-st2", attributeId: "attr-style", label: "Wirefree Contour", value: "Wirefree Contour", status: "active", sortOrder: 2 }
-    ]
-  },
-  {
-    id: "attr-cup-type",
-    name: "Cup Type",
-    slug: "cup-type",
-    type: "BUTTON",
-    usage: "BOTH",
-    showInHighlights: true,
-    isRequired: false,
-    sortOrder: 6,
-    status: "active",
-    isActive: true,
-    values: [
-      { id: "val-ct1", attributeId: "attr-cup-type", label: "Padded", value: "Padded", status: "active", sortOrder: 1 },
-      { id: "val-ct2", attributeId: "attr-cup-type", label: "Non-Padded", value: "Non-Padded", status: "active", sortOrder: 2 },
-      { id: "val-ct3", attributeId: "attr-cup-type", label: "Removable Cups", value: "Removable Cups", status: "active", sortOrder: 3 }
+      { id: "val-oc1", attributeId: "attr-occasion", label: "Navratri Garba", value: "Navratri Garba", status: "active", sortOrder: 1 },
+      { id: "val-oc2", attributeId: "attr-occasion", label: "Wedding & Festive", value: "Wedding & Festive", status: "active", sortOrder: 2 },
+      { id: "val-oc3", attributeId: "attr-occasion", label: "Ethnic Daily", value: "Ethnic Daily", status: "active", sortOrder: 3 },
+      { id: "val-oc4", attributeId: "attr-occasion", label: "Gift Hamper", value: "Gift Hamper", status: "active", sortOrder: 4 }
     ]
   }
 ];
@@ -125,10 +120,10 @@ export class AttributeService {
     return [...INITIAL_DEFAULT_ATTRIBUTES];
   }
 
-  private static saveLocalAttributes(attributes: AttributeMaster[]): void {
+  private static saveLocalAttributes(attributes: AttributeMaster[], dispatchSync: boolean = true): void {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(attributes));
-      if (typeof window !== 'undefined') {
+      if (dispatchSync && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('awesome_attribute_sync'));
         window.dispatchEvent(new CustomEvent('aaramly_attribute_sync'));
       }
@@ -146,7 +141,7 @@ export class AttributeService {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          this.saveLocalAttributes(json.data);
+          this.saveLocalAttributes(json.data, false);
           return json.data;
         }
       }

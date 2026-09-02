@@ -24,13 +24,23 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { Select } from '../components/ui/select';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export const OrdersPage: React.FC = () => {
+interface OrdersPageProps {
+  initialStatusFilter?: string;
+}
+
+export const OrdersPage: React.FC<OrdersPageProps> = ({ initialStatusFilter = 'ALL' }) => {
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>(() => initialStatusFilter);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [noteInput, setNoteInput] = useState('');
+
+  React.useEffect(() => {
+    if (initialStatusFilter) {
+      setStatusFilter(initialStatusFilter);
+    }
+  }, [initialStatusFilter]);
 
   const updateOrderStatus = (orderId: string, newStatus: any) => {
     setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));

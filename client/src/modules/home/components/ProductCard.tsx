@@ -48,39 +48,59 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
     }
   };
 
-  const skuMap: Record<string, string> = {
-    p1: "#1102", p2: "#1354", p3: "#1498", p4: "#1532",
-    p5: "#1722", p6: "#1811", p7: "#1902", p8: "#1988",
-    p9: "#2105", p10: "#2341", p11: "#2410", p12: "#2490",
-    p13: "#2509", p14: "#2718", p15: "#2901", p16: "#2950",
-    p17: "#3104", p18: "#3312", p19: "#3420", p20: "#3550"
+  const extractUrl = (val: any): string => {
+    if (!val) return "";
+    if (typeof val === "string") return val.trim();
+    if (typeof val === "object") {
+      if (typeof val.url === "string") return val.url.trim();
+      if (typeof val.src === "string") return val.src.trim();
+      if (typeof val.image === "string") return val.image.trim();
+    }
+    return "";
   };
-  const sku = p.code || skuMap[String(p.id)] || `#${String(p.id).toUpperCase()}`;
 
-  const mainImg = p.img || p.image || (p.images && p.images[0]) || "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=600";
-  const hoverImg = p.hoverImg || p.hoverImage || mainImg;
-  const wishlisted = isWishlisted(String(p.id));
+  const mainImg =
+    extractUrl(p.mainImage) ||
+    extractUrl(p.image) ||
+    extractUrl(p.img) ||
+    (Array.isArray(p.images) && extractUrl(p.images[0])) ||
+    (Array.isArray(p.colors) && (extractUrl(p.colors[0]?.mainImage) || extractUrl(p.colors[0]?.displayImage))) ||
+    (Array.isArray(p.variations) && extractUrl(p.variations[0]?.thumbnail)) ||
+    "/images/category/Latkan.webp";
+
+  const wishlisted = isWishlisted(productId);
+
+  const regPrice = Number(p.originalPrice || p.regularPrice || p.price || 0);
+  const finalPrice = Number(p.price || 0);
+  const hasDiscount = regPrice > finalPrice;
+  const discountVal = p.discountPercentage !== undefined
+    ? Number(p.discountPercentage)
+    : hasDiscount
+    ? Math.round(((regPrice - finalPrice) / regPrice) * 100)
+    : 0;
+
+  const badgeTag = p.defaultKey || p.badge || (p.labels?.bestSeller ? "Best Seller" : p.labels?.newArrival ? "New" : "");
 
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleWishlist(String(p.id));
+    toggleWishlist(productId);
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     addToCart({
-      productId: String(p.id),
-      productName: p.name,
+      productId: productId,
+      productName: p.name || "Handcrafted Product",
       brand: p.brand || "Awesome Handmade",
-      colorName: "Standard",
-      colorHex: "#000000",
-      size: (p.sizes && p.sizes[0]) || "S",
-      price: p.price,
-      originalPrice: p.originalPrice || Math.round(p.price * 1.4),
+      colorName: (p.colors && p.colors[0]?.colorName) || "Standard",
+      colorHex: (p.colors && p.colors[0]?.colorHex) || "#000000",
+      size: (p.sizes && p.sizes[0]) || (p.availableSizes && p.availableSizes[0]) || "Standard Pair",
+      price: finalPrice,
+      originalPrice: regPrice > 0 ? regPrice : finalPrice,
       image: mainImg,
-      sku: sku,
+      sku: p.sku || p.defaultSku || `AH-${p.id}`,
       quantity: 1,
     });
   };
@@ -94,6 +114,20 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
           alt={p.name}
           className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-[#f5f2ee]"
         >
+          {/* Top Badges (Discount % & Custom Tag) */}
+          <div className="absolute top-3 left-3 z-20 flex flex-col gap-1 items-start">
+            {discountVal > 0 && (
+              <span className="bg-[#520618] text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-xs tracking-wider">
+                -{discountVal}%
+              </span>
+            )}
+            {badgeTag && (
+              <span className="bg-amber-500 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-xs tracking-wider uppercase">
+                {badgeTag}
+              </span>
+            )}
+          </div>
+
           {/* Wishlist Heart Icon */}
           <button
             type="button"
@@ -129,20 +163,43 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
       {/* Info Content */}
       <div className="flex flex-1 flex-col pt-3 px-0.5">
         <Link to={`/product/${p.id}`} className="hover:text-[#520618] transition-colors">
-          {/* SKU Number */}
-          <p className="text-[11px] font-bold text-zinc-400 tracking-wider uppercase">{sku}</p>
+          {/* Category & Subcategory Tag */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-[#798A7A] tracking-wider uppercase">
+              {p.category || "Handmade"}
+            </span>
+            {p.subcategory && (
+              <span className="text-[10px] text-zinc-400 font-medium truncate">
+                • {p.subcategory}
+              </span>
+            )}
+          </div>
 
           {/* Product Title */}
           <h3 className="mt-1 text-sm sm:text-base font-bold text-zinc-900 line-clamp-2 leading-snug">
             {p.name}
           </h3>
+
+          {/* Subtitle / Tagline from Admin */}
+          {(p.subtitle || p.shortDescription || p.tagline) && (
+            <p className="mt-0.5 text-[11px] text-zinc-500 line-clamp-1">
+              {p.subtitle || p.shortDescription || p.tagline}
+            </p>
+          )}
         </Link>
 
         {/* Price & Add To Bag Button / Quantity Stepper */}
         <div className="mt-3 flex items-center justify-between gap-2">
-          <span className="text-base sm:text-lg font-bold text-zinc-900">
-            ₹{p.price.toLocaleString("en-IN")}.00
-          </span>
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-base sm:text-lg font-bold text-zinc-900">
+              ₹{finalPrice.toLocaleString("en-IN")}
+            </span>
+            {hasDiscount && (
+              <span className="text-xs sm:text-sm text-zinc-400 line-through">
+                ₹{regPrice.toLocaleString("en-IN")}
+              </span>
+            )}
+          </div>
 
           {itemQuantity > 0 ? (
             <div

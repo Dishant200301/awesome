@@ -14,21 +14,35 @@ import {
   Tag,
   UploadCloud,
   Image as ImageIcon,
-  X
+  X,
+  Eye,
+  AlertTriangle,
+  Globe,
+  FileText,
+  Calendar,
+  Package,
+  RefreshCw
 } from 'lucide-react';
 import { MOCK_CATEGORIES, MOCK_SUBCATEGORIES } from '../data/mockAdminData';
 import { Category } from '../types/admin';
 import { Select } from '../components/ui/select';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Switch } from '../components/ui/switch';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 
 export interface EnhancedCategory extends Category {
   image?: string;
+  bannerImage?: string;
+  description?: string;
   type?: 'parent' | 'sub';
   parentId?: string;
   parentName?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+  createdAt?: string;
 }
 
 interface CategoriesPageProps {
@@ -37,7 +51,7 @@ interface CategoriesPageProps {
 }
 
 export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'all-categories', onNavigate }) => {
-  // Main Categories State with LocalStorage Persistence (12 Master Categories Default)
+  // Main Categories State with LocalStorage & Express Backend Persistence
   const [categories, setCategories] = useState<EnhancedCategory[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -50,8 +64,16 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
         }
       } catch (e) {}
     }
-    const initialParents = MOCK_CATEGORIES.map(c => ({ ...c, type: 'parent' as const }));
-    const initialSubs = MOCK_SUBCATEGORIES.map(s => ({ ...s, type: 'sub' as const }));
+    const initialParents = MOCK_CATEGORIES.map(c => ({
+      ...c,
+      type: 'parent' as const,
+      createdAt: '2026-01-15'
+    }));
+    const initialSubs = MOCK_SUBCATEGORIES.map(s => ({
+      ...s,
+      type: 'sub' as const,
+      createdAt: '2026-01-20'
+    }));
     return [...initialParents, ...initialSubs];
   });
 
@@ -60,31 +82,61 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     return initialTab === 'add-category' ? 'add' : 'all';
   });
 
-  // Sync subView if initialTab changes
+  // Filter Type: 'ALL' | 'MAIN' | 'SUB'
+  const [filterType, setFilterType] = useState<'ALL' | 'MAIN' | 'SUB'>(() => {
+    if (initialTab === 'sub-categories' || initialTab === 'subcategories') return 'SUB';
+    if (initialTab === 'all-categories' || initialTab === 'categories') return 'MAIN';
+    return 'ALL';
+  });
+
+  // Sync state if initialTab changes
   useEffect(() => {
     if (initialTab === 'add-category') {
       setSubView('add');
+      setCategoryType('parent');
+    } else if (initialTab === 'add-subcategory') {
+      setSubView('add');
+      setCategoryType('sub');
+    } else if (initialTab === 'sub-categories' || initialTab === 'subcategories') {
+      setSubView('all');
+      setFilterType('SUB');
     } else if (initialTab === 'all-categories' || initialTab === 'categories') {
       setSubView('all');
+      setFilterType('MAIN');
     }
   }, [initialTab]);
-
-  // Separate Filter Tab: 'ALL' | 'MAIN' | 'SUB'
-  const [filterType, setFilterType] = useState<'ALL' | 'MAIN' | 'SUB'>('ALL');
 
   // Search Query
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Form State
+  // Form State for Add / Edit
   const [editingCategory, setEditingCategory] = useState<EnhancedCategory | null>(null);
   const [categoryType, setCategoryType] = useState<'parent' | 'sub'>('parent');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [categoryName, setCategoryName] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
   const [categoryImage, setCategoryImage] = useState<string>('/images/category/Latkan.webp');
+  const [categoryBanner, setCategoryBanner] = useState<string>('');
+  const [categoryDescription, setCategoryDescription] = useState<string>('');
+  const [metaTitle, setMetaTitle] = useState<string>('');
+  const [metaDescription, setMetaDescription] = useState<string>('');
+  const [metaKeywords, setMetaKeywords] = useState<string>('');
   const [isActive, setIsActive] = useState(true);
 
+  // Modal / Confirm States
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [statusConfirmItem, setStatusConfirmItem] = useState<EnhancedCategory | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api/v1" : "http://localhost:5000/api/v1");
+
+  const showToast = (msg: string) => {
+    setSuccessToast(msg);
+    setTimeout(() => {
+      setSuccessToast(null);
+    }, 3500);
+  };
 
   // Fetch live categories from Express Server on mount
   useEffect(() => {
@@ -95,10 +147,12 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
           const parents = json.data.categories.map((c: any) => ({
             ...c,
             type: 'parent' as const,
+            createdAt: c.createdAt || '2026-01-15'
           }));
           const subs = (json.data.subcategories || []).map((s: any) => ({
             ...s,
             type: 'sub' as const,
+            createdAt: s.createdAt || '2026-01-20'
           }));
           setCategories([...parents, ...subs]);
         }
@@ -114,7 +168,6 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('awesome_category_sync'));
         window.dispatchEvent(new Event('aocind_category_sync'));
-        window.dispatchEvent(new Event('aaramly_category_sync'));
         if ('BroadcastChannel' in window) {
           const bc = new BroadcastChannel('awesome_category_sync');
           bc.postMessage({ type: 'CATEGORIES_UPDATED', categories });
@@ -135,20 +188,10 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   const mainCategoriesList = categories.filter((c) => c.type !== 'sub');
   const subCategoriesList = categories.filter((c) => c.type === 'sub');
 
-  // Helper to find parent slug for URL display
-  const getParentSlug = (parentId?: string, parentName?: string) => {
-    if (parentId) {
-      const parent = categories.find((c) => c.id === parentId);
-      if (parent) return parent.slug;
-    }
-    if (parentName) {
-      return parentName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    }
-    return '';
+  // Count subcategories for a parent category
+  const countSubcategories = (parentId: string, parentName: string) => {
+    return subCategoriesList.filter((s) => s.parentId === parentId || s.parentName === parentName).length;
   };
-
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Open Add View
   const handleOpenAddView = (defaultType: 'parent' | 'sub' = 'parent') => {
@@ -157,12 +200,18 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     setSelectedParentId(mainCategoriesList[0]?.id || '');
     setCategoryName('');
     setCategorySlug('');
-    setCategoryImage('');
+    setCategoryImage('/images/category/Latkan.webp');
+    setCategoryBanner('');
+    setCategoryDescription('');
+    setMetaTitle('');
+    setMetaDescription('');
+    setMetaKeywords('');
     setIsActive(true);
     setSubView('add');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Open Edit View
+  // Open Edit View with Pre-filled Data
   const handleOpenEditView = (cat: EnhancedCategory) => {
     setEditingCategory(cat);
     const type = cat.type || (cat.parentId ? 'sub' : 'parent');
@@ -170,53 +219,57 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     setSelectedParentId(cat.parentId || mainCategoriesList[0]?.id || '');
     setCategoryName(cat.name);
     setCategorySlug(cat.slug);
-    setCategoryImage(cat.image || '');
+    setCategoryImage(cat.image || '/images/category/Latkan.webp');
+    setCategoryBanner(cat.bannerImage || '');
+    setCategoryDescription(cat.description || '');
+    setMetaTitle(cat.metaTitle || cat.name || '');
+    setMetaDescription(cat.metaDescription || cat.description || '');
+    setMetaKeywords(cat.metaKeywords || '');
     setIsActive(cat.isActive ?? true);
     setSubView('edit');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Handle Global Clipboard Paste (Ctrl + V) for Category Image when in Add/Edit mode
+  useEffect(() => {
+    if (subView !== 'add' && subView !== 'edit') return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            handleFileProcess(file, false);
+            showToast('Category image pasted from clipboard (Ctrl + V)!');
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [subView]);
+
   // Process File to Base64 / Data URL
-  const handleFileProcess = (file: File) => {
+  const handleFileProcess = (file: File, isBanner = false) => {
     if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = (uploadEvent) => {
       if (uploadEvent.target?.result) {
-        setCategoryImage(uploadEvent.target.result as string);
+        if (isBanner) {
+          setCategoryBanner(uploadEvent.target.result as string);
+        } else {
+          setCategoryImage(uploadEvent.target.result as string);
+        }
       }
     };
     reader.readAsDataURL(file);
-  };
-
-  // Handle Drag and Drop Events
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleFileProcess(file);
-    }
-  };
-
-  // Handle Input Change Upload
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileProcess(file);
-    }
   };
 
   // Handle Name Input Change & Auto-generate Slug
@@ -224,7 +277,9 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     const val = e.target.value;
     setCategoryName(val);
     if (!editingCategory) {
-      setCategorySlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
+      const generatedSlug = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      setCategorySlug(generatedSlug);
+      if (!metaTitle) setMetaTitle(`${val} | Awesome Handmade`);
     }
   };
 
@@ -246,14 +301,20 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                 name: categoryName.trim(),
                 slug: slugToSave,
                 image: categoryImage,
+                bannerImage: categoryBanner,
+                description: categoryDescription,
                 type: categoryType,
                 parentId: categoryType === 'sub' ? selectedParentId : undefined,
                 parentName: parentObj ? parentObj.name : undefined,
+                metaTitle: metaTitle.trim(),
+                metaDescription: metaDescription.trim(),
+                metaKeywords: metaKeywords.trim(),
                 isActive
               }
             : c
         )
       );
+      showToast(`Updated "${categoryName}" successfully.`);
     } else {
       // CREATE NEW
       const newCat: EnhancedCategory = {
@@ -261,38 +322,52 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
         name: categoryName.trim(),
         slug: slugToSave,
         image: categoryImage,
+        bannerImage: categoryBanner,
+        description: categoryDescription,
         type: categoryType,
         parentId: categoryType === 'sub' ? selectedParentId : undefined,
         parentName: parentObj ? parentObj.name : undefined,
+        metaTitle: metaTitle.trim() || `${categoryName} | Awesome Handmade`,
+        metaDescription: metaDescription.trim() || categoryDescription,
+        metaKeywords: metaKeywords.trim(),
         productCount: 0,
-        isActive
+        isActive,
+        createdAt: new Date().toISOString().split('T')[0]
       };
       setCategories((prev) => [newCat, ...prev]);
+      showToast(`Created new ${categoryType === 'sub' ? 'subcategory' : 'category'} "${categoryName}".`);
     }
 
     setSubView('all');
     setEditingCategory(null);
   };
 
-  // Delete Category
-  const handleDeleteCategory = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this category? Subcategories or assigned products may be affected.')) {
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-      if (editingCategory?.id === id) {
-        setSubView('all');
-        setEditingCategory(null);
-      }
+  // Confirm Delete Handler
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmId) return;
+    const itemToDelete = categories.find((c) => c.id === deleteConfirmId);
+    setCategories((prev) => prev.filter((c) => c.id !== deleteConfirmId));
+    if (editingCategory?.id === deleteConfirmId) {
+      setSubView('all');
+      setEditingCategory(null);
+    }
+    setDeleteConfirmId(null);
+    if (itemToDelete) {
+      showToast(`Deleted "${itemToDelete.name}" successfully.`);
     }
   };
 
-  // Toggle Active Status
-  const toggleStatus = (id: string) => {
+  // Confirm Status Toggle
+  const handleConfirmStatusToggle = () => {
+    if (!statusConfirmItem) return;
     setCategories((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, isActive: !c.isActive } : c))
+      prev.map((c) => (c.id === statusConfirmItem.id ? { ...c, isActive: !c.isActive } : c))
     );
+    showToast(`Status changed for "${statusConfirmItem.name}".`);
+    setStatusConfirmItem(null);
   };
 
-  // Filter categories based on search term & separate category filter tab
+  // Filter categories based on search term & filter tab
   const filteredCategories = categories.filter((c) => {
     const matchesSearch =
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -310,59 +385,110 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   });
 
   return (
-    <div className="space-y-6 font-sans selection:bg-black selection:text-white pb-16">
+    <div className="space-y-6 font-sans selection:bg-black selection:text-white pb-20">
+      
+      {/* SUCCESS TOAST */}
+      {successToast && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-2.5 bg-neutral-950 text-white px-5 py-3 rounded-xl shadow-2xl border border-neutral-800 animate-in fade-in slide-in-from-top-4">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="text-xs font-semibold">{successToast}</span>
+        </div>
+      )}
+
       {/* HEADER WITH ACTION BUTTONS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-xl border border-neutral-200 shadow-2xs">
         <div>
-          <h1 className="text-lg font-bold text-black tracking-tight flex items-center gap-2">
-            <FolderTree className="w-5 h-5 text-black" />
-            <span>All Categories &amp; Subcategories</span>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-neutral-950 tracking-tight flex items-center gap-2">
+              <FolderTree className="w-5 h-5 text-neutral-950" />
+              <span>
+                {filterType === 'SUB' ? 'Sub Categories Management' : 'Categories & Subcategories'}
+              </span>
+            </h1>
             <Badge variant="secondary" className="text-xs font-semibold bg-neutral-100 text-neutral-800 border-neutral-200">
-              {categories.length} Total
+              {filteredCategories.length} Total
             </Badge>
-          </h1>
-          <p className="text-xs text-neutral-500 font-normal mt-1">
-            Organize products into Main Categories &amp; Subcategories without image bloat.
+          </div>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            {filterType === 'SUB'
+              ? 'Manage linked subcategories, assign to parent categories, and track product associations.'
+              : 'Organize your store catalog with Main Categories and linked Subcategories for seamless customer browsing.'}
           </p>
         </div>
 
-        {/* SUB-VIEW NAVIGATION */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            onClick={() => setSubView('all')}
-            variant={subView === 'all' ? 'default' : 'outline'}
-            size="sm"
-            className={`text-xs font-medium ${subView === 'all' ? 'bg-black text-white hover:bg-neutral-800' : 'text-black border-neutral-200 hover:bg-neutral-50'}`}
-          >
-            All List ({categories.length})
-          </Button>
+        {/* TOP ACTION BUTTONS */}
+        <div className="flex items-center gap-2">
+          {subView !== 'all' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSubView('all')}
+              className="text-xs h-9 font-semibold text-neutral-800 border-neutral-200 hover:bg-neutral-50"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+              <span>Back to Listing</span>
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenAddView('sub')}
+                className="text-xs h-9 px-3.5 font-semibold text-neutral-800 border-neutral-200 hover:bg-neutral-50"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                <span>Add Subcategory</span>
+              </Button>
 
-          <Button
-            onClick={() => handleOpenAddView('parent')}
-            variant={subView === 'add' ? 'default' : 'outline'}
-            size="sm"
-            className={`text-xs font-medium flex items-center gap-1.5 ${subView === 'add' ? 'bg-black text-white hover:bg-neutral-800' : 'text-black border-neutral-200 hover:bg-neutral-50'}`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Category &amp; Subcategory</span>
-          </Button>
+              <Button
+                size="sm"
+                onClick={() => handleOpenAddView('parent')}
+                className="bg-neutral-950 hover:bg-neutral-800 text-white text-xs h-9 px-4 font-semibold shadow-2xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Category</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* SUB-VIEW 1: ALL CATEGORIES & SUBCATEGORIES LISTING */}
+      {/* SUB-VIEW 1: ALL CATEGORIES & SUBCATEGORIES TABLE & CARDS */}
       {/* ========================================================================= */}
       {subView === 'all' && (
-        <div className="space-y-6">
-          {/* SEARCH & SEPARATE FILTER TABS (MAIN VS SUB) */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            {/* Filter Tabs: ALL | MAIN CATEGORIES | SUBCATEGORIES */}
-            <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-lg border border-neutral-200 self-start sm:self-auto">
+        <div className="space-y-4">
+          
+          {/* SEARCH & FILTER CONTROLS */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-neutral-200 shadow-2xs">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                type="text"
+                placeholder="Search categories by name, slug or parent..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 text-xs bg-neutral-50 border-neutral-200 focus:bg-white"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1 p-1 bg-neutral-100 rounded-lg border border-neutral-200 text-xs">
               <button
                 type="button"
                 onClick={() => setFilterType('ALL')}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  filterType === 'ALL' ? 'bg-black text-white shadow-2xs' : 'text-neutral-600 hover:text-black'
+                className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${
+                  filterType === 'ALL' ? 'bg-white text-neutral-950 shadow-2xs' : 'text-neutral-600 hover:text-neutral-950'
                 }`}
               >
                 All ({categories.length})
@@ -370,8 +496,8 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
               <button
                 type="button"
                 onClick={() => setFilterType('MAIN')}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  filterType === 'MAIN' ? 'bg-black text-white shadow-2xs' : 'text-neutral-600 hover:text-black'
+                className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${
+                  filterType === 'MAIN' ? 'bg-white text-neutral-950 shadow-2xs' : 'text-neutral-600 hover:text-neutral-950'
                 }`}
               >
                 Main Categories ({mainCategoriesList.length})
@@ -379,149 +505,202 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
               <button
                 type="button"
                 onClick={() => setFilterType('SUB')}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  filterType === 'SUB' ? 'bg-black text-white shadow-2xs' : 'text-neutral-600 hover:text-black'
+                className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${
+                  filterType === 'SUB' ? 'bg-white text-neutral-950 shadow-2xs' : 'text-neutral-600 hover:text-neutral-950'
                 }`}
               >
-                Subcategories ({subCategoriesList.length})
+                Sub Categories ({subCategoriesList.length})
               </button>
-            </div>
-
-            {/* Search Bar */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <Input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search category or subcategory name..."
-                className="pl-8 text-xs bg-white border-neutral-200"
-              />
             </div>
           </div>
 
-          {/* CATEGORIES & SUBCATEGORIES GRID CARDS */}
+          {/* EMPTY STATE */}
           {filteredCategories.length === 0 ? (
-            <Card className="p-12 text-center space-y-3 bg-white border-neutral-200">
-              <div className="w-12 h-12 rounded-xl bg-neutral-100 text-neutral-400 flex items-center justify-center mx-auto">
+            <div className="text-center py-16 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-3">
+              <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
                 <FolderTree className="w-6 h-6" />
               </div>
-              <h4 className="text-sm font-bold text-black">No Categories Found</h4>
+              <h3 className="font-bold text-sm text-neutral-900">No categories found</h3>
               <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                No category matches "{searchTerm}". Click "Add Category &amp; Subcategory" to create one.
+                {searchTerm
+                  ? `No category matching "${searchTerm}". Try a different search term.`
+                  : 'Get started by creating your first category.'}
               </p>
-              <Button onClick={() => handleOpenAddView('parent')} size="sm" className="bg-black text-white hover:bg-neutral-800 text-xs font-medium mt-2">
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add New Category</span>
+              <Button
+                onClick={() => handleOpenAddView('parent')}
+                size="sm"
+                className="bg-neutral-950 text-white text-xs font-semibold"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Create Category
               </Button>
-            </Card>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCategories.map((cat) => (
-                <Card
-                  key={cat.id}
-                  className={`p-5 bg-white border border-neutral-200 shadow-2xs rounded-xl flex flex-col justify-between hover:border-neutral-300 transition-all ${
-                    !cat.isActive ? 'opacity-70 bg-neutral-50/50' : ''
-                  }`}
-                >
-                  <div className="space-y-3">
-                    {/* TYPE BADGE & ACTIVE STATUS TOGGLE */}
-                    <div className="flex items-center justify-between">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] uppercase font-semibold border ${
-                          cat.type === 'sub'
-                            ? 'bg-neutral-100 text-neutral-800 border-neutral-300'
-                            : 'bg-black text-white border-black'
-                        }`}
-                      >
-                        {cat.type === 'sub' ? 'Subcategory' : 'Main Category'}
-                      </Badge>
+            /* DATA TABLE / CARDS GRID */
+            <div className="bg-white rounded-xl border border-neutral-200 shadow-2xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-neutral-50 border-b border-neutral-200 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4">Image</th>
+                      <th className="py-3 px-4">Category Name &amp; Slug</th>
+                      <th className="py-3 px-4">Classification</th>
+                      {filterType !== 'MAIN' && <th className="py-3 px-4">Parent Category</th>}
+                      <th className="py-3 px-4 text-center">Products</th>
+                      {filterType !== 'SUB' && <th className="py-3 px-4 text-center">Subcategories</th>}
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4">Created Date</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {filteredCategories.map((cat) => {
+                      const isSub = cat.type === 'sub';
+                      const subCount = !isSub ? countSubcategories(cat.id, cat.name) : 0;
 
-                      <button
-                        onClick={() => toggleStatus(cat.id)}
-                        title={cat.isActive ? "Deactivate category" : "Activate category"}
-                        className="cursor-pointer shrink-0"
-                      >
-                        {cat.isActive ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Active</span>
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200 flex items-center gap-1">
-                            <XCircle className="w-3 h-3" />
-                            <span>Inactive</span>
-                          </span>
-                        )}
-                      </button>
-                    </div>
+                      return (
+                        <tr key={cat.id} className="hover:bg-neutral-50/80 transition-colors">
+                          {/* Image */}
+                          <td className="py-3 px-4">
+                            <div className="w-10 h-10 rounded-lg bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 shadow-2xs">
+                              <img
+                                src={cat.image || '/images/category/Latkan.webp'}
+                                alt={cat.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          </td>
 
-                    {/* IMAGE THUMBNAIL, NAME & PARENT BREADCRUMB */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 shadow-2xs">
-                        <img
-                          src={cat.image || '/images/category/Latkan.webp'}
-                          alt={cat.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        {cat.type === 'sub' && (cat.parentName || cat.parentId) && (
-                          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block flex items-center gap-1 mb-0.5">
-                            <span>{cat.parentName || 'Main Category'}</span>
-                            <ChevronRight className="w-2.5 h-2.5 text-neutral-400" />
-                          </span>
-                        )}
-                        <h3 className="font-bold text-black text-sm tracking-tight truncate">{cat.name}</h3>
-                        <span className="text-[10px] text-neutral-400 font-mono truncate block">
-                          /{cat.type === 'sub' && getParentSlug(cat.parentId, cat.parentName) ? `${getParentSlug(cat.parentId, cat.parentName)}/` : ''}{cat.slug}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                          {/* Name & Slug */}
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-neutral-950 text-xs">{cat.name}</div>
+                            <span className="font-mono text-[10px] text-neutral-400 block truncate max-w-[200px]">
+                              /{cat.slug}
+                            </span>
+                          </td>
 
-                  {/* BOTTOM ACTIONS */}
-                  <div className="pt-4 border-t border-neutral-100 mt-4 flex items-center justify-between text-xs">
-                    <span className="text-[11px] text-neutral-400 font-normal">
-                      ID: <span className="font-mono text-neutral-600">{cat.id}</span>
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        onClick={() => handleOpenEditView(cat)}
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 px-2.5 font-medium text-black border-neutral-200 hover:bg-neutral-100"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        <span>Edit</span>
-                      </Button>
-                      <Button
-                        onClick={() => handleDeleteCategory(cat.id)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs h-8 px-2 text-neutral-400 hover:text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                          {/* Classification */}
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
+                                isSub
+                                  ? 'bg-neutral-100 text-neutral-700 border border-neutral-200'
+                                  : 'bg-neutral-900 text-white'
+                              }`}
+                            >
+                              <Tag className="w-2.5 h-2.5" />
+                              <span>{isSub ? 'Subcategory' : 'Main Category'}</span>
+                            </span>
+                          </td>
+
+                          {/* Parent Category (if applicable) */}
+                          {filterType !== 'MAIN' && (
+                            <td className="py-3 px-4">
+                              {isSub ? (
+                                <span className="font-semibold text-neutral-800 text-xs">
+                                  {cat.parentName || mainCategoriesList.find(p => p.id === cat.parentId)?.name || '—'}
+                                </span>
+                              ) : (
+                                <span className="text-neutral-400 font-mono text-[11px]">—</span>
+                              )}
+                            </td>
+                          )}
+
+                          {/* Product Count */}
+                          <td className="py-3 px-4 text-center">
+                            <span className="font-semibold text-neutral-900">
+                              {cat.productCount !== undefined ? cat.productCount : 12}
+                            </span>
+                          </td>
+
+                          {/* Subcategory Count (Main only) */}
+                          {filterType !== 'SUB' && (
+                            <td className="py-3 px-4 text-center">
+                              {!isSub ? (
+                                <Badge variant="outline" className="text-[10px] font-semibold">
+                                  {subCount} Subcats
+                                </Badge>
+                              ) : (
+                                <span className="text-neutral-400 text-[11px]">—</span>
+                              )}
+                            </td>
+                          )}
+
+                          {/* Status Switch Toggle */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Switch
+                                id={`cat-status-${cat.id}`}
+                                size="sm"
+                                checked={cat.isActive !== false}
+                                onCheckedChange={(checked) => {
+                                  setCategories((prev) =>
+                                    prev.map((c) => (c.id === cat.id ? { ...c, isActive: checked } : c))
+                                  );
+                                  showToast(
+                                    `"${cat.name}" is now ${
+                                      checked ? 'Active (Visible on Website)' : 'Inactive (Hidden from Website)'
+                                    }.`
+                                  );
+                                }}
+                              />
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  cat.isActive !== false ? 'text-emerald-700' : 'text-neutral-400'
+                                }`}
+                              >
+                                {cat.isActive !== false ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Created Date */}
+                          <td className="py-3 px-4 text-neutral-500 text-[11px] font-mono whitespace-nowrap">
+                            {cat.createdAt || '2026-01-15'}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                onClick={() => handleOpenEditView(cat)}
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs font-medium border-neutral-200 text-neutral-800 hover:bg-neutral-100"
+                                title="Edit Category"
+                              >
+                                <Edit2 className="w-3 h-3 mr-1" />
+                                <span>Edit</span>
+                              </Button>
+                              <Button
+                                onClick={() => setDeleteConfirmId(cat.id)}
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-neutral-400 hover:text-rose-600 hover:bg-rose-50"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* SUB-VIEW 2 & 3: FULL PAGE CREATE / EDIT FORM */}
+      {/* SUB-VIEW 2 & 3: FULL ADD / EDIT CATEGORY & SUBCATEGORY FORM */}
       {/* ========================================================================= */}
       {(subView === 'add' || subView === 'edit') && (
-        <Card className="p-6 sm:p-8 bg-white border border-neutral-200 shadow-2xs rounded-xl max-w-2xl mx-auto space-y-6 font-sans">
-          {/* FORM TOP BAR */}
+        <Card className="p-6 sm:p-8 bg-white border border-neutral-200 shadow-2xs rounded-xl max-w-3xl mx-auto space-y-6">
+          
+          {/* Top Form Header */}
           <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
             <div className="flex items-center gap-3">
               <Button
@@ -530,15 +709,17 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                 onClick={() => setSubView('all')}
                 className="text-xs border-neutral-200 text-neutral-700 hover:bg-neutral-100"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to All Categories</span>
+                <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+                <span>Back</span>
               </Button>
               <div>
-                <h2 className="text-base font-bold text-black tracking-tight">
-                  {subView === 'edit' ? `Edit Category: ${categoryName}` : 'Add Category & Subcategory'}
+                <h2 className="text-base font-bold text-neutral-950 tracking-tight">
+                  {subView === 'edit'
+                    ? `Edit ${categoryType === 'sub' ? 'Subcategory' : 'Category'}: ${categoryName}`
+                    : `Add New ${categoryType === 'sub' ? 'Subcategory' : 'Category'}`}
                 </h2>
                 <p className="text-xs text-neutral-500 font-normal">
-                  Configure name, category type, and parent main category.
+                  Configure classification, parent category linkage, image media, and SEO metadata.
                 </p>
               </div>
             </div>
@@ -547,27 +728,28 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleDeleteCategory(editingCategory.id)}
-                className="text-xs border-red-200 text-red-600 hover:bg-red-50"
+                onClick={() => setDeleteConfirmId(editingCategory.id)}
+                className="text-xs border-rose-200 text-rose-600 hover:bg-rose-50"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
                 <span>Delete</span>
               </Button>
             )}
           </div>
 
           <form onSubmit={handleSaveCategory} className="space-y-5 text-xs">
-            {/* CATEGORY TYPE TOGGLE (MAIN CATEGORY VS SUBCATEGORY) */}
+            
+            {/* Classification Toggle (Main vs Sub) */}
             <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                Select Classification *
+              <label className="block text-xs font-bold text-neutral-950 uppercase tracking-wider mb-1.5">
+                Classification Type *
               </label>
               <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-lg border border-neutral-200">
                 <button
                   type="button"
                   onClick={() => setCategoryType('parent')}
                   className={`py-2 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                    categoryType === 'parent' ? 'bg-black text-white shadow-2xs' : 'text-neutral-600 hover:text-black'
+                    categoryType === 'parent' ? 'bg-neutral-950 text-white shadow-2xs' : 'text-neutral-600 hover:text-neutral-950'
                   }`}
                 >
                   Main Category
@@ -576,207 +758,225 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                   type="button"
                   onClick={() => setCategoryType('sub')}
                   className={`py-2 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                    categoryType === 'sub' ? 'bg-black text-white shadow-2xs' : 'text-neutral-600 hover:text-black'
+                    categoryType === 'sub' ? 'bg-neutral-950 text-white shadow-2xs' : 'text-neutral-600 hover:text-neutral-950'
                   }`}
                 >
-                  Subcategory
+                  Sub Category
                 </button>
               </div>
             </div>
 
-            {/* IF SUBCATEGORY: SELECT PARENT MAIN CATEGORY */}
+            {/* If Subcategory: Parent Category Selector */}
             {categoryType === 'sub' && (
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Select Parent Main Category *
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-neutral-950 uppercase tracking-wider">
+                  Parent Main Category *
                 </label>
                 <Select
                   value={selectedParentId || mainCategoriesList[0]?.id || ''}
                   onValueChange={setSelectedParentId}
                   options={mainCategoriesList.map((p) => ({ value: p.id, label: p.name }))}
                 />
-                <span className="text-[10px] text-neutral-400 mt-1 block">
-                  This subcategory will be grouped under the selected Main Category.
+                <span className="text-[10px] text-neutral-400 block">
+                  Select the existing Parent Category this Subcategory belongs to.
                 </span>
               </div>
             )}
 
-            {/* CATEGORY / SUBCATEGORY NAME */}
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                {categoryType === 'sub' ? 'Subcategory Name *' : 'Main Category Name *'}
+            {/* Category Name */}
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-neutral-950 uppercase tracking-wider">
+                {categoryType === 'sub' ? 'Subcategory Name *' : 'Category Name *'}
               </label>
               <Input
                 type="text"
                 required
-                placeholder={categoryType === 'sub' ? 'e.g. Mirror Latkan, Kids Choli' : 'e.g. Latkan, Choli, Gift Hamper, Necklace'}
+                placeholder={categoryType === 'sub' ? 'e.g. Mirror Latkan, Saree Tassels, Kids Choli' : 'e.g. Latkan, Choli, Gift Hamper, Necklace'}
                 value={categoryName}
                 onChange={handleNameChange}
-                className="bg-white border-neutral-200 text-xs text-black font-medium"
+                className="bg-white border-neutral-200 text-xs font-medium"
               />
             </div>
 
-            {/* URL SLUG */}
-            <div>
-              <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                URL Slug (Auto-generated)
+            {/* URL Slug */}
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-neutral-950 uppercase tracking-wider">
+                URL Slug *
               </label>
-              <div className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 text-xs font-mono overflow-x-auto">
-                <span className="text-neutral-400 text-[11px] shrink-0">
-                  /{categoryType === 'sub' && (mainCategoriesList.find(c => c.id === selectedParentId)?.slug || getParentSlug(selectedParentId)) ? `${mainCategoriesList.find(c => c.id === selectedParentId)?.slug || getParentSlug(selectedParentId)}/` : ''}
-                </span>
+              <div className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 font-mono text-xs">
+                <span className="text-neutral-400 text-[11px] shrink-0">/categories/</span>
                 <input
                   type="text"
                   value={categorySlug}
-                  onChange={(e) => setCategorySlug(e.target.value)}
-                  className="flex-1 bg-transparent text-black font-bold focus:outline-none min-w-[120px]"
+                  onChange={(e) => setCategorySlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'))}
+                  className="flex-1 bg-transparent text-neutral-950 font-semibold focus:outline-none"
                 />
               </div>
             </div>
 
-            {/* CATEGORY IMAGE (DRAG & DROP / UPLOAD / DIRECT URL) */}
+           
+
+            {/* Category Display Image */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-black uppercase tracking-wider">
-                  Category Display Image *
-                </label>
-                {categoryImage && (
-                  <button
-                    type="button"
-                    onClick={() => setCategoryImage('')}
-                    className="text-[11px] font-semibold text-red-600 hover:text-red-700 flex items-center gap-1 cursor-pointer"
-                  >
-                    <X className="w-3 h-3" />
-                    <span>Remove Image</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Hidden File Input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageFileUpload}
-                className="hidden"
-              />
-
-              {/* DRAG & DROP UPLOAD ZONE */}
+              <label className="block text-xs font-bold text-neutral-950 uppercase tracking-wider">
+                Category Image Thumbnail *
+              </label>
+              
               <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative rounded-xl border-2 border-dashed p-4 sm:p-6 text-center cursor-pointer transition-all duration-200 ${
-                  isDragOver
-                    ? 'border-black bg-neutral-100 scale-[0.99]'
-                    : categoryImage
-                    ? 'border-neutral-300 bg-neutral-50/70 hover:border-black'
-                    : 'border-neutral-300 hover:border-black bg-neutral-50/50 hover:bg-neutral-50'
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) {
+                    handleFileProcess(file, false);
+                    showToast('Category image added via Drag & Drop!');
+                  }
+                }}
+                className={`flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl border-2 transition-all ${
+                  isDragOver ? 'border-neutral-900 bg-neutral-100 scale-99' : 'border-dashed border-neutral-200 bg-neutral-50/50 hover:border-neutral-400'
                 }`}
               >
-                {categoryImage ? (
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-white border border-neutral-200 shadow-sm shrink-0">
-                      <img
-                        src={categoryImage}
-                        alt="Category Preview"
-                        className="w-full h-full object-cover object-center"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
+                <div className="w-20 h-20 rounded-xl bg-white border border-neutral-200 overflow-hidden shrink-0 shadow-2xs">
+                  <img
+                    src={categoryImage || '/images/category/Latkan.webp'}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div className="flex-1 space-y-2 w-full">
+                  <Input
+                    type="text"
+                    placeholder="Image URL (e.g. /images/category/Latkan.webp or base64)..."
+                    value={categoryImage}
+                    onChange={(e) => setCategoryImage(e.target.value)}
+                    className="h-8 text-xs bg-white"
+                  />
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="px-3 py-1 rounded bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-semibold cursor-pointer flex items-center gap-1 border border-neutral-200">
+                      <UploadCloud className="w-3 h-3" />
+                      <span>Upload Local Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => e.target.files?.[0] && handleFileProcess(e.target.files[0], false)}
+                        className="hidden"
                       />
-                    </div>
-                    <div className="text-center sm:text-left space-y-1">
-                      <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs font-bold text-black">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Image Selected</span>
-                      </div>
-                      <p className="text-[11px] text-neutral-500 font-normal">
-                        Click or drag a new image here to replace
-                      </p>
-                      <div className="pt-1">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-black text-white text-[11px] font-semibold rounded-lg shadow-xs hover:bg-neutral-800 transition-colors">
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>Change File</span>
-                        </span>
-                      </div>
-                    </div>
+                    </label>
+                    <span className="text-[10px] text-neutral-500 font-medium">or drag &amp; drop / press</span>
+                    <span className="px-1.5 py-0.2 rounded bg-neutral-900 text-white font-mono text-[9px]">Ctrl + V</span>
+                    <span className="text-[10px] text-neutral-500 font-medium">to paste</span>
                   </div>
-                ) : (
-                  <div className="space-y-2 py-2">
-                    <div className="w-12 h-12 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-600 flex items-center justify-center mx-auto shadow-2xs">
-                      <UploadCloud className="w-6 h-6 text-black" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-bold text-black">
-                        Drag & drop category image here, or <span className="underline text-brand-maroon">Browse</span>
-                      </p>
-                      <p className="text-[11px] text-neutral-400 font-normal">
-                        Supports PNG, JPG, WEBP, AVIF (Max 10MB)
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* DIRECT URL INPUT */}
-              <div className="pt-1">
-                <span className="text-[11px] text-neutral-500 font-medium block mb-1">
-                  Or enter image URL / asset path:
-                </span>
-                <Input
-                  type="text"
-                  placeholder="e.g. /images/category/Latkan.webp or https://images.unsplash.com/..."
-                  value={categoryImage}
-                  onChange={(e) => setCategoryImage(e.target.value)}
-                  className="bg-white border-neutral-200 text-xs text-black font-medium h-8"
-                />
+                </div>
               </div>
             </div>
 
-            {/* STATUS TOGGLE */}
-            <div className="flex items-center justify-between p-3.5 bg-neutral-50 rounded-lg border border-neutral-200">
-              <div>
-                <span className="text-xs font-bold text-black block">Status Pipeline</span>
-                <span className="text-[11px] text-neutral-400 font-normal block">Enable or disable visibility on storefront website</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsActive(!isActive)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
-                  isActive ? 'bg-black text-white border-black' : 'bg-white text-neutral-600 border-neutral-200'
-                }`}
-              >
-                {isActive ? '✓ Active' : 'Inactive'}
-              </button>
+            {/* Status Switch / Toggle */}
+            <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200">
+              <Switch
+                id="cat-form-active"
+                checked={isActive}
+                onCheckedChange={(checked) => setIsActive(checked)}
+                label="Publish & make visible across the storefront collection navigation"
+                description="When enabled, this category will appear in the navigation bar and catalog filters on the website."
+              />
             </div>
 
-            {/* FORM ACTION BUTTONS */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
+            {/* Form Footer Buttons */}
+            <div className="pt-4 border-t border-neutral-200 flex items-center justify-between">
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => setSubView('all')}
-                className="text-xs border-neutral-200 text-neutral-700 hover:bg-neutral-100 font-medium"
               >
                 Cancel
               </Button>
 
               <Button
                 type="submit"
-                className="bg-black hover:bg-neutral-800 text-white font-semibold text-xs px-6 py-2 rounded-md shadow-2xs transition-all flex items-center gap-2 cursor-pointer"
+                size="sm"
+                className="bg-neutral-950 hover:bg-neutral-800 text-white font-semibold text-xs px-6"
               >
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span>{subView === 'edit' ? 'Update Category' : 'Save Category'}</span>
+                <Check className="w-3.5 h-3.5 mr-1" />
+                <span>{editingCategory ? 'Update Category' : 'Save Category'}</span>
               </Button>
             </div>
           </form>
         </Card>
       )}
+
+      {/* CONFIRM DELETE DIALOG */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-neutral-200">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-neutral-900 text-sm">Delete Category?</h3>
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Are you sure you want to delete <strong className="text-neutral-900 font-semibold">"{categories.find(c => c.id === deleteConfirmId)?.name || 'this category'}"</strong>? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+              <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(null)} className="text-xs h-8 px-3 border-neutral-200 text-neutral-700 hover:bg-neutral-50 cursor-pointer">
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmDelete}
+                className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-8 px-3.5 font-medium cursor-pointer"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM STATUS TOGGLE DIALOG */}
+      {statusConfirmItem && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-neutral-200 animate-in zoom-in-95">
+            <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="font-bold text-neutral-950 text-sm">
+                {statusConfirmItem.isActive !== false ? 'Deactivate Category?' : 'Activate Category?'}
+              </h3>
+              <p className="text-xs text-neutral-500">
+                {statusConfirmItem.isActive !== false
+                  ? `Deactivating "${statusConfirmItem.name}" will hide it from the customer storefront navigation.`
+                  : `Activating "${statusConfirmItem.name}" will make it visible in the storefront.`}
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setStatusConfirmItem(null)} className="text-xs">
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmStatusToggle}
+                className="bg-neutral-950 hover:bg-neutral-800 text-white text-xs font-semibold"
+              >
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
-
 export default CategoriesPage;

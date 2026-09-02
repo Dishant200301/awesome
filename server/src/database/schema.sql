@@ -188,6 +188,25 @@ CREATE TABLE IF NOT EXISTS contact_messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+-- 12b. PRODUCT REVIEWS
+CREATE TABLE IF NOT EXISTS reviews (
+    id VARCHAR(36) PRIMARY KEY,
+    product_id VARCHAR(36) NOT NULL,
+    product_name VARCHAR(255),
+    product_image VARCHAR(512),
+    author VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    rating INT NOT NULL DEFAULT 5,
+    comment TEXT NOT NULL,
+    date VARCHAR(50),
+    verified BOOLEAN DEFAULT TRUE,
+    status VARCHAR(50) DEFAULT 'Approved', -- Approved, Pending, Rejected
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
 -- 13. CUSTOMERS
 CREATE TABLE IF NOT EXISTS customers (
     id VARCHAR(36) PRIMARY KEY,

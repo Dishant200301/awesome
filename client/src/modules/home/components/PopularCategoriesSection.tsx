@@ -1,16 +1,20 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import { FiChevronRight } from "react-icons/fi";
-
-const POPULAR_CATEGORIES = [
-  { key: "latkan", title: "LATKANS", img: "/images/category/Latkan.webp" },
-  { key: "necklace", title: "JEWELLERY", img: "/images/category/Necklace.webp" },
-  { key: "choli", title: "CHOLIS", img: "/images/category/Choli.webp" },
-];
+import { getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
 
 export default function PopularCategoriesSection() {
   const ref = useRef<HTMLDivElement>(null);
+  const [liveCategories, setLiveCategories] = useState(() => getLiveCategories());
+
+  useEffect(() => {
+    const unsub = subscribeToCategoriesStore(() => {
+      setLiveCategories(getLiveCategories());
+    });
+    return () => unsub();
+  }, []);
+
   useEffect(() => {
     if (!ref.current) return;
     const ctx = gsap.context(() => {
@@ -20,15 +24,24 @@ export default function PopularCategoriesSection() {
       });
     }, ref);
     return () => ctx.revert();
-  }, []);
+  }, [liveCategories]);
+
+  // Display top 3 active categories dynamically
+  const popularCats = liveCategories.slice(0, 3).map((c) => ({
+    key: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    title: c.name.toUpperCase(),
+    img: c.image || "/images/category/Latkan.webp",
+  }));
+
+  if (popularCats.length === 0) return null;
 
   return (
     <section ref={ref} className="mx-auto max-w-[1400px] px-5 md:px-8 py-16 md:py-24">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-4">
-        {POPULAR_CATEGORIES.map((c) => (
+        {popularCats.map((c) => (
           <Link
             key={c.key}
-            to={`/collections/${c.key}`}
+            to={`/shop?category=${encodeURIComponent(c.key)}`}
             className="pop-card group relative overflow-hidden rounded-[18px] md:rounded-[20px] aspect-10/14 bg-[#f5f2ee] shadow-sm select-none cursor-pointer block"
           >
             {/* Image zoom on hover */}
@@ -58,3 +71,4 @@ export default function PopularCategoriesSection() {
     </section>
   );
 }
+

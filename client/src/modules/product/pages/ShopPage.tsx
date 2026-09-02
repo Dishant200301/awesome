@@ -55,7 +55,9 @@ export default function ShopPage() {
 
   useEffect(() => {
     const unsubscribeFilters = subscribeToFilterStore(() => {
-      setFilterConfig(getLiveFilters() || { categories: [], colors: [], sizes: [], maxPrice: 3000 });
+      const cfg = getLiveFilters();
+      setFilterConfig(cfg);
+      if (cfg?.maxPrice) setMaxPrice(cfg.maxPrice);
     });
     const unsubscribeCats = subscribeToCategoriesStore(() => {
       setLiveCategoriesList(getLiveCategories());
@@ -99,6 +101,7 @@ export default function ShopPage() {
   const [maxPrice, setMaxPrice] = useState<number>(3000);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedAttributes, setSelectedAttributes] = useState<{ [attrName: string]: string[] }>({});
   const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -109,7 +112,7 @@ export default function ShopPage() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // Accordion Sections Toggle
-  const [openSections, setOpenSections] = useState({
+  const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
     categories: true,
     price: true,
     color: true,
@@ -117,7 +120,7 @@ export default function ShopPage() {
     rating: true,
   });
 
-  const toggleSection = (key: keyof typeof openSections) => {
+  const toggleSection = (key: string) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -234,6 +237,8 @@ export default function ShopPage() {
         (p: any) => p.isPublished !== false && p.status !== "Draft"
       );
       setProducts(published);
+      const cfg = getLiveFilters();
+      setFilterConfig(cfg);
     });
 
     return () => unsubscribe();
@@ -252,6 +257,16 @@ export default function ShopPage() {
     );
   };
 
+  const toggleAttributeValue = (attrName: string, val: string) => {
+    setSelectedAttributes((prev) => {
+      const current = prev[attrName] || [];
+      const updated = current.includes(val)
+        ? current.filter((v) => v !== val)
+        : [...current, val];
+      return { ...prev, [attrName]: updated };
+    });
+  };
+
   const toggleRating = (rating: number) => {
     setSelectedRatings((prev) =>
       prev.includes(rating) ? prev.filter((r) => r !== rating) : [...prev, rating]
@@ -263,6 +278,7 @@ export default function ShopPage() {
     setMaxPrice(3000);
     setSelectedColors([]);
     setSelectedSizes([]);
+    setSelectedAttributes({});
     setSelectedRatings([]);
     setSearchQuery("");
     setSort("default");
@@ -400,6 +416,42 @@ export default function ShopPage() {
       );
     }
 
+    // Custom Attributes Filter (Material, Craft Technique, Occasion, etc.)
+    Object.entries(selectedAttributes).forEach(([attrName, selectedVals]) => {
+      if (selectedVals.length > 0) {
+        const cleanAttrName = attrName.toLowerCase();
+        list = list.filter((p: any) => {
+          const pAttrs = p.attributes || [];
+          const pCustomAttrs = p.customAttributes || [];
+          const pSpecs = p.specifications || [];
+          const pOpts = p.productOptions || [];
+
+          return selectedVals.some((val) => {
+            const cleanVal = val.toLowerCase();
+            const inAttrs = pAttrs.some((a: any) =>
+              (a.name || "").toLowerCase().includes(cleanAttrName) &&
+              (a.values || []).some((v: string) => v.toLowerCase().includes(cleanVal))
+            );
+            const inCustom = pCustomAttrs.some((a: any) =>
+              (a.name || "").toLowerCase().includes(cleanAttrName) &&
+              (a.values || []).some((v: string) => v.toLowerCase().includes(cleanVal))
+            );
+            const inSpecs = pSpecs.some((s: any) =>
+              (s.key || "").toLowerCase().includes(cleanAttrName) &&
+              (s.value || "").toLowerCase().includes(cleanVal)
+            );
+            const inOpts = pOpts.some((o: any) =>
+              (o.name || "").toLowerCase().includes(cleanAttrName) &&
+              (o.values || []).some((v: string) => v.toLowerCase().includes(cleanVal))
+            );
+            const inDesc = (p.shortDescription || p.fullDescription || p.name || "").toLowerCase().includes(cleanVal);
+
+            return inAttrs || inCustom || inSpecs || inOpts || inDesc;
+          });
+        });
+      }
+    });
+
     // Rating Filter
     if (selectedRatings.length > 0) {
       list = list.filter((p) => {
@@ -439,6 +491,7 @@ export default function ShopPage() {
     maxPrice,
     selectedColors,
     selectedSizes,
+    selectedAttributes,
     selectedRatings,
     searchQuery,
     sort,
@@ -642,7 +695,53 @@ export default function ShopPage() {
         )}
       </div>
 
-      {/* 5. Rating Filter */}
+      {/* 5. Dynamic Custom Attributes Filters (Material, Craft Technique, Occasion, etc.) */}
+      {(filterConfig?.attributes || []).map((attr: any) => {
+        const attrKey = `attr_${attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+        const isOpen = openSections[attrKey] !== undefined ? openSections[attrKey] : true;
+        const currentSelected = selectedAttributes[attr.name] || [];
+
+        return (
+          <div key={attr.name} className="border-b border-zinc-200 pb-2">
+            <button
+              type="button"
+              onClick={() => toggleSection(attrKey)}
+              className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-zinc-900 mb-3 cursor-pointer"
+            >
+              <span>{attr.name}</span>
+              {isOpen ? (
+                <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
+              ) : (
+                <Plus className="w-6 h-6 stroke-1 text-zinc-800" />
+              )}
+            </button>
+            {isOpen && (
+              <ul className="space-y-2 text-xs font-semibold text-zinc-600 tracking-wide">
+                {(attr.values || []).map((val: string) => {
+                  const checked = currentSelected.includes(val);
+                  const inputId = `attr-${attr.name}-${val}`;
+                  return (
+                    <li key={val} className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id={inputId}
+                        checked={checked}
+                        onChange={() => toggleAttributeValue(attr.name, val)}
+                        className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
+                      />
+                      <label htmlFor={inputId} className="cursor-pointer select-none">
+                        <span>{val}</span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+
+      {/* 6. Rating Filter */}
       <div>
         <button
           type="button"
@@ -695,6 +794,7 @@ export default function ShopPage() {
       {(selectedCategory ||
         selectedColors.length > 0 ||
         selectedSizes.length > 0 ||
+        Object.values(selectedAttributes).some((arr) => arr.length > 0) ||
         selectedRatings.length > 0 ||
         maxPrice < 3000) && (
           <button

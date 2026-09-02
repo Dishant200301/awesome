@@ -23,9 +23,23 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
 
   const thumbScrollRef = useRef<HTMLDivElement>(null);
 
-  const validImages = Array.isArray(images) && images.length > 0
-    ? images.filter((img) => img && typeof img.url === "string" && img.url.trim().length > 0)
-    : [];
+  const seenUrls = new Set<string>();
+  const validImages: ProductImage[] = [];
+  if (Array.isArray(images)) {
+    images.forEach((img, i) => {
+      if (img && typeof img.url === "string" && img.url.trim().length > 0) {
+        const cleanUrl = img.url.trim();
+        if (!seenUrls.has(cleanUrl)) {
+          seenUrls.add(cleanUrl);
+          validImages.push({
+            id: img.id || `img-${i}`,
+            url: cleanUrl,
+            alt: img.alt || `Product Image ${validImages.length + 1}`,
+          });
+        }
+      }
+    });
+  }
 
   const safeImages: ProductImage[] = validImages.length > 0
     ? validImages

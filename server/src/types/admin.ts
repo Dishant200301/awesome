@@ -130,3 +130,19 @@ export interface StoreSettings {
   metaTitle: string;
   metaDescription: string;
 }
+
+export interface ReviewItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage?: string;
+  author: string;
+  email: string;
+  rating: number;
+  comment: string;
+  date: string;
+  verified?: boolean;
+  status?: 'Approved' | 'Pending' | 'Rejected';
+  createdAt?: string;
+}
+

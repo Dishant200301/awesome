@@ -21,6 +21,7 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 
 export const ContactMessagesPage: React.FC = () => {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
@@ -30,6 +31,7 @@ export const ContactMessagesPage: React.FC = () => {
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replySuccess, setReplySuccess] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState<ContactMessage | null>(null);
 
   const loadMessages = React.useCallback(async () => {
     setLoading(true);
@@ -89,12 +91,16 @@ export const ContactMessagesPage: React.FC = () => {
     }, 2500);
   };
 
-  const handleDeleteMessage = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this message?')) {
-      await AdminApiService.deleteContactMessage(id);
-      setMessages((prev) => prev.filter((msg) => msg.id !== id));
-      if (selectedMessage?.id === id) setSelectedMessage(null);
-    }
+  const handleDeleteMessage = (msg: ContactMessage) => {
+    setDeleteCandidate(msg);
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!deleteCandidate) return;
+    await AdminApiService.deleteContactMessage(deleteCandidate.id);
+    setMessages((prev) => prev.filter((msg) => msg.id !== deleteCandidate.id));
+    if (selectedMessage?.id === deleteCandidate.id) setSelectedMessage(null);
+    setDeleteCandidate(null);
   };
 
   const unreadCount = messages.filter((m) => m.status === 'New').length;
@@ -269,16 +275,20 @@ export const ContactMessagesPage: React.FC = () => {
                         setSelectedMessage(msg);
                         if (msg.status === 'New') handleMarkRead(msg.id);
                       }}
+                      className="w-7 h-7"
                       title="View Details & Reply"
                     >
                       <Eye className="w-3.5 h-3.5" />
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="icon"
-                      onClick={() => handleDeleteMessage(msg.id)}
-                      title="Delete Inquiry"
-                      className="hover:bg-rose-50 text-rose-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteMessage(msg);
+                      }}
+                      className="w-7 h-7 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      title="Delete Message"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -351,6 +361,15 @@ export const ContactMessagesPage: React.FC = () => {
           </Card>
         </div>
       )}
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteCandidate)}
+        title="Delete Inquiry Message?"
+        itemName={deleteCandidate ? `${deleteCandidate.subject} from ${deleteCandidate.name}` : undefined}
+        onConfirm={confirmDeleteMessage}
+        onCancel={() => setDeleteCandidate(null)}
+      />
     </div>
   );
 };
