@@ -176,6 +176,13 @@ export interface ProductDetails {
   type?: 'Simple' | 'Variable';
   brand: string;
   name: string;
+  category?: string;
+  categories?: string[];
+  subcategory?: string;
+  sku?: string;
+  stock?: number;
+  mainImage?: string;
+  discountPercentage?: number;
   subtitle: string;
   shortDescription?: string;
   fullDescription?: string;
@@ -192,6 +199,19 @@ export interface ProductDetails {
   sizeGuide?: SizeGuide;
   highlights: FeatureHighlight[];
   productAttributes?: ProductAttributeAssignment[];
+  customAttributes?: any[];
+  variantDetails?: any[];
+  features?: any[];
+  specifications?: any;
+  dimensions?: any;
+  weight?: any;
+  material?: any;
+  color?: any;
+  size?: any;
+  specs?: any;
+  galleryImages?: string[];
+  images?: any[];
+  reviews?: any[];
   productType?: 'simple' | 'variant';
   colorMediaConfigs?: { colorValueId?: string; colorName: string; colorCode?: string; mainImage: string; gallery: string[] }[];
   extendedDetails: {
@@ -233,6 +253,8 @@ export interface CartItem {
   image: string;
   sku: string;
   quantity: number;
+  stock?: number;
+  maxStock?: number;
 }
 
 export interface ClientShopProduct {

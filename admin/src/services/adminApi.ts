@@ -216,7 +216,10 @@ export class AdminApiService {
   public static async getProductById(id: string): Promise<Product | null> {
     const remote = await this.request<Product>(`/products/${id}`);
     if (remote) return remote;
-    return MOCK_PRODUCTS.find((p) => p.id === id || p.slug === id) || null;
+    const all = getAdminProducts();
+    const found = all.find((p) => String(p.id) === String(id) || p.slug === id);
+    if (found) return found;
+    return MOCK_PRODUCTS.find((p) => String(p.id) === String(id) || p.slug === id) || null;
   }
 
   public static async createProduct(productData: Partial<Product>): Promise<Product> {

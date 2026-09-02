@@ -42,6 +42,408 @@ import {
   subscribeToCategoriesStore,
 } from "@/modules/core/lib/apiStore";
 
+// Comprehensive category & subcategory matching helper
+const matchProductCategory = (prod: any, targetCategory: string): boolean => {
+  if (!targetCategory || targetCategory.toLowerCase() === "all") return true;
+
+  const clean = (s?: string) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
+  const target = clean(targetCategory);
+  const targetStem = target.endsWith("s") && target.length > 3 ? target.slice(0, -1) : target;
+
+  const cat = clean(prod.category);
+  const subcat = clean(prod.subcategory || prod.subCategory);
+  const name = clean(prod.name);
+  const desc = clean(prod.shortDescription || prod.subtitle || "");
+  const categoriesList = Array.isArray(prod.categories) ? prod.categories.map(clean) : [];
+
+  // 1. Direct or stem equality
+  if (cat === target || cat === targetStem || subcat === target || subcat === targetStem) return true;
+  if (categoriesList.includes(target) || categoriesList.includes(targetStem)) return true;
+
+  // 2. Substring matching
+  if (cat.includes(targetStem) || subcat.includes(targetStem) || target.includes(cat) || targetStem.includes(cat)) return true;
+  if (name.includes(targetStem) || desc.includes(targetStem)) return true;
+
+  // 3. Domain-specific semantic mappings
+  if (targetStem.includes("latkan") || targetStem.includes("tassel")) {
+    return cat.includes("latkan") || cat.includes("tassel") || subcat.includes("latkan") || subcat.includes("tassel") || name.includes("latkan") || name.includes("tassel");
+  }
+  if (targetStem.includes("choli") || targetStem.includes("navratri")) {
+    return cat.includes("choli") || subcat.includes("choli") || name.includes("choli");
+  }
+  if (targetStem.includes("earring") || targetStem.includes("jhumka")) {
+    return cat.includes("earring") || cat.includes("jhumka") || subcat.includes("earring") || name.includes("earring") || name.includes("jhumka");
+  }
+  if (targetStem.includes("necklace") || targetStem.includes("haar") || targetStem.includes("mala")) {
+    return cat.includes("necklace") || subcat.includes("necklace") || name.includes("necklace");
+  }
+  if (targetStem.includes("gift") || targetStem.includes("hamper") || targetStem.includes("keychain")) {
+    return cat.includes("gift") || cat.includes("hamper") || cat.includes("keychain") || subcat.includes("gift") || subcat.includes("hamper") || subcat.includes("keychain") || name.includes("gift") || name.includes("hamper") || name.includes("keychain");
+  }
+  if (targetStem.includes("hair") || targetStem.includes("bow") || targetStem.includes("clip") || targetStem.includes("band")) {
+    return cat.includes("hair") || subcat.includes("hair") || cat.includes("bow") || cat.includes("clip") || name.includes("hair") || name.includes("bow") || name.includes("clip");
+  }
+  if (targetStem.includes("krishna") || targetStem.includes("poshak") || targetStem.includes("outfit")) {
+    return cat.includes("krishna") || subcat.includes("krishna") || name.includes("krishna") || name.includes("poshak");
+  }
+  if (targetStem.includes("belt") || targetStem.includes("kandora") || targetStem.includes("kamarbandh")) {
+    return cat.includes("belt") || subcat.includes("belt") || name.includes("belt") || name.includes("kamarbandh") || name.includes("kandora");
+  }
+  if (targetStem.includes("watch")) {
+    return cat.includes("watch") || subcat.includes("watch") || name.includes("watch");
+  }
+  if (targetStem.includes("bracelet") || targetStem.includes("anklet") || targetStem.includes("payal")) {
+    return cat.includes("bracelet") || cat.includes("anklet") || cat.includes("payal") || subcat.includes("bracelet") || subcat.includes("anklet") || name.includes("bracelet") || name.includes("anklet");
+  }
+  if (targetStem.includes("jewel") || targetStem.includes("ornament")) {
+    return cat.includes("necklace") || cat.includes("earring") || cat.includes("bracelet") || cat.includes("anklet") || cat.includes("ring") || name.includes("jewel");
+  }
+
+  return false;
+};
+
+// Color Hex mapping for display badges
+const COLOR_HEX_MAP: Record<string, string> = {
+  maroon: '#800000',
+  red: '#DC2626',
+  crimson: '#991B1B',
+  gold: '#D4AF37',
+  golden: '#D4AF37',
+  yellow: '#EAB308',
+  mustard: '#CA8A04',
+  blue: '#2563EB',
+  royal: '#1D4ED8',
+  navy: '#1E3A8A',
+  green: '#16A34A',
+  emerald: '#059669',
+  bottle: '#064E3B',
+  pink: '#EC4899',
+  rani: '#BE185D',
+  magenta: '#D946EF',
+  orange: '#F97316',
+  peach: '#FDBA74',
+  purple: '#9333EA',
+  violet: '#7E22CE',
+  black: '#171717',
+  white: '#FAFAFA',
+  cream: '#FEF3C7',
+  beige: '#F5F5DC',
+  silver: '#E5E7EB',
+  teal: '#0D9488',
+  copper: '#B45309'
+};
+
+const getColorHex = (name?: string): string => {
+  if (!name) return '#232323';
+  const lower = name.toLowerCase().trim();
+  for (const [k, hex] of Object.entries(COLOR_HEX_MAP)) {
+    if (lower.includes(k)) return hex;
+  }
+  return '#232323';
+};
+
+export interface ShopDisplayItem {
+  id: string;
+  productId: string;
+  name: string;
+  baseTitle: string;
+  variantColor?: string;
+  variantColorHex?: string;
+  variantSize?: string;
+  price: number;
+  originalPrice: number;
+  image: string;
+  images: string[];
+  galleryImages?: string[];
+  hoverImage?: string;
+  stock: number;
+  rating: number;
+  salesCount?: number;
+  reviewCount?: number;
+  sku: string;
+  slug: string;
+  category: string;
+  categories?: string[];
+  subcategory?: string;
+  labels?: any;
+  attributes?: any[];
+  customAttributes?: any[];
+  specifications?: any[];
+  productOptions?: any[];
+  shortDescription?: string;
+  fullDescription?: string;
+  createdAt?: string;
+  linkUrl: string;
+  parentProduct: ClientShopProduct;
+  isVariantCard: boolean;
+}
+
+const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
+  const prodAny = p as any;
+  const pId = String(p.id);
+  const baseTitle = p.name || "Handcrafted Product";
+  const pSlug = p.slug || pId;
+  const pCategory = p.category || "Latkan";
+  const pSubcategory = prodAny.subcategory || prodAny.subCategory || "";
+  const pRating = Number(p.rating !== undefined && p.rating !== null ? p.rating : 4.8);
+  const pSales = p.salesCount ?? prodAny.reviewCount ?? 0;
+
+  const extractUrl = (val: any): string => {
+    if (!val) return "";
+    if (typeof val === "string") return val.trim();
+    if (typeof val === "object") {
+      return (val.url || val.src || val.image || val.mainImage || "").trim();
+    }
+    return "";
+  };
+
+  const variantDetails: any[] = Array.isArray(prodAny.variantDetails) ? prodAny.variantDetails : [];
+  const variations: any[] = Array.isArray(prodAny.variations) ? prodAny.variations : [];
+  const colors: any[] = Array.isArray(prodAny.colors) ? prodAny.colors : [];
+  const colorMediaConfigs: any[] = Array.isArray(prodAny.colorMediaConfigs) ? prodAny.colorMediaConfigs : [];
+
+  const isVariableProduct =
+    prodAny.productType === "variant" ||
+    prodAny.type === "Variable" ||
+    variantDetails.length > 0 ||
+    variations.length > 1 ||
+    colors.length > 1 ||
+    colorMediaConfigs.length > 1;
+
+  const getDynamicVariantShortDesc = (baseShort?: string, colorName?: string) => {
+    const cleanColor = (colorName || "").trim();
+    const cleanShort = (baseShort || "").trim();
+    if (!cleanShort) {
+      return cleanColor ? `Exquisitely handcrafted in an opulent ${cleanColor} tone, blending traditional artistry with premium finishes.` : "";
+    }
+    if (cleanColor && !cleanShort.toLowerCase().includes(cleanColor.toLowerCase())) {
+      return `Featured in an elegant ${cleanColor} palette. ${cleanShort}`;
+    }
+    return cleanShort;
+  };
+
+  if (isVariableProduct) {
+    const variantCardsMap = new Map<string, ShopDisplayItem>();
+
+    // 1. Process from variantDetails
+    if (variantDetails.length > 0) {
+      variantDetails.forEach((vd: any) => {
+        if (!vd) return;
+        const rawColor = vd.colorName || vd.color || vd.name || vd.optionValue || "Standard";
+        const pureColor = rawColor.split("/")[0].trim() || rawColor;
+        const colorKey = pureColor.toLowerCase();
+
+        if (!variantCardsMap.has(colorKey)) {
+          const vdMain = extractUrl(vd.mainImage) || extractUrl(vd.image) || (Array.isArray(vd.images) ? extractUrl(vd.images[0]) : "") || extractUrl(vd.thumbnail) || extractUrl(p.image) || "/images/category/Latkan.webp";
+          const vdGallery: string[] = [vdMain];
+          if (Array.isArray(vd.galleryImages)) vd.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
+          if (Array.isArray(vd.images)) vd.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
+
+          const vdPrice = Number(vd.price) || Number(p.price) || 799;
+          const vdOrigPrice = Number(vd.originalPrice) || Number(p.originalPrice) || Math.round(vdPrice * 1.5);
+          const vdStock = (vd.quantity !== undefined && vd.quantity !== null && !isNaN(Number(vd.quantity)))
+            ? Number(vd.quantity)
+            : ((vd.stock !== undefined && vd.stock !== null && !isNaN(Number(vd.stock)))
+              ? Number(vd.stock)
+              : (Number(p.stock) || 25));
+
+          variantCardsMap.set(colorKey, {
+            id: `${pId}-${pureColor.replace(/\s+/g, "-")}`,
+            productId: pId,
+            name: `${baseTitle} - ${pureColor}`,
+            baseTitle,
+            variantColor: pureColor,
+            variantColorHex: vd.colorHex || getColorHex(pureColor),
+            variantSize: vd.size || vd.sizeName || "Free Size",
+            price: vdPrice,
+            originalPrice: vdOrigPrice,
+            image: vdMain,
+            images: vdGallery,
+            galleryImages: vdGallery,
+            hoverImage: vdGallery[1] || vdMain,
+            stock: vdStock,
+            rating: pRating,
+            salesCount: pSales,
+            sku: vd.sku || `${p.sku || "AOC"}-${pureColor}`,
+            slug: pSlug,
+            category: pCategory,
+            categories: p.categories,
+            subcategory: pSubcategory,
+            labels: p.labels,
+            attributes: p.attributes,
+            customAttributes: prodAny.customAttributes,
+            specifications: prodAny.specifications,
+            productOptions: prodAny.productOptions,
+            shortDescription: getDynamicVariantShortDesc(p.shortDescription, pureColor),
+            fullDescription: p.fullDescription,
+            createdAt: prodAny.createdAt,
+            linkUrl: `/product/${pSlug}?color=${encodeURIComponent(pureColor)}`,
+            parentProduct: p,
+            isVariantCard: true,
+          });
+        }
+      });
+    }
+
+    // 2. Process from variations
+    if (variations.length > 0) {
+      variations.forEach((v: any) => {
+        if (!v) return;
+        const rawColor = v.colorName || (v as any).color || "Standard";
+        const pureColor = rawColor.split("/")[0].trim() || rawColor;
+        const colorKey = pureColor.toLowerCase();
+
+        if (!variantCardsMap.has(colorKey)) {
+          const vMain = extractUrl(v.thumbnail) || extractUrl(v.mainImage) || extractUrl(v.image) || (Array.isArray(v.images) ? extractUrl(v.images[0]) : "") || extractUrl(p.image) || "/images/category/Latkan.webp";
+          const vGallery: string[] = [vMain];
+          if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
+
+          const vPrice = Number(v.price) || Number(p.price) || 799;
+          const vOrigPrice = Number(v.originalPrice) || Number(p.originalPrice) || Math.round(vPrice * 1.5);
+          const vStock = (v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)))
+            ? Number(v.stock)
+            : ((v.quantity !== undefined && v.quantity !== null && !isNaN(Number(v.quantity)))
+              ? Number(v.quantity)
+              : (Number(p.stock) || 25));
+
+          variantCardsMap.set(colorKey, {
+            id: `${pId}-${pureColor.replace(/\s+/g, "-")}`,
+            productId: pId,
+            name: `${baseTitle} - ${pureColor}`,
+            baseTitle,
+            variantColor: pureColor,
+            variantColorHex: v.colorHex || getColorHex(pureColor),
+            variantSize: v.size || v.sizeName || "Free Size",
+            price: vPrice,
+            originalPrice: vOrigPrice,
+            image: vMain,
+            images: vGallery,
+            galleryImages: vGallery,
+            hoverImage: vGallery[1] || vMain,
+            stock: vStock,
+            rating: pRating,
+            salesCount: pSales,
+            sku: v.sku || `${p.sku || "AOC"}-${pureColor}`,
+            slug: pSlug,
+            category: pCategory,
+            categories: p.categories,
+            subcategory: pSubcategory,
+            labels: p.labels,
+            attributes: p.attributes,
+            customAttributes: prodAny.customAttributes,
+            specifications: prodAny.specifications,
+            productOptions: prodAny.productOptions,
+            shortDescription: getDynamicVariantShortDesc(p.shortDescription, pureColor),
+            fullDescription: p.fullDescription,
+            createdAt: prodAny.createdAt,
+            linkUrl: `/product/${pSlug}?color=${encodeURIComponent(pureColor)}`,
+            parentProduct: p,
+            isVariantCard: true,
+          });
+        }
+      });
+    }
+
+    // 3. Process from colors
+    if (colors.length > 0) {
+      colors.forEach((c: any) => {
+        if (!c) return;
+        const rawColor = typeof c === "string" ? c : (c.colorName || c.name || c.color || "Standard");
+        const pureColor = rawColor.split("/")[0].trim() || rawColor;
+        const colorKey = pureColor.toLowerCase();
+
+        if (!variantCardsMap.has(colorKey)) {
+          const cMain = extractUrl(c.displayImage) || extractUrl(c.mainImage) || extractUrl(c.image) || (Array.isArray(c.galleryImages) ? extractUrl(c.galleryImages[0]) : "") || extractUrl(p.image) || "/images/category/Latkan.webp";
+          const cGallery: string[] = [cMain];
+          if (Array.isArray(c.galleryImages)) c.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !cGallery.includes(u)) cGallery.push(u); });
+
+          variantCardsMap.set(colorKey, {
+            id: `${pId}-${pureColor.replace(/\s+/g, "-")}`,
+            productId: pId,
+            name: `${baseTitle} - ${pureColor}`,
+            baseTitle,
+            variantColor: pureColor,
+            variantColorHex: c.colorHex || getColorHex(pureColor),
+            variantSize: (c.sizes && c.sizes[0]) || "Free Size",
+            price: Number(p.price) || 799,
+            originalPrice: Number(p.originalPrice) || Math.round(Number(p.price) * 1.5),
+            image: cMain,
+            images: cGallery,
+            galleryImages: cGallery,
+            hoverImage: cGallery[1] || cMain,
+            stock: Number(p.stock) || 25,
+            rating: pRating,
+            salesCount: pSales,
+            sku: `${p.sku || "AOC"}-${pureColor}`,
+            slug: pSlug,
+            category: pCategory,
+            categories: p.categories,
+            subcategory: pSubcategory,
+            labels: p.labels,
+            attributes: p.attributes,
+            customAttributes: prodAny.customAttributes,
+            specifications: prodAny.specifications,
+            productOptions: prodAny.productOptions,
+            shortDescription: getDynamicVariantShortDesc(p.shortDescription, pureColor),
+            fullDescription: p.fullDescription,
+            createdAt: prodAny.createdAt,
+            linkUrl: `/product/${pSlug}?color=${encodeURIComponent(pureColor)}`,
+            parentProduct: p,
+            isVariantCard: true,
+          });
+        }
+      });
+    }
+
+    if (variantCardsMap.size > 0) {
+      return Array.from(variantCardsMap.values());
+    }
+  }
+
+  // Fallback: Simple Product (single card)
+  const defaultImg = extractUrl(p.image) || extractUrl(prodAny.mainImage) || (Array.isArray(p.images) ? extractUrl(p.images[0]) : "") || "/images/category/Latkan.webp";
+  const defaultGals: string[] = [defaultImg];
+  if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !defaultGals.includes(u)) defaultGals.push(u); });
+  if (Array.isArray(prodAny.galleryImages)) prodAny.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !defaultGals.includes(u)) defaultGals.push(u); });
+
+  return [
+    {
+      id: pId,
+      productId: pId,
+      name: baseTitle,
+      baseTitle,
+      variantColor: prodAny.colorName || "Standard",
+      variantColorHex: "#232323",
+      variantSize: "Free Size",
+      price: Number(p.price) || 799,
+      originalPrice: Number(p.originalPrice) || Math.round(Number(p.price) * 1.5),
+      image: defaultImg,
+      images: defaultGals,
+      galleryImages: defaultGals,
+      hoverImage: defaultGals[1] || defaultImg,
+      stock: (p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock))) ? Number(p.stock) : 25,
+      rating: pRating,
+      salesCount: pSales,
+      sku: p.sku || `AOC-${pId}`,
+      slug: pSlug,
+      category: pCategory,
+      categories: p.categories,
+      subcategory: pSubcategory,
+      labels: p.labels,
+      attributes: p.attributes,
+      customAttributes: prodAny.customAttributes,
+      specifications: prodAny.specifications,
+      productOptions: prodAny.productOptions,
+      shortDescription: p.shortDescription,
+      fullDescription: p.fullDescription,
+      createdAt: prodAny.createdAt,
+      linkUrl: `/product/${pSlug}`,
+      parentProduct: p,
+      isVariantCard: false,
+    }
+  ];
+};
+
 export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { categorySlug } = useParams<{ categorySlug?: string }>();
@@ -68,16 +470,27 @@ export default function ShopPage() {
     };
   }, []);
 
-  // Top header categories derived dynamically from Admin
-  const dynamicShopCategories = useMemo(() => {
-    return liveCategoriesList.map((c) => ({
-      id: c.name,
-      name: c.name,
-      count: c.count || `${c.productCount || 0} items`,
-      img: c.image || "/images/category/Latkan.webp",
-    }));
-  }, [liveCategoriesList]);
+  // Products State
+  const [products, setProducts] = useState<ClientShopProduct[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // Explode products into variant display items for Shop Page
+  const allShopItems = useMemo(() => {
+    return products.flatMap(explodeProductToShopItems);
+  }, [products]);
+
+  // Top header categories derived dynamically from Admin with live item counts
+  const dynamicShopCategories = useMemo(() => {
+    return liveCategoriesList.map((c) => {
+      const realCount = allShopItems.filter((item) => matchProductCategory(item.parentProduct, c.name)).length;
+      return {
+        id: c.name,
+        name: c.name,
+        count: `${realCount} items`,
+        img: c.image || "/images/category/Latkan.webp",
+      };
+    });
+  }, [liveCategoriesList, allShopItems]);
 
   const handleProductClick = (e: React.MouseEvent, productId: string | number) => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -85,10 +498,6 @@ export default function ShopPage() {
       openQuickView(productId);
     }
   };
-
-  // Products State
-  const [products, setProducts] = useState<ClientShopProduct[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Layout View Mode (grid vs list)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -98,12 +507,16 @@ export default function ShopPage() {
   const initialSubCategory = searchParams.get("sub") || null;
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(initialSubCategory);
-  const [maxPrice, setMaxPrice] = useState<number>(3000);
+  const [minPrice, setMinPrice] = useState<number>(399);
+  const [maxPrice, setMaxPrice] = useState<number>(2000);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedAttributes, setSelectedAttributes] = useState<{ [attrName: string]: string[] }>({});
   const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  const PRICE_MIN = 399;
+  const PRICE_MAX = 2000;
 
   // Sort & Pagination
   const [sort, setSort] = useState("default");
@@ -249,12 +662,14 @@ export default function ShopPage() {
     setSelectedColors((prev) =>
       prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]
     );
+    setCurrentPage(1);
   };
 
   const toggleSize = (size: string) => {
     setSelectedSizes((prev) =>
       prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
     );
+    setCurrentPage(1);
   };
 
   const toggleAttributeValue = (attrName: string, val: string) => {
@@ -265,17 +680,21 @@ export default function ShopPage() {
         : [...current, val];
       return { ...prev, [attrName]: updated };
     });
+    setCurrentPage(1);
   };
 
   const toggleRating = (rating: number) => {
     setSelectedRatings((prev) =>
       prev.includes(rating) ? prev.filter((r) => r !== rating) : [...prev, rating]
     );
+    setCurrentPage(1);
   };
 
   const resetFilters = () => {
     setSelectedCategory(null);
-    setMaxPrice(3000);
+    setSelectedSubCategory(null);
+    setMinPrice(399);
+    setMaxPrice(2000);
     setSelectedColors([]);
     setSelectedSizes([]);
     setSelectedAttributes({});
@@ -286,80 +705,20 @@ export default function ShopPage() {
     setSearchParams({});
   };
 
-  // Comprehensive category & subcategory matching helper
-  const matchProductCategory = (prod: any, targetCategory: string): boolean => {
-    if (!targetCategory || targetCategory.toLowerCase() === "all") return true;
-
-    const clean = (s?: string) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
-    const target = clean(targetCategory);
-    const targetStem = target.endsWith("s") && target.length > 3 ? target.slice(0, -1) : target;
-
-    const cat = clean(prod.category);
-    const subcat = clean(prod.subcategory);
-    const name = clean(prod.name);
-    const desc = clean(prod.shortDescription || prod.subtitle || "");
-    const categoriesList = Array.isArray(prod.categories) ? prod.categories.map(clean) : [];
-
-    // 1. Direct or stem equality
-    if (cat === target || cat === targetStem || subcat === target || subcat === targetStem) return true;
-    if (categoriesList.includes(target) || categoriesList.includes(targetStem)) return true;
-
-    // 2. Substring matching
-    if (cat.includes(targetStem) || subcat.includes(targetStem) || target.includes(cat) || targetStem.includes(cat)) return true;
-    if (name.includes(targetStem) || desc.includes(targetStem)) return true;
-
-    // 3. Domain-specific semantic mappings
-    if (targetStem.includes("latkan") || targetStem.includes("tassel")) {
-      return cat.includes("latkan") || cat.includes("tassel") || subcat.includes("latkan") || subcat.includes("tassel") || name.includes("latkan") || name.includes("tassel");
-    }
-    if (targetStem.includes("choli") || targetStem.includes("navratri")) {
-      return cat.includes("choli") || subcat.includes("choli") || name.includes("choli");
-    }
-    if (targetStem.includes("earring") || targetStem.includes("jhumka")) {
-      return cat.includes("earring") || cat.includes("jhumka") || subcat.includes("earring") || name.includes("earring") || name.includes("jhumka");
-    }
-    if (targetStem.includes("necklace") || targetStem.includes("haar") || targetStem.includes("mala")) {
-      return cat.includes("necklace") || subcat.includes("necklace") || name.includes("necklace");
-    }
-    if (targetStem.includes("gift") || targetStem.includes("hamper") || targetStem.includes("keychain")) {
-      return cat.includes("gift") || cat.includes("hamper") || cat.includes("keychain") || subcat.includes("gift") || subcat.includes("hamper") || subcat.includes("keychain") || name.includes("gift") || name.includes("hamper") || name.includes("keychain");
-    }
-    if (targetStem.includes("hair") || targetStem.includes("bow") || targetStem.includes("clip") || targetStem.includes("band")) {
-      return cat.includes("hair") || subcat.includes("hair") || cat.includes("bow") || cat.includes("clip") || name.includes("hair") || name.includes("bow") || name.includes("clip");
-    }
-    if (targetStem.includes("krishna") || targetStem.includes("poshak") || targetStem.includes("outfit")) {
-      return cat.includes("krishna") || subcat.includes("krishna") || name.includes("krishna") || name.includes("poshak");
-    }
-    if (targetStem.includes("belt") || targetStem.includes("kandora") || targetStem.includes("kamarbandh")) {
-      return cat.includes("belt") || subcat.includes("belt") || name.includes("belt") || name.includes("kamarbandh") || name.includes("kandora");
-    }
-    if (targetStem.includes("watch")) {
-      return cat.includes("watch") || subcat.includes("watch") || name.includes("watch");
-    }
-    if (targetStem.includes("bracelet") || targetStem.includes("anklet") || targetStem.includes("payal")) {
-      return cat.includes("bracelet") || cat.includes("anklet") || cat.includes("payal") || subcat.includes("bracelet") || subcat.includes("anklet") || name.includes("bracelet") || name.includes("anklet");
-    }
-    if (targetStem.includes("jewel") || targetStem.includes("ornament")) {
-      return cat.includes("necklace") || cat.includes("earring") || cat.includes("bracelet") || cat.includes("anklet") || cat.includes("ring") || name.includes("jewel");
-    }
-
-    return false;
-  };
-
-  // Filtered & Sorted Products
+  // Filtered & Sorted Display Items (including all variant cards)
   const filteredProducts = useMemo(() => {
-    let list = [...products];
+    let list = [...allShopItems];
 
-    // Category Filter (if category selected, show only related; if no category or all, show all products)
+    // Category Filter
     if (selectedCategory && selectedCategory.toLowerCase() !== "all") {
       if (selectedCategory === "newArrival") {
-        list = list.filter((p) => p.labels?.newArrival);
+        list = list.filter((item) => item.labels?.newArrival || item.parentProduct?.labels?.newArrival);
       } else if (selectedCategory === "bestSeller") {
-        list = list.filter((p) => p.labels?.bestSeller);
+        list = list.filter((item) => item.labels?.bestSeller || item.parentProduct?.labels?.bestSeller);
       } else if (selectedCategory === "sale") {
-        list = list.filter((p) => p.labels?.sale);
+        list = list.filter((item) => item.labels?.sale || item.parentProduct?.labels?.sale);
       } else {
-        list = list.filter((p) => matchProductCategory(p, selectedCategory));
+        list = list.filter((item) => matchProductCategory(item.parentProduct, selectedCategory));
       }
     }
 
@@ -367,51 +726,80 @@ export default function ShopPage() {
     if (selectedSubCategory) {
       const cleanSub = (s?: string) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
       const targetSub = cleanSub(selectedSubCategory);
-      list = list.filter((p: any) => {
-        const pSub = cleanSub(p.subcategory || (p as any).subCategory);
-        const pName = cleanSub(p.name);
+      list = list.filter((item: any) => {
+        const pSub = cleanSub(item.subcategory || item.parentProduct?.subcategory || item.parentProduct?.subCategory);
+        const pName = cleanSub(item.name);
         return pSub.includes(targetSub) || targetSub.includes(pSub) || pName.includes(targetSub);
       });
     }
 
-    // Max Price
-    list = list.filter((p) => p.price <= maxPrice);
-
-    // Color Filter
+    // Dual Slider Price Filter (₹399 to ₹2,000+)
+    list = list.filter((item) => {
+      if (maxPrice >= 2000) {
+        return item.price >= minPrice;
+      }
+      return item.price >= minPrice && item.price <= maxPrice;
+    });    // Color Filter (Strict card-level matching)
     if (selectedColors.length > 0) {
-      list = list.filter((p: any) =>
+      list = list.filter((item: any) =>
         selectedColors.some((c) => {
           const cleanC = c.toLowerCase().trim();
-          const hasVarColor = (p.variations || []).some((v: any) =>
-            (v.colorName || (v as any).color || "").toLowerCase().includes(cleanC) ||
-            cleanC.includes((v.colorName || (v as any).color || "").toLowerCase())
-          );
-          const hasColorObj = (p.colors || []).some((col: any) =>
-            (typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().includes(cleanC)
-          );
-          const hasAttrColor = p.attributes?.some(
-            (a: any) => a.name.toLowerCase() === "color" &&
-              a.values.some((v: string) => v.toLowerCase().includes(cleanC))
-          );
-          const inNameOrDesc = (p.name || "").toLowerCase().includes(cleanC) || (p.shortDescription || "").toLowerCase().includes(cleanC);
-          return hasVarColor || hasColorObj || hasAttrColor || inNameOrDesc;
+          const itemColor = (item.variantColor || "").toLowerCase().trim();
+
+          if (itemColor && (itemColor === cleanC || itemColor.includes(cleanC) || cleanC.includes(itemColor))) {
+            return true;
+          }
+
+          if (!item.isVariantCard) {
+            const p = item.parentProduct || {};
+            const hasColorObj = (p.colors || []).some((col: any) => {
+              const colRaw = (typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().trim();
+              const colParts = colRaw.split("/").map((s: string) => s.trim());
+              return colParts[0] === cleanC || colParts.includes(cleanC) || colRaw === cleanC;
+            });
+            const hasAttrColor = (p.attributes || p.productOptions || []).some(
+              (a: any) =>
+                (a.name || "").toLowerCase().includes("color") &&
+                (a.values || []).some((v: string) => v.toLowerCase().trim() === cleanC)
+            );
+            return hasColorObj || hasAttrColor;
+          }
+
+          return false;
         })
       );
     }
 
-    // Size Filter
+    // Size Filter (Strict card-level matching)
     if (selectedSizes.length > 0) {
-      list = list.filter((p: any) =>
+      list = list.filter((item: any) =>
         selectedSizes.some((s) => {
           const cleanS = s.toLowerCase().trim();
-          const hasAvailSize = (p.availableSizes || []).some((sz: string) => sz.toLowerCase().trim() === cleanS || cleanS.includes(sz.toLowerCase().trim()));
-          const hasVarSize = (p.variations || []).some((v: any) => (v.size || v.sizeName || "").toLowerCase().trim() === cleanS || cleanS.includes((v.size || v.sizeName || "").toLowerCase().trim()));
-          const hasSizesArr = (p.sizes || []).some((sz: string) => sz.toLowerCase().trim() === cleanS || cleanS.includes(sz.toLowerCase().trim()));
-          const hasAttrSize = p.attributes?.some(
-            (a: any) => a.name.toLowerCase() === "size" &&
-              a.values.some((v: string) => v.toLowerCase().includes(cleanS))
-          );
-          return hasAvailSize || hasVarSize || hasSizesArr || hasAttrSize;
+          const itemSize = (item.variantSize || "").toLowerCase().trim();
+
+          if (itemSize && (itemSize === cleanS || itemSize.includes(cleanS) || cleanS.includes(itemSize))) {
+            return true;
+          }
+
+          if (!item.isVariantCard) {
+            const p = item.parentProduct || {};
+            const hasAvailSize = (p.availableSizes || []).some(
+              (sz: string) => sz.toLowerCase().trim() === cleanS
+            );
+            const hasVarSize = (p.variations || []).some((v: any) => {
+              const sVal = (v.size || v.sizeName || "").toLowerCase().trim();
+              const parts = (v.colorName || "").toLowerCase().split("/").map((x: string) => x.trim());
+              return sVal === cleanS || (parts.length > 1 && parts[1] === cleanS);
+            });
+            const hasAttrSize = (p.attributes || p.productOptions || []).some(
+              (a: any) =>
+                (a.name || "").toLowerCase().includes("size") &&
+                (a.values || []).some((v: string) => v.toLowerCase().trim() === cleanS)
+            );
+            return hasAvailSize || hasVarSize || hasAttrSize;
+          }
+
+          return false;
         })
       );
     }
@@ -420,7 +808,8 @@ export default function ShopPage() {
     Object.entries(selectedAttributes).forEach(([attrName, selectedVals]) => {
       if (selectedVals.length > 0) {
         const cleanAttrName = attrName.toLowerCase();
-        list = list.filter((p: any) => {
+        list = list.filter((item: any) => {
+          const p = item.parentProduct || {};
           const pAttrs = p.attributes || [];
           const pCustomAttrs = p.customAttributes || [];
           const pSpecs = p.specifications || [];
@@ -444,7 +833,7 @@ export default function ShopPage() {
               (o.name || "").toLowerCase().includes(cleanAttrName) &&
               (o.values || []).some((v: string) => v.toLowerCase().includes(cleanVal))
             );
-            const inDesc = (p.shortDescription || p.fullDescription || p.name || "").toLowerCase().includes(cleanVal);
+            const inDesc = (item.shortDescription || item.fullDescription || item.name || "").toLowerCase().includes(cleanVal);
 
             return inAttrs || inCustom || inSpecs || inOpts || inDesc;
           });
@@ -454,8 +843,8 @@ export default function ShopPage() {
 
     // Rating Filter
     if (selectedRatings.length > 0) {
-      list = list.filter((p) => {
-        const prodRating = Math.floor(p.rating !== undefined && p.rating !== null ? p.rating : 4.8);
+      list = list.filter((item) => {
+        const prodRating = Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8);
         return selectedRatings.some((r) => prodRating >= r);
       });
     }
@@ -464,11 +853,13 @@ export default function ShopPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
-          p.brand?.toLowerCase().includes(q)
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          item.baseTitle.toLowerCase().includes(q) ||
+          item.sku.toLowerCase().includes(q) ||
+          item.category.toLowerCase().includes(q) ||
+          item.variantColor?.toLowerCase().includes(q) ||
+          item.parentProduct?.brand?.toLowerCase().includes(q)
       );
     }
 
@@ -485,9 +876,10 @@ export default function ShopPage() {
 
     return list;
   }, [
-    products,
+    allShopItems,
     selectedCategory,
     selectedSubCategory,
+    minPrice,
     maxPrice,
     selectedColors,
     selectedSizes,
@@ -503,6 +895,105 @@ export default function ShopPage() {
     currentPage * showPerPage
   );
   const totalPages = Math.ceil(totalResults / showPerPage);
+
+  // Live Category Real Counts
+  const categoryRealCounts = useMemo(() => {
+    const map: { [catKey: string]: number } = {};
+    (filterConfig?.categories || []).forEach((cat: any) => {
+      const catKey = cat.key || cat.id || cat.name;
+      map[catKey] = allShopItems.filter((item) => matchProductCategory(item.parentProduct, catKey)).length;
+    });
+    return map;
+  }, [filterConfig?.categories, allShopItems]);
+
+  // Live Rating Real Counts
+  const ratingCounts = useMemo(() => {
+    const c5 = allShopItems.filter((item) => Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8) >= 5).length;
+    const c4 = allShopItems.filter((item) => Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8) === 4).length;
+    const c3 = allShopItems.filter((item) => Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8) === 3).length;
+    return [
+      { stars: 5, count: c5 },
+      { stars: 4, count: c4 },
+      { stars: 3, count: c3 },
+    ];
+  }, [allShopItems]);
+
+  // Live Dynamic Colors extracted from current shop products & variants with accurate counts
+  const availableDynamicColors = useMemo(() => {
+    const colorMap = new Map<string, { name: string; hex: string }>();
+
+    // 1. Populate from active shop items
+    allShopItems.forEach((item: any) => {
+      const pureColor = (item.variantColor || "").trim();
+      if (pureColor && !["standard", "default", "none", "free size"].includes(pureColor.toLowerCase())) {
+        const key = pureColor.toLowerCase();
+        if (!colorMap.has(key)) {
+          colorMap.set(key, {
+            name: pureColor,
+            hex: item.variantColorHex || getColorHex(pureColor),
+          });
+        }
+      }
+
+      const p = item.parentProduct;
+      if (p && Array.isArray(p.colors)) {
+        p.colors.forEach((col: any) => {
+          const colName = (typeof col === "string" ? col : col.colorName || col.name || col.color || "").trim();
+          if (colName && !["standard", "default", "none"].includes(colName.toLowerCase())) {
+            const key = colName.toLowerCase();
+            if (!colorMap.has(key)) {
+              colorMap.set(key, {
+                name: colName,
+                hex: (typeof col === "object" ? col.colorHex : null) || getColorHex(colName),
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // 2. Also populate from filterConfig colors if present
+    if (Array.isArray(filterConfig?.colors)) {
+      filterConfig.colors.forEach((c: any) => {
+        const colName = (typeof c === "string" ? c : c.name || "").trim();
+        if (colName && !["standard", "default", "none"].includes(colName.toLowerCase())) {
+          const key = colName.toLowerCase();
+          if (!colorMap.has(key)) {
+            colorMap.set(key, {
+              name: colName,
+              hex: (typeof c === "object" ? c.hex : null) || getColorHex(colName),
+            });
+          }
+        }
+      });
+    }
+
+    // 3. Compute exact product/variant count for each distinct color
+    const result: Array<{ name: string; hex: string; count: number }> = [];
+    colorMap.forEach((val) => {
+      const cleanC = val.name.toLowerCase().trim();
+      const countForColor = allShopItems.filter((item: any) => {
+        const itemColor = (item.variantColor || "").toLowerCase().trim();
+        const p = item.parentProduct || {};
+        if (itemColor && (itemColor === cleanC || itemColor.includes(cleanC) || cleanC.includes(itemColor))) return true;
+        const hasCol = (p.colors || []).some((col: any) => {
+          const colRaw = (typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().trim();
+          return colRaw === cleanC || colRaw.includes(cleanC);
+        });
+        return hasCol;
+      }).length;
+
+      if (countForColor > 0) {
+        result.push({
+          name: val.name,
+          hex: val.hex,
+          count: countForColor,
+        });
+      }
+    });
+
+    return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [allShopItems, filterConfig?.colors]);
 
   // Sidebar Filter Component (matching Hervia Tea collapsible accordion design)
   const FilterSidebar = (
@@ -540,7 +1031,7 @@ export default function ShopPage() {
               >
                 <span>All Products</span>
                 <span className="text-zinc-400 font-normal text-[10px]">
-                  ({products.length})
+                  ({allShopItems.length})
                 </span>
               </button>
             </li>
@@ -553,6 +1044,9 @@ export default function ShopPage() {
                 ? rawName.toLowerCase().split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
                 : rawName;
               const isActive = selectedCategory === catKey;
+              const realCount = categoryRealCounts[catKey] !== undefined
+                ? categoryRealCounts[catKey]
+                : allShopItems.filter((item) => matchProductCategory(item.parentProduct, catKey)).length;
               return (
                 <li key={catKey}>
                   <button
@@ -566,11 +1060,9 @@ export default function ShopPage() {
                       }`}
                   >
                     <span>{catName}</span>
-                    {cat.count !== undefined && (
-                      <span className="text-zinc-400 font-normal text-[10px]">
-                        ({cat.count})
-                      </span>
-                    )}
+                    <span className="text-zinc-400 font-normal text-[10px]">
+                      ({realCount})
+                    </span>
                   </button>
                 </li>
               );
@@ -579,14 +1071,14 @@ export default function ShopPage() {
         )}
       </div>
 
-      {/* 2. Filter By Price */}
-      <div className="border-b border-zinc-200 pb-2">
+      {/* 2. Price Dual Slider (Matching Screenshot exactly: ₹399 to ₹2,000+) */}
+      <div className="border-b border-zinc-200 pb-5">
         <button
           type="button"
           onClick={() => toggleSection("price")}
-          className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-[#1c1c1e] mb-3 cursor-pointer"
+          className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-[#1c1c1e] mb-2 cursor-pointer"
         >
-          <span>Filter By Price</span>
+          <span>Price</span>
           {openSections.price ? (
             <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
           ) : (
@@ -594,21 +1086,75 @@ export default function ShopPage() {
           )}
         </button>
         {openSections.price && (
-          <div className="space-y-3">
-            <input
-              type="range"
-              min="200"
-              max={filterConfig?.maxPrice || 3000}
-              step="100"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#520618]"
-            />
-            <div className="flex items-center justify-between text-xs font-medium text-zinc-700">
-              <span>
-                Price: <strong className="text-zinc-900">₹200 — ₹{maxPrice}</strong>
-              </span>
+          <div className="space-y-4 pt-1">
+            {/* Price Label (e.g. ₹399 – ₹2,000+) */}
+            <div className="text-sm font-bold text-zinc-900 tracking-tight">
+              ₹{minPrice.toLocaleString("en-IN")} – ₹{maxPrice >= 2000 ? "2,000+" : maxPrice.toLocaleString("en-IN")}
             </div>
+
+            {/* Dual Slider Track & Circle Thumbs */}
+            <div className="relative flex items-center select-none py-3 w-full">
+              {/* Background Gray Track */}
+              <div className="w-full h-1.5 bg-zinc-200 rounded-full" />
+
+              {/* Active Black Highlight Track */}
+              <div
+                className="absolute h-1.5 bg-neutral-900 rounded-full transition-all duration-75"
+                style={{
+                  left: `${((Math.max(PRICE_MIN, minPrice) - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100}%`,
+                  width: `${((Math.min(PRICE_MAX, maxPrice) - Math.max(PRICE_MIN, minPrice)) / (PRICE_MAX - PRICE_MIN)) * 100}%`,
+                }}
+              />
+
+              {/* Left Thumb (Min Slider) */}
+              <input
+                type="range"
+                min={PRICE_MIN}
+                max={PRICE_MAX}
+                step={20}
+                value={minPrice}
+                onChange={(e) => {
+                  const val = Math.min(Number(e.target.value), maxPrice - 40);
+                  setMinPrice(val);
+                }}
+                className="dual-range-input"
+                style={{ zIndex: minPrice > 1600 ? 25 : 15 }}
+              />
+
+              {/* Right Thumb (Max Slider) */}
+              <input
+                type="range"
+                min={PRICE_MIN}
+                max={PRICE_MAX}
+                step={20}
+                value={maxPrice}
+                onChange={(e) => {
+                  const val = Math.max(Number(e.target.value), minPrice + 40);
+                  setMaxPrice(val);
+                }}
+                className="dual-range-input"
+                style={{ zIndex: 20 }}
+              />
+            </div>
+
+            {/* Quick Reset if modified */}
+            {(minPrice > PRICE_MIN || maxPrice < PRICE_MAX) && (
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-zinc-400 font-medium">
+                  {filteredProducts.length} items found
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMinPrice(PRICE_MIN);
+                    setMaxPrice(PRICE_MAX);
+                  }}
+                  className="text-[11px] text-neutral-900 font-bold hover:underline cursor-pointer"
+                >
+                  Reset Price
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -628,32 +1174,38 @@ export default function ShopPage() {
           )}
         </button>
         {openSections.color && (
-          <ul className="space-y-2 text-xs font-semibold text-zinc-600 font-semibold tracking-wide">
-            {(filterConfig?.colors || []).map((c: any) => {
-              const colorName = typeof c === "string" ? c : c.name;
-              const colorHex = typeof c === "object" ? c.hex : null;
-              const checked = selectedColors.includes(colorName);
-              return (
-                <li key={colorName} className="flex items-center gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    id={`color-${colorName}`}
-                    checked={checked}
-                    onChange={() => toggleColor(colorName)}
-                    className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
-                  />
-                  <label htmlFor={`color-${colorName}`} className="cursor-pointer select-none flex items-center gap-2">
-                    {colorHex && (
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border border-zinc-300 shadow-2xs inline-block"
-                        style={{ backgroundColor: colorHex }}
+          <ul className="space-y-2 text-xs font-semibold text-zinc-600 tracking-wide">
+            {availableDynamicColors.length === 0 ? (
+              <li className="text-[11px] text-zinc-400 py-1">No colors available</li>
+            ) : (
+              availableDynamicColors.map((col) => {
+                const colorName = col.name;
+                const colorHex = col.hex;
+                const checked = selectedColors.includes(colorName);
+
+                return (
+                  <li key={colorName} className="flex items-center justify-between cursor-pointer">
+                    <label htmlFor={`color-${colorName}`} className="cursor-pointer select-none flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`color-${colorName}`}
+                        checked={checked}
+                        onChange={() => toggleColor(colorName)}
+                        className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
                       />
-                    )}
-                    <span>{colorName}</span>
-                  </label>
-                </li>
-              );
-            })}
+                      {colorHex && (
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-zinc-300 shadow-2xs inline-block shrink-0"
+                          style={{ backgroundColor: colorHex }}
+                        />
+                      )}
+                      <span>{colorName}</span>
+                    </label>
+                    <span className="text-zinc-400 font-normal text-[10px]">({col.count})</span>
+                  </li>
+                );
+              })
+            )}
           </ul>
         )}
       </div>
@@ -698,8 +1250,8 @@ export default function ShopPage() {
       {/* 5. Dynamic Custom Attributes Filters (Material, Craft Technique, Occasion, etc.) */}
       {(filterConfig?.attributes || []).map((attr: any) => {
         const attrKey = `attr_${attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
-        const isOpen = openSections[attrKey] !== undefined ? openSections[attrKey] : true;
-        const currentSelected = selectedAttributes[attr.name] || [];
+        const isSectionOpen = openSections[attrKey] ?? true;
+        const selectedVals = selectedAttributes[attr.name] || [];
 
         return (
           <div key={attr.name} className="border-b border-zinc-200 pb-2">
@@ -709,28 +1261,27 @@ export default function ShopPage() {
               className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-zinc-900 mb-3 cursor-pointer"
             >
               <span>{attr.name}</span>
-              {isOpen ? (
+              {isSectionOpen ? (
                 <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
               ) : (
                 <Plus className="w-6 h-6 stroke-1 text-zinc-800" />
               )}
             </button>
-            {isOpen && (
+            {isSectionOpen && (
               <ul className="space-y-2 text-xs font-semibold text-zinc-600 tracking-wide">
                 {(attr.values || []).map((val: string) => {
-                  const checked = currentSelected.includes(val);
-                  const inputId = `attr-${attr.name}-${val}`;
+                  const checked = selectedVals.includes(val);
                   return (
                     <li key={val} className="flex items-center gap-2.5 cursor-pointer">
                       <input
                         type="checkbox"
-                        id={inputId}
+                        id={`${attrKey}-${val}`}
                         checked={checked}
                         onChange={() => toggleAttributeValue(attr.name, val)}
                         className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
                       />
-                      <label htmlFor={inputId} className="cursor-pointer select-none">
-                        <span>{val}</span>
+                      <label htmlFor={`${attrKey}-${val}`} className="cursor-pointer select-none">
+                        {val}
                       </label>
                     </li>
                   );
@@ -757,11 +1308,7 @@ export default function ShopPage() {
         </button>
         {openSections.rating && (
           <ul className="space-y-2.5 text-xs text-zinc-600">
-            {[
-              { stars: 5, count: 8 },
-              { stars: 4, count: 14 },
-              { stars: 3, count: 2 },
-            ].map(({ stars, count }) => {
+            {ratingCounts.map(({ stars, count }) => {
               const checked = selectedRatings.includes(stars);
               return (
                 <li key={stars} className="flex items-center justify-between cursor-pointer">
@@ -1026,7 +1573,7 @@ export default function ShopPage() {
       </section>
 
       {/* MAIN PRODUCTS & FILTERS CONTENT SECTION */}
-      <main className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 lg:py-12 flex-1">
+      <main className="max-w-[1500px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 lg:py-12 flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8 items-start">
           {/* Desktop Left Sidebar Filter */}
           <aside className="hidden lg:block sticky top-24 pr-2">{FilterSidebar}</aside>
@@ -1063,10 +1610,10 @@ export default function ShopPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {displayedProducts.map((p) => {
                   const mainImg =
-                    p.images?.[0] ||
                     p.image ||
+                    p.images?.[0] ||
                     "https://m.media-amazon.com/images/I/71LtEuQjqXL._SL1500_.jpg";
-                  const wishlisted = isWishlisted(String(p.id));
+                  const wishlisted = isWishlisted(String(p.productId));
                   const discount = p.originalPrice
                     ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
                     : 0;
@@ -1077,7 +1624,11 @@ export default function ShopPage() {
                       className="group bg-white rounded-2xl border border-zinc-200/80 p-2 overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between"
                     >
                       {(() => {
-                        const cartItem = cartItems.find((item) => String(item.productId) === String(p.id));
+                        const cartItem = cartItems.find(
+                          (item) =>
+                            String(item.productId) === String(p.productId) &&
+                            (item.colorName || "").toLowerCase() === (p.variantColor || "standard").toLowerCase()
+                        );
                         const itemQuantity = cartItem ? cartItem.quantity : 0;
 
                         return (
@@ -1085,8 +1636,8 @@ export default function ShopPage() {
                             <div>
                               {/* Image Frame & Badges with Smooth Right-to-Left Auto Slider on Hover */}
                               <Link
-                                to={`/product/${p.id}`}
-                                onClick={(e) => handleProductClick(e, p.id)}
+                                to={p.linkUrl}
+                                onClick={(e) => handleProductClick(e, p.productId)}
                                 className="block cursor-pointer"
                               >
                                 <ProductHoverSlider
@@ -1101,7 +1652,7 @@ export default function ShopPage() {
                                         -{discount}%
                                       </span>
                                     )}
-                                    {p.labels?.bestSeller && (
+                                    {(p.labels?.bestSeller || p.parentProduct?.labels?.bestSeller) && (
                                       <span className="bg-amber-500 text-white text-[9px] font-extrabold font-semibold px-2 py-0.5 rounded-full shadow-xs">
                                         BEST SELLER
                                       </span>
@@ -1114,7 +1665,7 @@ export default function ShopPage() {
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      toggleWishlist(String(p.id));
+                                      toggleWishlist(String(p.productId));
                                     }}
                                     className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${wishlisted
                                       ? "bg-rose-500 text-white"
@@ -1136,17 +1687,29 @@ export default function ShopPage() {
                                   {p.category}
                                 </span>
 
-                                <Link to={`/product/${p.id}`} onClick={(e) => handleProductClick(e, p.id)}>
+                                <Link to={p.linkUrl} onClick={(e) => handleProductClick(e, p.productId)}>
                                   <h3 className="font-semibold text-zinc-900 text-sm line-clamp-1 group-hover:text-[#520618] transition-colors">
-                                    {p.name}
+                                    {p.name || p.baseTitle}
                                   </h3>
                                 </Link>
+
+                                {p.isVariantCard && p.variantColor && (
+                                  <div className="flex items-center gap-1.5 pt-0.5">
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full border border-black/15 shrink-0 inline-block shadow-2xs"
+                                      style={{ backgroundColor: p.variantColorHex || getColorHex(p.variantColor) }}
+                                    />
+                                    <span className="text-[11px] font-semibold text-zinc-600">
+                                      {p.variantColor}
+                                    </span>
+                                  </div>
+                                )}
 
                                 <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
                                   <Star className="w-3.5 h-3.5 fill-current" />
                                   <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
                                   <span className="text-zinc-400 font-normal text-[10px]">
-                                    ({p.salesCount ?? (p as any).reviewCount ?? 0})
+                                    ({p.salesCount ?? p.reviewCount ?? 0})
                                   </span>
                                 </div>
 
@@ -1166,13 +1729,7 @@ export default function ShopPage() {
                             {/* Add to Bag Button / Green Quantity Stepper */}
                             <div className="p-2 pt-0">
                               {itemQuantity > 0 ? (
-                                <div
-                                  className="w-full h-10 bg-black text-white text-sm font-medium px-3 rounded-xl shadow-md flex items-center justify-between"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                  }}
-                                >
+                                <div className="w-full h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-between px-3 shadow-xs">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1188,33 +1745,50 @@ export default function ShopPage() {
                                   <span className="text-xs font-semibold px-2">{itemQuantity}</span>
                                   <button
                                     type="button"
+                                    disabled={p.stock !== undefined && p.stock !== null && itemQuantity >= Number(p.stock)}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      if (cartItem) updateQuantity(cartItem.id, cartItem.quantity + 1);
+                                      const maxS = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 25;
+                                      if (cartItem && itemQuantity < maxS) {
+                                        updateQuantity(cartItem.id, Math.min(maxS, cartItem.quantity + 1));
+                                      }
                                     }}
-                                    className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors font-black text-sm cursor-pointer active:scale-90"
+                                    className={`w-6 h-6 flex items-center justify-center rounded-lg transition-colors font-black text-sm ${
+                                      p.stock !== undefined && itemQuantity >= Number(p.stock)
+                                        ? "text-zinc-500 opacity-40 cursor-not-allowed"
+                                        : "text-white hover:bg-white/20 cursor-pointer active:scale-90"
+                                    }`}
                                     aria-label="Increase quantity"
+                                    title={p.stock !== undefined && itemQuantity >= Number(p.stock) ? `Max ${p.stock} in stock` : "Increase quantity"}
                                   >
                                     <Plus className="w-6 h-6 stroke-1" />
                                   </button>
                                 </div>
+                              ) : (p.stock !== undefined && p.stock <= 0) ? (
+                                <button
+                                  disabled
+                                  className="w-full h-10 bg-zinc-200 text-zinc-500 text-xs font-semibold rounded-xl cursor-not-allowed select-none"
+                                >
+                                  Out of Stock
+                                </button>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() =>
                                     addToCart({
-                                      productId: String(p.id),
+                                      productId: String(p.productId),
                                       productName: p.name,
-                                      brand: p.brand || "AOCIND",
-                                      colorName: "Maroon",
-                                      colorHex: "#800000",
-                                      size: "Free Size",
+                                      brand: p.parentProduct?.brand || "Awesome Handmade",
+                                      colorName: p.variantColor || "Standard",
+                                      colorHex: p.variantColorHex || getColorHex(p.variantColor),
+                                      size: p.variantSize || "Free Size",
                                       price: p.price,
                                       originalPrice: p.originalPrice || p.price,
                                       image: mainImg,
                                       sku: p.sku || "AOC-SKU",
                                       quantity: 1,
+                                      stock: p.stock !== undefined ? Number(p.stock) : 25,
                                     })
                                   }
                                   className="w-full h-10 bg-zinc-900 hover:bg-[#520618] text-white text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
@@ -1236,11 +1810,15 @@ export default function ShopPage() {
               <div className="space-y-4">
                 {displayedProducts.map((p) => {
                   const mainImg =
-                    p.images?.[0] ||
                     p.image ||
+                    p.images?.[0] ||
                     "https://m.media-amazon.com/images/I/71LtEuQjqXL._SL1500_.jpg";
-                  const wishlisted = isWishlisted(String(p.id));
-                  const cartItem = cartItems.find((item) => String(item.productId) === String(p.id));
+                  const wishlisted = isWishlisted(String(p.productId));
+                  const cartItem = cartItems.find(
+                    (item) =>
+                      String(item.productId) === String(p.productId) &&
+                      (item.colorName || "").toLowerCase() === (p.variantColor || "standard").toLowerCase()
+                  );
                   const itemQuantity = cartItem ? cartItem.quantity : 0;
                   const discount = p.originalPrice
                     ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
@@ -1253,8 +1831,8 @@ export default function ShopPage() {
                     >
                       {/* Product Image Frame with Top-Right Heart Icon */}
                       <Link
-                        to={`/product/${p.id}`}
-                        onClick={(e) => handleProductClick(e, p.id)}
+                        to={p.linkUrl}
+                        onClick={(e) => handleProductClick(e, p.productId)}
                         className="w-28 sm:w-40 md:w-44 aspect-[3/3.5] sm:aspect-square bg-zinc-100 rounded-xl overflow-hidden shrink-0 relative block cursor-pointer"
                       >
                         <img
@@ -1278,7 +1856,7 @@ export default function ShopPage() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            toggleWishlist(String(p.id));
+                            toggleWishlist(String(p.productId));
                           }}
                           className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${wishlisted
                             ? "bg-rose-500 text-white"
@@ -1296,17 +1874,29 @@ export default function ShopPage() {
                           {p.category}
                         </span>
 
-                        <Link to={`/product/${p.id}`} onClick={(e) => handleProductClick(e, p.id)}>
+                        <Link to={p.linkUrl} onClick={(e) => handleProductClick(e, p.productId)}>
                           <h3 className="font-semibold text-zinc-900 text-xs sm:text-base line-clamp-1 group-hover:text-[#520618] transition-colors">
-                            {p.name}
+                            {p.name || p.baseTitle}
                           </h3>
                         </Link>
+
+                        {p.isVariantCard && p.variantColor && (
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-black/15 shrink-0 inline-block shadow-2xs"
+                              style={{ backgroundColor: p.variantColorHex || getColorHex(p.variantColor) }}
+                            />
+                            <span className="text-[11px] font-semibold text-zinc-600">
+                              {p.variantColor}
+                            </span>
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-1 text-amber-500 text-[11px] sm:text-xs font-bold">
                           <Star className="w-3.5 h-3.5 fill-current" />
                           <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
                           <span className="text-zinc-400 font-normal text-[10px]">
-                            ({p.salesCount ?? (p as any).reviewCount ?? 0})
+                            ({p.salesCount ?? p.reviewCount ?? 0})
                           </span>
                         </div>
 
@@ -1350,35 +1940,53 @@ export default function ShopPage() {
                               <span className="text-xs font-semibold px-1">{itemQuantity}</span>
                               <button
                                 type="button"
+                                disabled={p.stock !== undefined && p.stock !== null && itemQuantity >= Number(p.stock)}
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  if (cartItem) updateQuantity(cartItem.id, cartItem.quantity + 1);
+                                  const maxS = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 25;
+                                  if (cartItem && itemQuantity < maxS) {
+                                    updateQuantity(cartItem.id, Math.min(maxS, cartItem.quantity + 1));
+                                  }
                                 }}
-                                className="w-5 h-5 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors font-black cursor-pointer active:scale-90"
+                                className={`w-5 h-5 flex items-center justify-center rounded-lg transition-colors font-black ${
+                                  p.stock !== undefined && itemQuantity >= Number(p.stock)
+                                    ? "text-zinc-500 opacity-40 cursor-not-allowed"
+                                    : "text-white hover:bg-white/20 cursor-pointer active:scale-90"
+                                }`}
                                 aria-label="Increase quantity"
+                                title={p.stock !== undefined && itemQuantity >= Number(p.stock) ? `Max ${p.stock} in stock` : "Increase quantity"}
                               >
                                 <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                               </button>
                             </div>
+                          ) : (p.stock !== undefined && p.stock <= 0) ? (
+                            <button
+                              disabled
+                              className="w-[128px] h-[36px] bg-zinc-200 text-zinc-500 text-xs font-semibold rounded-xl cursor-not-allowed select-none shrink-0"
+                            >
+                              Out of Stock
+                            </button>
                           ) : (
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 addToCart({
-                                  productId: String(p.id),
+                                  productId: String(p.productId),
                                   productName: p.name,
-                                  brand: p.brand || "AOCIND",
-                                  colorName: "Maroon",
-                                  colorHex: "#800000",
-                                  size: "Free Size",
+                                  brand: p.parentProduct?.brand || "Awesome Handmade",
+                                  colorName: p.variantColor || "Standard",
+                                  colorHex: p.variantColorHex || getColorHex(p.variantColor),
+                                  size: p.variantSize || "Free Size",
                                   price: p.price,
                                   originalPrice: p.originalPrice || p.price,
                                   image: mainImg,
                                   sku: p.sku || "AOC-SKU",
                                   quantity: 1,
-                                })
-                              }
+                                  stock: p.stock !== undefined ? Number(p.stock) : 25,
+                                });
+                              }}
                               className="w-[128px] h-[36px] bg-zinc-900 hover:bg-[#520618] text-white text-[12px] font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
                             >
                               <ShoppingBag className="w-4 h-4" />

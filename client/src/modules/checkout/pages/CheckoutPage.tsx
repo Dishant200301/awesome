@@ -22,6 +22,7 @@ import { CheckoutTerms } from "../components/CheckoutTerms";
 import { PlaceOrderButton } from "../components/PlaceOrderButton";
 import Footer from "@/modules/core/components/Footer";
 import { AlertCircle, ShoppingBag, ArrowLeft } from "lucide-react";
+import { deductLiveStock } from "@/modules/core/lib/apiStore";
 
 const SAVED_ADDRESSES_KEY = "awesome_saved_addresses_v1";
 
@@ -217,7 +218,7 @@ export const CheckoutPage: React.FC = () => {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const orderId = `AWH-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -270,6 +271,9 @@ export const CheckoutPage: React.FC = () => {
             localStorage.setItem(SAVED_ADDRESSES_KEY, JSON.stringify(nextSaved.slice(0, 5)));
           } catch {}
         }
+
+        // Deduct purchased quantity from live stock in real time
+        await deductLiveStock(cartItems);
 
         // Clear cart & navigate to Order Success page
         clearCart();

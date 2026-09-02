@@ -55,7 +55,7 @@ export const ProductDescriptionSection: React.FC<ProductDescriptionSectionProps>
   reviewCount,
   reviews = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<"description" | "additional_info" | "reviews">("description");
+  const [activeTab, setActiveTab] = useState<"description" | "reviews">("description");
 
   // Reviews State - 100% Dynamic from live customer review store & admin
   const [reviewsList, setReviewsList] = useState<ReviewItem[]>(() => {
@@ -373,23 +373,7 @@ export const ProductDescriptionSection: React.FC<ProductDescriptionSectionProps>
             )}
           </button>
 
-          {/* 2. Additional Information Tab */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("additional_info")}
-            className={`pb-3 text-xs sm:text-sm md:text-base lg:text-lg transition-all cursor-pointer relative font-bold uppercase tracking-wider shrink-0 ${
-              activeTab === "additional_info"
-                ? "text-brand-maroon font-bold"
-                : "text-zinc-400 hover:text-brand-maroon font-medium"
-            }`}
-          >
-            Additional information
-            {activeTab === "additional_info" && (
-              <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-brand-maroon rounded-full" />
-            )}
-          </button>
-
-          {/* 3. Reviews Tab */}
+          {/* 2. Reviews Tab */}
           <button
             type="button"
             onClick={() => setActiveTab("reviews")}
@@ -525,37 +509,7 @@ export const ProductDescriptionSection: React.FC<ProductDescriptionSectionProps>
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 2: ADDITIONAL INFORMATION (Specifications Grid Table) */}
-        {/* ========================================================================= */}
-        {activeTab === "additional_info" && (
-          <div>
-            {specTable.length > 0 ? (
-              <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white shadow-2xs font-sans">
-                <div className="divide-y divide-zinc-200">
-                  {specTable.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-12 text-xs sm:text-sm">
-                      {/* Left Column: Label */}
-                      <div className="col-span-5 sm:col-span-4 p-3.5 sm:p-4 bg-[#fbfbfb] text-zinc-800 font-semibold border-r border-zinc-200 tracking-wide">
-                        {row.key}
-                      </div>
-                      {/* Right Column: Value */}
-                      <div className="col-span-7 sm:col-span-8 p-3.5 sm:p-4 text-zinc-700 font-normal">
-                        {row.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-12 text-zinc-500 text-sm font-sans">
-                No additional specifications available for this product.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* TAB 3: REVIEWS */}
+        {/* TAB 2: REVIEWS */}
         {/* ========================================================================= */}
         {activeTab === "reviews" && (
           <div className="space-y-10 font-sans">

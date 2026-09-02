@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   FiStar,
@@ -163,7 +163,30 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
   const inCartQuantity = exactVariantItem ? exactVariantItem.quantity : 0;
 
 
+  // Determine live available stock for the currently active variation/product
+  const activeStock = React.useMemo(() => {
+    if (activeVariation?.stock !== undefined && activeVariation.stock !== null && !isNaN(Number(activeVariation.stock))) {
+      return Number(activeVariation.stock);
+    }
+    if ((activeVariation as any)?.quantity !== undefined && (activeVariation as any).quantity !== null && !isNaN(Number((activeVariation as any).quantity))) {
+      return Number((activeVariation as any).quantity);
+    }
+    if (product?.stock !== undefined && product.stock !== null && !isNaN(Number(product.stock))) {
+      return Number(product.stock);
+    }
+    return 25;
+  }, [activeVariation, product.stock]);
+
+  // Auto-clamp inCartQuantity if it exceeds activeStock
+  useEffect(() => {
+    if (inCartQuantity > activeStock && activeStock > 0) {
+      updateQuantity(cartItemId, activeStock);
+    }
+  }, [inCartQuantity, activeStock, cartItemId, updateQuantity]);
+
   const handleAddToCart = () => {
+    if (activeStock <= 0) return;
+
     let formattedTitle = product.name;
     if (activeVariation?.colorName && activeVariation.colorName !== "Default" && !formattedTitle.toLowerCase().includes(activeVariation.colorName.toLowerCase())) {
       formattedTitle = `${product.name} - ${activeVariation.colorName}`;
@@ -181,6 +204,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
       image: activeVariation.thumbnail || activeVariation.images[0].url,
       sku: activeVariation.sku,
       quantity: 1,
+      stock: activeStock,
     });
 
     setIsAddedAnimation(true);
@@ -206,10 +230,20 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
         const key = colName.toLowerCase();
         const matchingVar = (product.variations || []).find(
           (v) => v && (v.colorName || (v as any).color || "").toLowerCase() === key
+        ) || (product.variantDetails || []).find(
+          (v: any) => v && (v.optionValue || v.name || "").toLowerCase().includes(key)
         );
 
         const colMainImg = col.displayImage || col.mainImage || (col as any).image || (col.galleryImages && col.galleryImages[0]) || matchingVar?.thumbnail || (product as any).mainImage || (product as any).image || "/images/category/Latkan.webp";
         const colGallery = col.galleryImages || (matchingVar?.images ? matchingVar.images.map((i: any) => typeof i === 'string' ? i : i.url) : []);
+
+        const varStockVal = (matchingVar?.stock !== undefined && matchingVar.stock !== null && !isNaN(Number(matchingVar.stock)))
+          ? Number(matchingVar.stock)
+          : (((matchingVar as any)?.quantity !== undefined && (matchingVar as any).quantity !== null && !isNaN(Number((matchingVar as any).quantity)))
+            ? Number((matchingVar as any).quantity)
+            : (product.stock !== undefined && product.stock !== null && !isNaN(Number(product.stock)))
+              ? Number(product.stock)
+              : 25);
 
         map.set(key, {
           id: matchingVar?.id || col.id || `col-${key}`,
@@ -221,7 +255,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
           originalPrice: matchingVar?.originalPrice || product.originalPrice || 1299,
           discountPercentage: matchingVar?.discountPercentage || 38,
           sku: matchingVar?.sku || product.defaultSku || `AH-${colName}-STD`,
-          stock: matchingVar?.stock !== undefined ? matchingVar.stock : 50,
+          stock: varStockVal,
           images: [
             { id: `img-${key}-main`, url: colMainImg, alt: `${product.name} - ${colName}` },
             ...colGallery.map((gUrl, idx) => ({ id: `img-${key}-gal-${idx}`, url: gUrl, alt: `${product.name} - ${colName} View ${idx + 1}` }))
@@ -320,9 +354,42 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
   const activeColorMedia = ((product as any).colorMediaConfigs || []).find(
     (cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === (activeVariation?.colorName || "").toLowerCase()
   );
-  const displayTitle = activeColorMedia?.title || (activeVariation as any)?.title || product.name;
-  const displaySubtitle = activeColorMedia?.productInfo || (activeVariation as any)?.productInfo || (activeVariation as any)?.subtitle || product.subtitle || product.shortDescription;
-  const rawDescription = displaySubtitle || product.shortDescription || product.fullDescription || product.extendedDetails?.description || "";
+
+  const activeColorName = (activeVariation?.colorName || selectedColor || "").trim();
+  const isNonDefaultColor = Boolean(activeColorName && !["standard", "default", "none"].includes(activeColorName.toLowerCase()));
+
+  // Dynamic Product Title: Appends active color if not already in base title
+  const displayTitle = React.useMemo(() => {
+    if (activeColorMedia?.title) return activeColorMedia.title;
+    if ((activeVariation as any)?.title) return (activeVariation as any).title;
+    const base = product.name || "Handcrafted Product";
+    if (isNonDefaultColor && isVariableProduct && !base.toLowerCase().includes(activeColorName.toLowerCase())) {
+      return `${base} - ${activeColorName}`;
+    }
+    return base;
+  }, [product.name, activeColorName, isNonDefaultColor, isVariableProduct, activeColorMedia, activeVariation]);
+
+  // Dynamic Short Description: Tailored with active color variant
+  const rawDescription = React.useMemo(() => {
+    if (activeColorMedia?.productInfo) return activeColorMedia.productInfo;
+    if ((activeVariation as any)?.productInfo) return (activeVariation as any).productInfo;
+    if ((activeVariation as any)?.shortDescription) return (activeVariation as any).shortDescription;
+
+    const baseShort = (product.shortDescription || product.subtitle || "").trim();
+    if (!baseShort) {
+      if (isNonDefaultColor) {
+        return `Exquisitely handcrafted in a vibrant ${activeColorName} finish, merging traditional artisanal heritage with timeless grace.`;
+      }
+      return product.fullDescription || product.extendedDetails?.description || "";
+    }
+
+    if (isNonDefaultColor && !baseShort.toLowerCase().includes(activeColorName.toLowerCase())) {
+      return `Featured in an elegant ${activeColorName} palette. ${baseShort}`;
+    }
+
+    return baseShort;
+  }, [product.shortDescription, product.subtitle, product.fullDescription, product.extendedDetails?.description, activeColorName, isNonDefaultColor, activeColorMedia, activeVariation]);
+
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   // Dynamic selector label (e.g. SELECT METAL, SELECT COLOR, SELECT VARIANT)
@@ -556,7 +623,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
       {/* 7. ACTION BUTTON & LIVE INVENTORY COUNT */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
         {/* Add To Cart / Quantity Selector */}
-        {activeVariation.stock <= 0 ? (
+        {activeStock <= 0 ? (
           <button
             disabled
             className="w-full sm:w-auto px-8 py-3.5 rounded-md font-semibold text-xs sm:text-sm tracking-wider uppercase bg-zinc-200 text-zinc-500 cursor-not-allowed select-none"
@@ -578,9 +645,19 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
             </span>
             <button
               type="button"
-              onClick={() => updateQuantity(cartItemId, inCartQuantity + 1)}
-              className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded transition-colors cursor-pointer active:scale-90"
+              disabled={inCartQuantity >= activeStock}
+              onClick={() => {
+                if (inCartQuantity < activeStock) {
+                  updateQuantity(cartItemId, Math.min(activeStock, inCartQuantity + 1));
+                }
+              }}
+              className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
+                inCartQuantity >= activeStock
+                  ? "text-zinc-500 opacity-40 cursor-not-allowed"
+                  : "text-white hover:bg-white/20 cursor-pointer active:scale-90"
+              }`}
               aria-label="Increase quantity"
+              title={inCartQuantity >= activeStock ? `Maximum stock reached (${activeStock} pieces)` : "Increase quantity"}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -602,10 +679,16 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
 
         {/* Live Pieces Available Stock Display */}
         <div className="text-xs sm:text-sm text-zinc-600 font-medium">
-          {activeVariation.stock > 0 ? (
-            <span>{activeVariation.stock} pieces available</span>
+          {activeStock > 0 ? (
+            <span>
+              {activeStock <= 5 ? (
+                <span className="text-amber-700 font-bold">Only {activeStock} pieces left in stock!</span>
+              ) : (
+                <span>{activeStock} pieces available</span>
+              )}
+            </span>
           ) : (
-            <span className="text-rose-600 font-semibold">Currently Unavailable</span>
+            <span className="text-rose-600 font-semibold">Currently Unavailable / Out of Stock</span>
           )}
         </div>
       </div>

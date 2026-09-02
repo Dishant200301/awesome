@@ -1,26 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   ChevronLeft,
   UploadCloud,
   X,
   Plus,
   Trash2,
-  Eye,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
   Info,
-  Save,
   Package,
   Layers,
-  Palette,
-  Sliders,
   ChevronDown,
   Search,
   Check,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Sparkles
 } from 'lucide-react';
 import {
   getAdminCategoriesAndSubcategories,
@@ -29,25 +25,18 @@ import {
 import {
   Product,
   ProductOptionItem,
-  ProductVariantDetail,
-  ProductAddonOption
+  ProductVariantDetail
 } from '../types/admin';
 import { AttributeMaster } from '../types/attribute.types';
 import { AttributeService } from '../services/attributeService';
 import { AdminApiService } from '../services/adminApi';
 import { RichTextEditor } from '../components/RichTextEditor';
-import { Button } from '../components/ui/button';
-import { getClosestColorName, findHexByColorName } from '../utils/colorMatcher';
+import { findHexByColorName } from '../utils/colorMatcher';
+import { generateSmartProductContent } from '../utils/productContentGenerator';
 
 interface ProductCreatePageProps {
   onNavigate?: (tab: string, productId?: string) => void;
   editingProductId?: string;
-}
-
-interface SpecItem {
-  id: string;
-  key: string;
-  value: string;
 }
 
 const DEFAULT_COLOR_PALETTES = [
@@ -62,7 +51,14 @@ const DEFAULT_COLOR_PALETTES = [
   { name: 'Black', hex: '#18181B' },
   { name: 'Purple', hex: '#9333EA' },
   { name: 'Orange', hex: '#F97316' },
-  { name: 'Turquoise', hex: '#06B6D4' }
+  { name: 'Green', hex: '#16A34A' }
+];
+
+const STANDARD_ATTRIBUTES = [
+  { name: 'Color', defaultValues: ['Green', 'Black', 'Red', 'Maroon', 'Gold', 'Blue', 'Pink', 'White'] },
+  { name: 'Size', defaultValues: ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'] },
+  { name: 'Material', defaultValues: ['Silk', 'Cotton', 'Velvet', 'Georgette', 'Brass'] },
+  { name: 'Design', defaultValues: ['Traditional', 'Bridal', 'Floral', 'Contemporary', 'Artisan'] }
 ];
 
 export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate, editingProductId }) => {
@@ -85,23 +81,11 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [isDirty, setIsDirty] = useState<boolean>(false);
-  const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
-  const [showFinalPreviewModal, setShowFinalPreviewModal] = useState<boolean>(false);
 
   // Dynamic Categories from Store & Backend
   const [categoriesData, setCategoriesData] = useState(() => getAdminCategoriesAndSubcategories());
   const mainCategories = categoriesData.mainCategories || [];
   const allSubcategories = categoriesData.subcategories || [];
-
-  // Live Color Picker State
-  const [activePickerHex, setActivePickerHex] = useState<string>('#50C878');
-  const [activePickerName, setActivePickerName] = useState<string>('Emerald Green');
-
-  const handleColorPickerChange = (hex: string) => {
-    setActivePickerHex(hex);
-    const closest = getClosestColorName(hex);
-    setActivePickerName(closest.name);
-  };
 
   // Dynamic Master Attributes
   const [masterAttributes, setMasterAttributes] = useState<AttributeMaster[]>([]);
@@ -136,19 +120,22 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     };
   }, []);
 
-  // 1. BASIC DETAILS & CLASSIFICATION (Merged inside Product Details)
-  const [name, setName] = useState<string>('');
-  const [displayName, setDisplayName] = useState<string>('');
-  const [slug, setSlug] = useState<string>('');
-  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState<boolean>(false);
-  const [category, setCategory] = useState<string>(mainCategories[0]?.name || 'Latkan');
-  const [subcategory, setSubcategory] = useState<string>('');
-  const [brand, setBrand] = useState<string>('Awesome Handmade');
-  const [defaultKey, setDefaultKey] = useState<string>('Artisan Special');
-  const [status, setStatus] = useState<'Active' | 'Draft'>('Active');
+  // 1. PRODUCT TYPE (Simple Product vs Variable Product) - Default: Simple
+  const [productType, setProductType] = useState<'Simple' | 'Variable'>('Simple');
 
-  // Available subcategories filtered by selected category
+  // 2. PRODUCT DETAILS
+  const [name, setName] = useState<string>('');
+  const [category, setCategory] = useState<string>('');
+  const [subcategory, setSubcategory] = useState<string>('');
+  const [sku, setSku] = useState<string>('');
+  const [brand, setBrand] = useState<string>('');
+  const [tags, setTags] = useState<string>('');
+  const [slug, setSlug] = useState<string>('');
+  const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
+
+  // Available subcategories filtered strictly by selected category
   const filteredSubcategories = useMemo(() => {
+    if (!category) return [];
     const parentCat = mainCategories.find(
       (c) => c.name.toLowerCase() === category.toLowerCase() || c.id === category
     );
@@ -162,127 +149,159 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     );
   }, [category, mainCategories, allSubcategories]);
 
-  // Set subcategory default when category changes
+  // Set initial category if none chosen
   useEffect(() => {
-    if (filteredSubcategories.length > 0 && !filteredSubcategories.some((s) => s.name === subcategory)) {
-      setSubcategory(filteredSubcategories[0].name);
+    if (!category && mainCategories.length > 0 && !isEditMode) {
+      setCategory(mainCategories[0].name);
     }
-  }, [filteredSubcategories, category]);
+  }, [mainCategories, category, isEditMode]);
 
-  // 2. PRODUCT TYPE (Simple vs Variable)
-  const [productType, setProductType] = useState<'Simple' | 'Variable'>('Simple');
+  // Handle Category Change & update Subcategory
+  const handleCategoryChange = (newCat: string) => {
+    setCategory(newCat);
+    setIsDirty(true);
+    const parentCat = mainCategories.find(
+      (c) => c.name.toLowerCase() === newCat.toLowerCase() || c.id === newCat
+    );
+    const validSubs = parentCat
+      ? allSubcategories.filter(
+          (s) =>
+            s.categoryId === parentCat.id ||
+            s.parentId === parentCat.id ||
+            (s.categoryName && s.categoryName.toLowerCase() === parentCat.name.toLowerCase()) ||
+            (s.parentName && s.parentName.toLowerCase() === parentCat.name.toLowerCase())
+        )
+      : [];
+
+    if (validSubs.length > 0) {
+      setSubcategory(validSubs[0].name);
+    } else {
+      setSubcategory('');
+    }
+  };
 
   // 3. PRICING & INVENTORY (For Simple Product)
-  const [regularPrice, setRegularPrice] = useState<number>(1299);
-  const [salePrice, setSalePrice] = useState<number>(799);
-  const [sku, setSku] = useState<string>('AH-PROD-001');
-  const [stock, setStock] = useState<number>(50);
+  const [sellingPrice, setSellingPrice] = useState<string>('799');
+  const [regularPrice, setRegularPrice] = useState<string>('999');
+  const [stock, setStock] = useState<string>('25');
 
-  // 4. MEDIA (For Simple Product)
-  const [mainImage, setMainImage] = useState<string>('/images/category/Latkan.webp');
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [isMainDragOver, setIsMainDragOver] = useState(false);
-  const [isGalleryDragOver, setIsGalleryDragOver] = useState(false);
-
-  // Drag over states for variants
-  const [activeVarDragMain, setActiveVarDragMain] = useState<number | null>(null);
-  const [activeVarDragGal, setActiveVarDragGal] = useState<number | null>(null);
-
-  // Focus target for paste
-  const [activePasteTarget, setActivePasteTarget] = useState<
-    'root_main' | 'root_gallery' | { type: 'var_main' | 'var_gallery'; index: number }
-  >('root_main');
+  // 4. PRODUCT IMAGES (Main + Gallery)
+  const [images, setImages] = useState<string[]>([
+    '/images/category/Latkan.webp'
+  ]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   // 5. DESCRIPTIONS
   const [shortDescription, setShortDescription] = useState<string>('');
-  const [longDescription, setLongDescription] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
 
-  // 6. ADDITIONAL INFORMATION / SPECIFICATIONS (Dynamic Key-Value Pairs)
-  const [specifications, setSpecifications] = useState<SpecItem[]>([
-    { id: 'spec-1', key: 'Primary Material', value: 'Silk & Zari, Pure Cotton' },
-    { id: 'spec-2', key: 'Craft Technique', value: 'Handmade Mirror Work & Knotting' },
-    { id: 'spec-3', key: 'Origin / Made In', value: 'Surat, Gujarat, India' },
-    { id: 'spec-4', key: 'Care Instructions', value: 'Spot Clean Only / Dry in Shade' },
-    { id: 'spec-5', key: 'Package Contains', value: '1 Pair (2 Pieces)' }
-  ]);
-
-  // 7. VARIABLE PRODUCT: OPTIONS & VARIANTS
-  const [options, setOptions] = useState<ProductOptionItem[]>([
+  // 6. VARIANT PRODUCT: ATTRIBUTES & GENERATED COMBINATIONS
+  const [attributes, setAttributes] = useState<ProductOptionItem[]>([
     {
-      id: 'opt-color',
+      id: 'attr-color',
       name: 'Color',
-      values: []
+      values: ['Green', 'Black']
+    },
+    {
+      id: 'attr-size',
+      name: 'Size',
+      values: ['S', 'M', 'XL']
     }
   ]);
-  const [newOptionValueInputs, setNewOptionValueInputs] = useState<{ [optionId: string]: string }>({});
 
   const [variants, setVariants] = useState<ProductVariantDetail[]>([]);
+  const [activeVariantImageModal, setActiveVariantImageModal] = useState<number | null>(null);
 
-  // 8. ADDONS (Optional props)
-  const [addons] = useState<ProductAddonOption[]>([]);
-
-  // Auto-generate slug from name
+  // Auto-generate slug and SKU
   useEffect(() => {
-    if (!isSlugManuallyEdited && name) {
-      const generated = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '');
-      setSlug(generated);
+    if (name && !slug) {
+      setSlug(
+        name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, '')
+      );
     }
-  }, [name, isSlugManuallyEdited]);
-
-  // Auto-generate SKU when title or category changes
-  useEffect(() => {
-    if (!isEditMode && name && (!sku || sku === 'AH-PROD-001')) {
-      const catCode = category ? category.slice(0, 3).toUpperCase() : 'PRD';
-      const cleanName = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase();
-      setSku(`AH-${catCode}-${cleanName || '001'}`);
+    if (!isEditMode && name && !sku) {
+      const catPrefix = category ? category.slice(0, 3).toUpperCase() : 'PRD';
+      const namePart = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase();
+      setSku(`AH-${catPrefix}-${namePart || '001'}`);
     }
-  }, [name, category, isEditMode]);
+  }, [name, category, isEditMode, slug, sku]);
 
-  // Global Clipboard Paste (Ctrl + V) Handler
+  // Auto-generate Short & Full Descriptions when Name, Category, or Subcategory changes
   useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items || items.length === 0) return;
+    if (!name || name.trim().length < 2) return;
+    if (isEditMode && description && shortDescription) return;
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.indexOf('image') !== -1) {
-          const file = item.getAsFile();
-          if (file) {
-            e.preventDefault();
-            const reader = new FileReader();
-            reader.onload = () => {
-              if (reader.result) {
-                const dataUrl = reader.result as string;
+    const generated = generateSmartProductContent({
+      title: name.trim(),
+      category: category || '',
+      subcategory: subcategory || '',
+      imageNames: images,
+      seed: Math.floor(Math.random() * 5000),
+    });
 
-                if (activePasteTarget === 'root_main' || activePasteTarget === 'root_gallery') {
-                  handleSimpleAddImages([dataUrl]);
-                  showToast('Product photo pasted from clipboard!');
-                } else if (typeof activePasteTarget === 'object') {
-                  const { type, index } = activePasteTarget;
-                  if (type === 'var_main' || type === 'var_gallery') {
-                    handleVariantAddImages(index, [dataUrl]);
-                    showToast(`Variant ${variants[index]?.optionValue || index + 1} photo pasted from clipboard!`);
-                  }
-                }
-                setIsDirty(true);
-              }
-            };
-            reader.readAsDataURL(file);
-            break;
-          }
-        }
-      }
-    };
+    if (!shortDescription || shortDescription.includes('Authentically handcrafted') || shortDescription.includes('Elevate your ethnic') || shortDescription.includes('Handmade with utmost') || shortDescription.includes('A captivating') || shortDescription.includes('Exquisite artisanal')) {
+      setShortDescription(generated.shortDescription);
+    }
 
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
-  }, [activePasteTarget, variants, mainImage]);
+    if (!description || description.includes('PRODUCT OVERVIEW')) {
+      setDescription(generated.longDescription);
+    }
+  }, [name, category, subcategory]);
 
-  // Fetch Existing Product in Edit Mode
+  // Manual Trigger for Auto-Generating ONLY Short Description with unique variation per click
+  const handleAutoGenerateShortDescription = () => {
+    if (!name || !name.trim()) {
+      showToast('Please enter a Product Name first');
+      return;
+    }
+    const freshSeed = Date.now() + Math.floor(Math.random() * 100000);
+    const generated = generateSmartProductContent({
+      title: name.trim(),
+      category: category || '',
+      subcategory: subcategory || '',
+      imageNames: images,
+      seed: freshSeed,
+    });
+    setShortDescription(generated.shortDescription);
+    setIsDirty(true);
+    showToast('✨ Generated fresh Short Description!');
+  };
+
+  // Manual Trigger for Auto-Generating ONLY Full Description with unique variation per click
+  const handleAutoGenerateLongDescription = () => {
+    if (!name || !name.trim()) {
+      showToast('Please enter a Product Name first');
+      return;
+    }
+    const freshSeed = Date.now() + Math.floor(Math.random() * 100000);
+    const generated = generateSmartProductContent({
+      title: name.trim(),
+      category: category || '',
+      subcategory: subcategory || '',
+      imageNames: images,
+      seed: freshSeed,
+    });
+    setDescription(generated.longDescription);
+    setIsDirty(true);
+    showToast('✨ Generated fresh Full Description!');
+  };
+
+  // Helper to extract clean image URL from string or object
+  const extractImageUrl = (item: any): string => {
+    if (!item) return '';
+    if (typeof item === 'string') return item.trim();
+    if (typeof item === 'object') {
+      return (item.url || item.src || item.image || item.mainImage || '').trim();
+    }
+    return '';
+  };
+
+  // Load Existing Product in Edit Mode
   useEffect(() => {
     if (!effectiveProductId) return;
 
@@ -293,73 +312,184 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         const prod = await AdminApiService.getProductById(effectiveProductId);
         if (!prod || !isMounted) return;
 
-        setName(prod.name || '');
-        setDisplayName(prod.displayName || prod.name || '');
+        // Basic Info
+        setName(prod.name || prod.displayName || '');
         setSlug(prod.slug || '');
-        setIsSlugManuallyEdited(true);
-        setCategory(prod.category || mainCategories[0]?.name || 'Latkan');
+        setCategory(prod.category || (Array.isArray(prod.categories) && prod.categories[0]) || '');
         setSubcategory(prod.subcategory || prod.subCategory || '');
-        setBrand(prod.brand || 'Awesome Handmade');
-        setDefaultKey(prod.defaultKey || 'Artisan Special');
+        setBrand(prod.brand || '');
+        setTags(Array.isArray(prod.tags) ? prod.tags.join(', ') : (prod.tags || ''));
+        setStatus(prod.status === 'Inactive' || prod.status === 'Draft' ? 'Inactive' : 'Active');
+
+        // Determine if Simple or Variable
+        const hasVariants =
+          (Array.isArray(prod.variantDetails) && prod.variantDetails.length > 0) ||
+          (Array.isArray(prod.variants) && prod.variants.length > 0) ||
+          (Array.isArray(prod.variations) && prod.variations.length > 0) ||
+          (Array.isArray(prod.productOptions) && prod.productOptions.length > 0);
+
+        const isVariable =
+          prod.type === 'Variable' || (prod as any).type === 'Variant' || hasVariants;
+        setProductType(isVariable ? 'Variable' : 'Simple');
+
+        // Pricing & Inventory
+        setSellingPrice(String(prod.price !== undefined ? prod.price : ((prod as any).salePrice || 799)));
+        setRegularPrice(String(prod.regularPrice || prod.originalPrice || prod.price || 999));
+        setSku(prod.sku || prod.defaultSku || 'AH-LAT-001');
+        setStock(String(prod.stock !== undefined ? prod.stock : 25));
+
+        // Descriptions & Content
         setShortDescription(prod.shortDescription || prod.subtitle || '');
-        setLongDescription(prod.fullDescription || prod.longDescription || '');
-        setStatus(prod.status === 'Draft' ? 'Draft' : 'Active');
-        setProductType(prod.type === 'Variable' ? 'Variable' : 'Simple');
+        setDescription(prod.fullDescription || prod.longDescription || (prod as any).description || '');
 
-        setRegularPrice(prod.regularPrice || prod.originalPrice || prod.price || 1299);
-        setSalePrice(prod.price || 799);
-        setSku(prod.sku || prod.defaultSku || 'AH-PROD-001');
-        setStock(prod.stock !== undefined ? prod.stock : 50);
+        // Images Collection
+        const loadedImgs: string[] = [];
+        const addImg = (val: any) => {
+          const url = extractImageUrl(val);
+          if (url && !loadedImgs.includes(url)) {
+            loadedImgs.push(url);
+          }
+        };
 
-        if (prod.mainImage || prod.image) {
-          setMainImage(prod.mainImage || prod.image || '/images/category/Latkan.webp');
-        }
-        if (Array.isArray(prod.galleryImages) && prod.galleryImages.length > 0) {
-          setGalleryImages(prod.galleryImages.filter((g: any) => typeof g === 'string'));
-        } else if (Array.isArray(prod.images) && prod.images.length > 1) {
-          setGalleryImages(prod.images.slice(1).map((g: any) => (typeof g === 'string' ? g : g.url)));
-        }
+        addImg(prod.mainImage);
+        addImg(prod.image);
+        addImg((prod as any).thumbnail);
+        if (Array.isArray(prod.galleryImages)) prod.galleryImages.forEach(addImg);
+        if (Array.isArray(prod.images)) prod.images.forEach(addImg);
 
-        // Load specifications
-        if (Array.isArray(prod.specifications) && prod.specifications.length > 0) {
-          setSpecifications(
-            prod.specifications.map((s, idx) => ({
-              id: `spec-${idx}`,
-              key: s.key,
-              value: s.value
-            }))
-          );
+        if (loadedImgs.length > 0) {
+          setImages(loadedImgs);
         }
 
-        // Load options & variants
-        if (prod.productOptions && prod.productOptions.length > 0) {
-          setOptions(prod.productOptions);
+        // 1. Parse Attributes / Options
+        let loadedAttributes: ProductOptionItem[] = [];
+        if (Array.isArray(prod.productOptions) && prod.productOptions.length > 0) {
+          loadedAttributes = prod.productOptions.map((opt: any, i: number) => ({
+            id: opt.id || `attr-${i}`,
+            name: opt.name || `Option ${i + 1}`,
+            values: Array.isArray(opt.values) ? opt.values : []
+          }));
+        } else if (Array.isArray(prod.attributes) && prod.attributes.length > 0) {
+          loadedAttributes = prod.attributes
+            .filter((a: any) => a && (a.name || a.key))
+            .map((a: any, i: number) => ({
+              id: a.id || `attr-${i}`,
+              name: a.name || a.key,
+              values: Array.isArray(a.values) ? a.values : (Array.isArray(a.options) ? a.options : [])
+            }));
         }
 
-        if (prod.variantDetails && prod.variantDetails.length > 0) {
-          setVariants(prod.variantDetails);
-        } else if (prod.variants && prod.variants.length > 0) {
-          const mapped: ProductVariantDetail[] = prod.variants.map((v, i) => {
-            const vMain = v.image || (v.galleryImages && v.galleryImages[0]) || prod.mainImage || '/images/category/Latkan.webp';
-            const vGal = v.galleryImages && v.galleryImages.length > 0 ? v.galleryImages : [];
+        // 2. Parse Variants
+        let loadedVariants: ProductVariantDetail[] = [];
+        if (Array.isArray(prod.variantDetails) && prod.variantDetails.length > 0) {
+          loadedVariants = prod.variantDetails.map((v: any, i: number) => {
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '/images/category/Latkan.webp';
+            const vGals: string[] = [];
+            if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
+            if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
+            const allVImgs = Array.from(new Set([vMain, ...vGals].filter(Boolean)));
+
             return {
               id: v.id || `var-${i}`,
-              name: `Variant: ${v.colorName || v.title || v.sku}`,
-              optionValue: v.colorName || v.title || `Variant ${i + 1}`,
-              price: v.price || prod.price || 799,
-              salePrice: v.originalPrice || prod.originalPrice || 1299,
-              quantity: v.stock !== undefined ? v.stock : 15,
-              sku: v.sku || `AH-VAR-${i + 1}`,
-              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
+              name: v.name || v.optionValue || v.title || `Variant ${i + 1}`,
+              optionValue: v.optionValue || v.name || v.title || `Variant ${i + 1}`,
+              price: v.price !== undefined ? Number(v.price) : (prod.price || 799),
+              salePrice: v.salePrice !== undefined ? Number(v.salePrice) : (v.originalPrice !== undefined ? Number(v.originalPrice) : (prod.originalPrice || 1299)),
+              quantity: v.quantity !== undefined ? Number(v.quantity) : (v.stock !== undefined ? Number(v.stock) : 25),
+              sku: v.sku || `${prod.sku || 'AH-LAT'}-${i + 1}`,
+              colorHex: v.colorHex || findHexByColorName(v.optionValue || v.name || ''),
               mainImage: vMain,
-              galleryImages: vGal,
-              images: vGal.length > 0 ? [vMain, ...vGal] : [vMain]
+              galleryImages: vGals,
+              images: allVImgs.length > 0 ? allVImgs : [vMain],
+              status: v.status === 'Inactive' ? 'Inactive' : 'Active'
             };
           });
-          setVariants(mapped);
+        } else if (Array.isArray(prod.variants) && prod.variants.length > 0) {
+          loadedVariants = prod.variants.map((v: any, i: number) => {
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '/images/category/Latkan.webp';
+            const vGals: string[] = [];
+            if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
+            if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
+            const allVImgs = Array.from(new Set([vMain, ...vGals].filter(Boolean)));
+
+            return {
+              id: v.id || `var-${i}`,
+              name: v.title || v.name || v.colorName || `Variant ${i + 1}`,
+              optionValue: v.title || v.name || v.colorName || `Variant ${i + 1}`,
+              price: v.price !== undefined ? Number(v.price) : (prod.price || 799),
+              salePrice: v.originalPrice !== undefined ? Number(v.originalPrice) : (v.salePrice !== undefined ? Number(v.salePrice) : (prod.originalPrice || 1299)),
+              quantity: v.stock !== undefined ? Number(v.stock) : (v.quantity !== undefined ? Number(v.quantity) : 25),
+              sku: v.sku || `${prod.sku || 'AH-LAT'}-${i + 1}`,
+              colorHex: v.colorHex || findHexByColorName(v.colorName || v.title || ''),
+              mainImage: vMain,
+              galleryImages: vGals,
+              images: allVImgs.length > 0 ? allVImgs : [vMain],
+              status: v.status === 'Inactive' ? 'Inactive' : 'Active'
+            };
+          });
+        } else if (Array.isArray(prod.variations) && prod.variations.length > 0) {
+          loadedVariants = prod.variations.map((v: any, i: number) => {
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.displayImage) || extractImageUrl(v.image) || loadedImgs[0] || '/images/category/Latkan.webp';
+            const vGals: string[] = [];
+            if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
+            const allVImgs = Array.from(new Set([vMain, ...vGals].filter(Boolean)));
+
+            return {
+              id: v.id || `var-${i}`,
+              name: v.colorName || v.name || `Variant ${i + 1}`,
+              optionValue: v.colorName || v.name || `Variant ${i + 1}`,
+              price: v.price !== undefined ? Number(v.price) : (prod.price || 799),
+              salePrice: v.originalPrice !== undefined ? Number(v.originalPrice) : (prod.originalPrice || 1299),
+              quantity: v.stock !== undefined ? Number(v.stock) : 25,
+              sku: v.sku || `${prod.sku || 'AH-LAT'}-${i + 1}`,
+              colorHex: v.colorHex || findHexByColorName(v.colorName || ''),
+              mainImage: vMain,
+              galleryImages: vGals,
+              images: allVImgs.length > 0 ? allVImgs : [vMain],
+              status: v.status === 'Inactive' ? 'Inactive' : 'Active'
+            };
+          });
+        }
+
+        // If no attributes were explicitly loaded but variants exist, reconstruct attributes
+        if (loadedAttributes.length === 0 && loadedVariants.length > 0) {
+          const colorSet = new Set<string>();
+          const sizeSet = new Set<string>();
+
+          loadedVariants.forEach((v) => {
+            const parts = (v.optionValue || v.name).split('/').map((s) => s.trim());
+            if (parts.length >= 2) {
+              colorSet.add(parts[0]);
+              sizeSet.add(parts[1]);
+            } else if (parts.length === 1 && parts[0]) {
+              colorSet.add(parts[0]);
+            }
+          });
+
+          if (colorSet.size > 0) {
+            loadedAttributes.push({
+              id: 'attr-color-loaded',
+              name: 'Color',
+              values: Array.from(colorSet)
+            });
+          }
+          if (sizeSet.size > 0) {
+            loadedAttributes.push({
+              id: 'attr-size-loaded',
+              name: 'Size',
+              values: Array.from(sizeSet)
+            });
+          }
+        }
+
+        if (loadedAttributes.length > 0) {
+          setAttributes(loadedAttributes);
+        }
+        if (loadedVariants.length > 0) {
+          setVariants(loadedVariants);
         }
       } catch (err) {
-        console.error('Failed to load product for editing:', err);
+        console.error('Failed to load product:', err);
       } finally {
         if (isMounted) setIsInitialLoading(false);
       }
@@ -376,300 +506,226 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     setSaveSuccessMsg(msg);
     setTimeout(() => {
       setSaveSuccessMsg(null);
-    }, 4000);
+    }, 3500);
   };
 
-  // Image Upload Handlers for Simple Product
-  const handleProcessMainImageFile = (file: File) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (reader.result) {
-        setMainImage(reader.result as string);
-        setIsDirty(true);
-        showToast('Main product image updated');
-      }
-    };
-    reader.readAsDataURL(file);
+  // Image Upload Handlers
+  const handleAddImages = (newUrls: string[]) => {
+    const combined = Array.from(new Set([...images, ...newUrls].filter(Boolean)));
+    setImages(combined);
+    setIsDirty(true);
   };
 
-  const handleProcessGalleryFiles = (files: FileList | null) => {
+  const handleRemoveImage = (index: number) => {
+    const filtered = images.filter((_, i) => i !== index);
+    setImages(filtered);
+    setIsDirty(true);
+  };
+
+  const handleSetMainImage = (index: number) => {
+    if (index === 0 || index >= images.length) return;
+    const item = images[index];
+    const remaining = images.filter((_, i) => i !== index);
+    setImages([item, ...remaining]);
+    setIsDirty(true);
+    showToast('Main display image set');
+  };
+
+  const handleFileUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith('image/')) return;
       const reader = new FileReader();
       reader.onload = () => {
         if (reader.result) {
-          setGalleryImages((prev) => [...prev, reader.result as string]);
-          setIsDirty(true);
+          handleAddImages([reader.result as string]);
         }
       };
       reader.readAsDataURL(file);
     });
-    showToast('Gallery image(s) uploaded');
+    showToast('Product images uploaded');
   };
 
-  const handleRemoveGalleryImage = (idx: number) => {
-    setGalleryImages((prev) => prev.filter((_, i) => i !== idx));
-    setIsDirty(true);
-  };
+  // Global Paste Handler for Images
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
 
-  // Specification Handlers
-  const handleAddSpecRow = () => {
-    setSpecifications((prev) => [
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (reader.result) {
+                if (activeVariantImageModal !== null) {
+                  handleVariantAddImages(activeVariantImageModal, [reader.result as string]);
+                  showToast('Variant image pasted from clipboard!');
+                } else {
+                  handleAddImages([reader.result as string]);
+                  showToast('Product photo pasted from clipboard!');
+                }
+              }
+            };
+            reader.readAsDataURL(file);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [images, activeVariantImageModal]);
+
+  // Attribute Handlers for Variant Product Flow
+  const handleAddAttribute = () => {
+    const available = STANDARD_ATTRIBUTES.find(
+      (sa) => !attributes.some((a) => a.name.toLowerCase() === sa.name.toLowerCase())
+    );
+    const newName = available ? available.name : `Attribute ${attributes.length + 1}`;
+    const defaultVals = available ? available.defaultValues.slice(0, 2) : [];
+
+    setAttributes((prev) => [
       ...prev,
-      { id: `spec-${Date.now()}`, key: 'New Attribute', value: 'Details' }
+      {
+        id: `attr-${Date.now()}`,
+        name: newName,
+        values: defaultVals
+      }
     ]);
     setIsDirty(true);
   };
 
-  const handleUpdateSpecRow = (idx: number, field: 'key' | 'value', val: string) => {
-    setSpecifications((prev) => {
+  const handleRemoveAttribute = (index: number) => {
+    setAttributes((prev) => prev.filter((_, i) => i !== index));
+    setIsDirty(true);
+  };
+
+  const handleAttributeNameChange = (index: number, newName: string) => {
+    setAttributes((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: val };
+      next[index] = { ...next[index], name: newName };
       return next;
     });
     setIsDirty(true);
   };
 
-  const handleRemoveSpecRow = (idx: number) => {
-    setSpecifications((prev) => prev.filter((_, i) => i !== idx));
+  const handleAddAttributeValue = (attrId: string, val: string) => {
+    const trimmed = val.trim();
+    if (!trimmed) return;
+    setAttributes((prev) =>
+      prev.map((attr) => {
+        if (attr.id === attrId) {
+          if (attr.values.includes(trimmed)) return attr;
+          return { ...attr, values: [...attr.values, trimmed] };
+        }
+        return attr;
+      })
+    );
+    setValueSearchQueries((prev) => ({ ...prev, [attrId]: '' }));
     setIsDirty(true);
   };
 
-  // Sync Variants when Options change
-  const syncVariantsFromOptions = (newOpts: ProductOptionItem[]) => {
-    if (newOpts.length === 0) {
-      setVariants([]);
+  const handleRemoveAttributeValue = (attrId: string, valIndex: number) => {
+    setAttributes((prev) =>
+      prev.map((attr) => {
+        if (attr.id === attrId) {
+          return { ...attr, values: attr.values.filter((_, i) => i !== valIndex) };
+        }
+        return attr;
+      })
+    );
+    setIsDirty(true);
+  };
+
+  // Cartesian product combination generator
+  const cartesian = (arrays: string[][]): string[][] => {
+    if (arrays.length === 0) return [];
+    return arrays.reduce<string[][]>(
+      (acc, curr) => acc.flatMap((c) => curr.map((n) => [...c, n])),
+      [[]]
+    );
+  };
+
+  // Generate Variants Button Handler
+  const handleGenerateVariants = () => {
+    const validAttrs = attributes.filter((a) => a.values && a.values.length > 0);
+    if (validAttrs.length === 0) {
+      showToast('Please add at least one attribute with values first');
       return;
     }
 
-    const cartesian = (arrays: string[][]): string[][] => {
-      return arrays.reduce<string[][]>(
-        (acc, curr) => acc.flatMap((d) => curr.map((e) => [...d, e])),
-        [[]]
-      );
-    };
+    const combinations = cartesian(validAttrs.map((a) => a.values));
+    const baseSku = sku || 'AH-LAT';
+    const baseSelling = Number(sellingPrice) || 399;
+    const baseRegular = Number(regularPrice) || 1299;
+    const baseStock = Number(stock) || 25;
+    const defaultImage = images[0] || '/images/category/Latkan.webp';
 
-    const validOpts = newOpts.filter((o) => o.values && o.values.length > 0);
-    if (validOpts.length === 0) {
-      setVariants([]);
-      return;
-    }
-
-    const valueCombos = cartesian(validOpts.map((o) => o.values));
-
-    const updatedVariants: ProductVariantDetail[] = valueCombos.map((combo, idx) => {
+    const generated: ProductVariantDetail[] = combinations.map((combo, idx) => {
       const comboName = combo.join(' / ');
       const existing = variants.find((v) => v.optionValue === comboName || v.name.includes(comboName));
 
-      const skuSuffix = combo
-        .map((s) => s.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase())
-        .join('-');
+      const skuParts = combo.map((part) =>
+        part.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase()
+      );
+      const variantSku = `${baseSku}-${skuParts.join('-')}`;
 
-      const variantColorHex = findHexByColorName(combo[0] || '');
-
-      const vMainImg = existing?.mainImage || existing?.images?.[0] || mainImage || '/images/category/Latkan.webp';
-      const vGals = existing?.galleryImages || [];
+      // Try matching color hex from first color attribute
+      const colorVal = combo.find((c) => findHexByColorName(c) !== '#D4AF37') || combo[0];
+      const colorHex = findHexByColorName(colorVal || '');
 
       return (
         existing || {
           id: `var-${Date.now()}-${idx}`,
-          name: `Variant: ${comboName}`,
+          name: comboName,
           optionValue: comboName,
-          price: salePrice || 799,
-          salePrice: regularPrice || 1299,
-          quantity: 20,
-          sku: `${sku}-${skuSuffix || idx + 1}`,
-          colorHex: variantColorHex,
-          mainImage: vMainImg,
-          galleryImages: vGals,
-          images: [vMainImg, ...vGals]
+          sku: variantSku,
+          price: baseSelling,
+          salePrice: baseRegular,
+          quantity: baseStock,
+          colorHex: colorHex,
+          mainImage: defaultImage,
+          galleryImages: [],
+          images: [defaultImage],
+          status: 'Active'
         }
       );
     });
 
-    setVariants(updatedVariants);
-  };
-
-  // Option Handlers
-  const handleAddOption = () => {
-    const newId = `opt-${Date.now()}`;
-    const updated = [
-      ...options,
-      {
-        id: newId,
-        name: `Option ${options.length + 1}`,
-        values: []
-      }
-    ];
-    setOptions(updated);
+    setVariants(generated);
     setIsDirty(true);
+    showToast(`✨ Generated ${generated.length} variant combinations!`);
   };
 
-  const handleAddOptionFromMaster = (attr: AttributeMaster) => {
-    const existing = options.find(
-      (o) => o.name.toLowerCase() === attr.name.toLowerCase()
-    );
-    if (existing) {
-      showToast(`Attribute "${attr.name}" already added`);
-      return;
-    }
-    const newId = `opt-${Date.now()}`;
-    const updated = [
-      ...options,
-      {
-        id: newId,
-        name: attr.name,
-        values: []
-      }
-    ];
-    setOptions(updated);
-    setIsDirty(true);
-    showToast(`Added attribute "${attr.name}"`);
-  };
-
-  const handleAddAllValuesFromMaster = (optionId: string, attr: AttributeMaster) => {
-    if (!attr.values || attr.values.length === 0) return;
-    const toAdd = attr.values.map((v) => (v.label || v.value).trim()).filter(Boolean);
-    const updated = options.map((opt) => {
-      if (opt.id === optionId) {
-        const set = new Set([...opt.values, ...toAdd]);
-        return {
-          ...opt,
-          values: Array.from(set)
-        };
-      }
-      return opt;
-    });
-    setOptions(updated);
-    syncVariantsFromOptions(updated);
-    setIsDirty(true);
-  };
-
-  const handleRemoveOption = (index: number) => {
-    const updated = options.filter((_, i) => i !== index);
-    setOptions(updated);
-    syncVariantsFromOptions(updated);
-    setIsDirty(true);
-  };
-
-  const handleOptionNameChange = (index: number, newName: string) => {
-    const updated = [...options];
-    updated[index].name = newName;
-    setOptions(updated);
-    setIsDirty(true);
-  };
-
-  const getColorHex = (nameOrVal: string): string => {
-    return findHexByColorName(nameOrVal);
-  };
-
-  const handleAddOptionValue = (optionId: string, customVal?: string) => {
-    const rawVal = (customVal !== undefined ? customVal : newOptionValueInputs[optionId])?.trim();
-    if (!rawVal) return;
-
-    const updated = options.map((opt) => {
-      if (opt.id === optionId) {
-        if (opt.values.includes(rawVal)) return opt;
-        return {
-          ...opt,
-          values: [...opt.values, rawVal]
-        };
-      }
-      return opt;
-    });
-
-    setOptions(updated);
-    setNewOptionValueInputs((prev) => ({ ...prev, [optionId]: '' }));
-    syncVariantsFromOptions(updated);
-    setIsDirty(true);
-  };
-
-  const handleRemoveOptionValue = (optionId: string, valIndex: number) => {
-    const updated = options.map((opt) => {
-      if (opt.id === optionId) {
-        return {
-          ...opt,
-          values: opt.values.filter((_, i) => i !== valIndex)
-        };
-      }
-      return opt;
-    });
-
-    setOptions(updated);
-    syncVariantsFromOptions(updated);
-    setIsDirty(true);
-  };
-
-  // Variant Field & Image Handlers
   const handleUpdateVariantField = (
-    variantIndex: number,
+    index: number,
     field: keyof ProductVariantDetail,
     value: any
   ) => {
-    const updated = [...variants];
-    updated[variantIndex] = {
-      ...updated[variantIndex],
-      [field]: value
-    };
-    setVariants(updated);
-    setIsDirty(true);
-  };
-
-  // Simple Product Media Handlers
-  const handleSimpleAddImages = (newImgs: string[]) => {
-    const existing = [mainImage, ...galleryImages].filter(Boolean);
-    const combined = Array.from(new Set([...existing, ...newImgs].filter(Boolean))) as string[];
-    setMainImage(combined[0] || '');
-    setGalleryImages(combined.slice(1));
-    setIsDirty(true);
-  };
-
-  const handleSimpleRemoveImage = (imgIndex: number) => {
-    const existing = [mainImage, ...galleryImages].filter(Boolean);
-    const filtered = existing.filter((_, idx) => idx !== imgIndex) as string[];
-    setMainImage(filtered[0] || '');
-    setGalleryImages(filtered.slice(1));
-    setIsDirty(true);
-  };
-
-  const handleSimpleSetMainImage = (imgIndex: number) => {
-    const existing = [mainImage, ...galleryImages].filter(Boolean);
-    if (imgIndex < 0 || imgIndex >= existing.length) return;
-    const selected = existing.splice(imgIndex, 1)[0];
-    const reordered = [selected, ...existing] as string[];
-    setMainImage(reordered[0] || '');
-    setGalleryImages(reordered.slice(1));
-    setIsDirty(true);
-    showToast('Main cover image updated');
-  };
-
-  const handleSimpleGalleryFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.result) {
-          const dataUrl = reader.result as string;
-          handleSimpleAddImages([dataUrl]);
-        }
-      };
-      reader.readAsDataURL(file);
+    setVariants((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
     });
-
-    showToast('Product photos updated');
+    setIsDirty(true);
   };
 
+  const handleRemoveVariant = (index: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+    setIsDirty(true);
+  };
+
+  // Variant Image Helpers
   const handleVariantAddImages = (variantIndex: number, newImgs: string[]) => {
     setVariants((prev) => {
       const next = [...prev];
       const target = next[variantIndex];
-      const existing = (target.images && target.images.length > 0)
-        ? target.images
-        : ([target.mainImage, ...(target.galleryImages || [])].filter(Boolean) as string[]);
+      const existing = target.images && target.images.length > 0 ? target.images : [target.mainImage].filter(Boolean);
       const combined = Array.from(new Set([...existing, ...newImgs].filter(Boolean))) as string[];
       next[variantIndex] = {
         ...target,
@@ -686,9 +742,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     setVariants((prev) => {
       const next = [...prev];
       const target = next[variantIndex];
-      const existing = (target.images && target.images.length > 0)
-        ? target.images
-        : ([target.mainImage, ...(target.galleryImages || [])].filter(Boolean) as string[]);
+      const existing = target.images && target.images.length > 0 ? target.images : [target.mainImage].filter(Boolean);
       const filtered = existing.filter((_, idx) => idx !== imgIndex) as string[];
       next[variantIndex] = {
         ...target,
@@ -701,62 +755,18 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     setIsDirty(true);
   };
 
-  const handleVariantSetMainImage = (variantIndex: number, imgIndex: number) => {
-    setVariants((prev) => {
-      const next = [...prev];
-      const target = next[variantIndex];
-      const existing = (target.images && target.images.length > 0)
-        ? [...target.images]
-        : ([target.mainImage, ...(target.galleryImages || [])].filter(Boolean) as string[]);
-      if (imgIndex < 0 || imgIndex >= existing.length) return prev;
-      const selected = existing.splice(imgIndex, 1)[0];
-      const reordered = [selected, ...existing] as string[];
-      next[variantIndex] = {
-        ...target,
-        mainImage: reordered[0] || '',
-        galleryImages: reordered.slice(1),
-        images: reordered
-      };
-      return next;
-    });
-    setIsDirty(true);
-    showToast('Variant cover photo updated');
-  };
-
-  const handleVariantGalleryFiles = (variantIndex: number, files: FileList | null) => {
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.result) {
-          const dataUrl = reader.result as string;
-          handleVariantAddImages(variantIndex, [dataUrl]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    showToast(`Variant ${variants[variantIndex]?.optionValue || variantIndex + 1} photos updated`);
-  };
-
-  // Validation
+  // Form Validation
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
-    if (!name.trim()) errors.name = 'Product Title / Name is required.';
+    if (!name.trim()) errors.name = 'Product Name is required.';
     if (!category.trim()) errors.category = 'Please select a Category.';
 
     if (productType === 'Simple') {
-      if (!salePrice || salePrice <= 0) errors.price = 'Please enter a valid selling price.';
-      if (!mainImage) errors.mainImage = 'Please upload or provide a Main Product Image.';
+      if (!sellingPrice || Number(sellingPrice) <= 0) errors.price = 'Please enter a valid Selling Price.';
+      if (images.length === 0) errors.images = 'Please upload at least one product image.';
     } else {
       if (variants.length === 0) {
-        errors.variants = 'At least one variant must be configured for a Variable Product.';
-      }
-      const hasAnyImage = variants.some((v) => v.mainImage || (v.images && v.images.length > 0)) || Boolean(mainImage);
-      if (!hasAnyImage) {
-        errors.mainImage = 'Please add a Main Image for at least one variant.';
+        errors.variants = 'Please click "Generate Variants" to create variant combinations.';
       }
     }
 
@@ -764,7 +774,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     return Object.keys(errors).length === 0;
   };
 
-  // Submit & Save
+  // Save / Publish
   const handleSaveProduct = async (statusOverride?: 'Draft' | 'Active') => {
     if (!validateForm()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -772,145 +782,139 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     }
 
     setIsSaving(true);
-    const finalStatus = statusOverride || status;
+    const finalStatus = statusOverride === 'Draft' ? 'Draft' : (status === 'Active' ? 'Active' : 'Draft');
     const isLive = finalStatus === 'Active';
 
-    // In Variable mode, derive root main image and galleries from first variant if not explicitly set
     const effectiveMainImage =
-      productType === 'Variable' && variants.length > 0
-        ? variants[0].mainImage || variants[0].images?.[0] || mainImage
-        : mainImage;
+      images[0] ||
+      (productType === 'Variable' && variants[0]?.mainImage ? variants[0].mainImage : '/images/category/Latkan.webp');
+    const effectiveGallery = images.slice(1);
 
-    const effectiveGalleryImages =
-      productType === 'Variable' && variants.length > 0
-        ? variants.flatMap((v) => v.galleryImages || [])
-        : galleryImages;
-
-    const allRootImages = Array.from(new Set([effectiveMainImage, ...effectiveGalleryImages].filter(Boolean)));
-
-    // Calculate effective selling and regular price
     const finalSellingPrice =
       productType === 'Variable' && variants.length > 0
-        ? Math.min(...variants.map((v) => Number(v.price) || salePrice))
-        : Number(salePrice) || 799;
+        ? Math.min(...variants.map((v) => Number(v.price) || 399))
+        : Number(sellingPrice) || 799;
 
     const finalOriginalPrice =
       productType === 'Variable' && variants.length > 0
-        ? Math.max(...variants.map((v) => Number(v.salePrice || v.price) || regularPrice))
-        : Number(regularPrice) || 1299;
+        ? Math.max(...variants.map((v) => Number(v.salePrice || v.price) || 1299))
+        : Number(regularPrice) || 999;
 
     const totalStock =
       productType === 'Variable' && variants.length > 0
-        ? variants.reduce((acc, v) => acc + (Number(v.quantity) || 0), 0)
-        : Number(stock) || 50;
+        ? variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0)
+        : Number(stock) || 25;
 
-    const cleanSpecs = specifications
-      .filter((s) => s.key.trim() && s.value.trim())
-      .map((s) => ({ key: s.key.trim(), value: s.value.trim() }));
-
-    // Generate colors list for storefront color swatches
-    const formattedColors =
+    const allVariantImages =
       productType === 'Variable'
-        ? variants.map((v, i) => {
-            const vMain = v.mainImage || v.images?.[0] || effectiveMainImage;
-            const vGals = v.galleryImages && v.galleryImages.length > 0 ? v.galleryImages : allRootImages;
-            return {
-              id: `col-${v.id || i}`,
-              colorName: v.optionValue || v.name || `Color ${i + 1}`,
-              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
-              displayImage: vMain,
-              mainImage: vMain,
-              galleryImages: vGals,
-              sizes: ['Free Size', 'Standard Pair']
-            };
-          })
-        : [
-            {
-              id: 'col-main',
-              colorName: 'Standard',
-              colorHex: '#C89B3C',
-              displayImage: effectiveMainImage,
-              mainImage: effectiveMainImage,
-              galleryImages: effectiveGalleryImages,
-              sizes: ['Free Size', 'Standard Pair']
-            }
-          ];
+        ? variants.flatMap((v) =>
+            v.images && v.images.length > 0
+              ? v.images
+              : [v.mainImage, ...(v.galleryImages || [])].filter(Boolean)
+          )
+        : images;
 
-    // Generate formatted variations
-    const formattedVariations =
-      productType === 'Variable'
-        ? variants.map((v, i) => {
-            const vMain = v.mainImage || v.images?.[0] || effectiveMainImage;
-            const vGals = v.galleryImages && v.galleryImages.length > 0 ? v.galleryImages : allRootImages;
-            const vImagesAll = Array.from(new Set([vMain, ...vGals].filter(Boolean)));
-
-            return {
-              id: v.id || `var-${i}`,
-              colorName: v.optionValue || v.name,
-              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
-              size: 'Free Size',
-              sizeName: 'Free Size',
-              price: Number(v.price),
-              originalPrice: Number(v.salePrice || v.price),
-              discountPercentage: Math.round(
-                (((Number(v.salePrice || v.price) - Number(v.price)) / Number(v.salePrice || v.price)) * 100) || 0
-              ),
-              sku: v.sku || `${sku}-${i + 1}`,
-              stock: Number(v.quantity),
-              thumbnail: vMain,
-              status: Number(v.quantity) > 0 ? ('Active' as const) : ('Out of Stock' as const),
-              images: vImagesAll.map((url, idx) => ({
-                id: `img-var-${i}-${idx}`,
-                url,
-                alt: `${name} - ${v.optionValue}`
-              }))
-            };
-          })
-        : [];
+    const effectiveAllImages: string[] = Array.from(
+      new Set([effectiveMainImage, ...effectiveGallery, ...allVariantImages].filter((img): img is string => Boolean(img)))
+    );
 
     const payload: Partial<Product> = {
       name: name.trim(),
-      displayName: (displayName || name).trim(),
+      displayName: name.trim(),
       slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      defaultKey: defaultKey.trim() || 'Artisan Special',
-      sku: sku.trim() || 'AH-PROD-001',
-      defaultSku: sku.trim() || 'AH-PROD-001',
+      sku: sku.trim() || 'AH-LAT-001',
+      defaultSku: sku.trim() || 'AH-LAT-001',
       category: category.trim(),
       categories: [category.trim()],
       subcategory: (subcategory || '').trim(),
       subCategory: (subcategory || '').trim(),
       brand: brand.trim() || 'Awesome Handmade',
+      tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
       shortDescription: shortDescription.trim(),
       subtitle: shortDescription.trim(),
-      fullDescription: longDescription.trim(),
-      longDescription: longDescription.trim(),
-      status: isLive ? 'Active' : 'Draft',
+      fullDescription: description.trim(),
+      longDescription: description.trim(),
+      status: finalStatus,
       isPublished: isLive,
       type: productType,
       price: finalSellingPrice,
       originalPrice: finalOriginalPrice,
       regularPrice: finalOriginalPrice,
-      discountPercentage: Math.round((((finalOriginalPrice - finalSellingPrice) / finalOriginalPrice) * 100) || 0),
+      discountPercentage: Math.round(
+        (((finalOriginalPrice - finalSellingPrice) / finalOriginalPrice) * 100) || 0
+      ),
       stock: totalStock,
       stockStatus: totalStock > 0 ? 'in_stock' : 'out_of_stock',
       image: effectiveMainImage,
       mainImage: effectiveMainImage,
-      galleryImages: effectiveGalleryImages,
-      images: allRootImages,
-      specifications: cleanSpecs,
-      attributes: options.filter(o => o.name && o.values && o.values.length > 0).map(o => ({ name: o.name, values: o.values })),
-      customAttributes: [
-        ...cleanSpecs.map((s) => ({ name: s.key, values: [s.value] })),
-        ...options.filter(o => o.name && o.values && o.values.length > 0).map(o => ({ name: o.name, values: o.values }))
-      ],
-      productOptions: productType === 'Variable' ? options : [],
+      galleryImages: effectiveGallery,
+      images: effectiveAllImages.length > 0 ? effectiveAllImages : images,
+      specifications: [],
+      productOptions: productType === 'Variable' ? attributes : [],
+      attributes: productType === 'Variable' ? attributes.map((a) => ({ name: a.name, values: a.values })) : [],
       variantDetails: productType === 'Variable' ? variants : [],
-      addonOptions: addons,
-      colors: formattedColors,
-      variations: formattedVariations,
-      availableSizes: (options.find(o => o.name.toLowerCase().includes('size'))?.values) || ['Free Size', 'Standard Pair'],
+      variants:
+        productType === 'Variable'
+          ? variants.map((v, i) => ({
+              id: v.id || `var-${i}`,
+              title: v.name || v.optionValue,
+              colorName: v.optionValue || v.name,
+              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
+              price: Number(v.price),
+              originalPrice: Number(v.salePrice || v.price),
+              stock: Number(v.quantity),
+              sku: v.sku,
+              image: v.mainImage || effectiveMainImage,
+              images: ((v.images && v.images.length > 0) ? v.images : (v.mainImage ? [v.mainImage] : [])).filter((img): img is string => Boolean(img)),
+              status: ((v as any).status === 'Inactive' ? 'Inactive' : 'Active') as any
+            }))
+          : [],
+      variations:
+        productType === 'Variable'
+          ? variants.map((v, i) => {
+              const vImgList = (v.images && v.images.length > 0) ? v.images : (v.mainImage ? [v.mainImage] : [effectiveMainImage]);
+              return {
+                id: v.id || `var-${i}`,
+                colorName: v.optionValue || v.name,
+                colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
+                size: 'Free Size',
+                sizeName: 'Free Size',
+                price: Number(v.price),
+                originalPrice: Number(v.salePrice || v.price),
+                sku: v.sku,
+                stock: Number(v.quantity),
+                thumbnail: v.mainImage || effectiveMainImage,
+                images: vImgList.map((url, idx) => ({
+                  id: `img-${i}-${idx}`,
+                  url,
+                  alt: `${name} - ${v.optionValue}`
+                })),
+                status: ((v as any).status === 'Inactive' ? 'Inactive' : 'Active') as any
+              };
+            })
+          : [],
+      colors:
+        productType === 'Variable'
+          ? variants.map((v, i) => ({
+              id: `col-${i}`,
+              colorName: v.optionValue || v.name,
+              colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
+              displayImage: v.mainImage || effectiveMainImage,
+              mainImage: v.mainImage || effectiveMainImage,
+              galleryImages: v.galleryImages || []
+            }))
+          : [
+              {
+                id: 'col-main',
+                colorName: 'Standard',
+                colorHex: '#C89B3C',
+                displayImage: effectiveMainImage,
+                mainImage: effectiveMainImage,
+                galleryImages: effectiveGallery
+              }
+            ],
       rating: 4.9,
-      reviewCount: 14
+      reviewCount: 12
     };
 
     try {
@@ -928,7 +932,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
       setTimeout(() => {
         navigateBack();
-      }, 1000);
+      }, 900);
     } catch (err: any) {
       console.error('Failed to save product:', err);
       alert('Error saving product: ' + (err.message || 'Unknown error'));
@@ -949,7 +953,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   }
 
   return (
-    <div className="font-sans text-neutral-900 bg-[#fbfbfc] min-h-screen pb-24">
+    <div className="font-sans text-neutral-900 bg-white min-h-screen pb-24">
       {/* SUCCESS TOAST */}
       {saveSuccessMsg && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-neutral-950 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-neutral-800 animate-in fade-in slide-in-from-top-4">
@@ -958,39 +962,27 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         </div>
       )}
 
-      {/* TOP STICKY BAR */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-neutral-200 shadow-2xs px-6 py-4 flex items-center justify-between">
+      {/* TOP HEADER */}
+      <div className="bg-white border-b border-neutral-200 px-6 sm:px-10 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (isDirty) setShowDiscardModal(true);
-              else navigateBack();
-            }}
-            className="h-8 w-8 p-0 rounded-lg border-neutral-200 hover:bg-neutral-100 cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4 text-neutral-700" />
-          </Button>
-
+          <div className="w-9 h-9 rounded-lg border border-neutral-200 bg-neutral-50 flex items-center justify-center">
+            <Package className="w-5 h-5 text-neutral-800" />
+          </div>
           <div>
-            <h1 className="text-sm sm:text-base font-bold text-neutral-950 tracking-tight">
+            <h1 className="text-base font-bold text-neutral-950">
               {isEditMode ? `Edit Product: ${name || 'Untitled'}` : 'Add New Product'}
             </h1>
-            <p className="text-[11px] text-neutral-400">
-              Configure product details, category, pricing, media gallery, and variations.
-            </p>
           </div>
         </div>
       </div>
 
       {/* VALIDATION ERRORS BANNER */}
       {Object.keys(formErrors).length > 0 && (
-        <div className="max-w-6xl mx-auto mt-6 px-4">
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-3 animate-in fade-in">
+        <div className="max-w-7xl mx-auto mt-6 px-4 sm:px-8">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block mb-1">Please fix the following before saving:</span>
+              <span className="font-bold block mb-1">Please fix the following errors:</span>
               <ul className="list-disc list-inside space-y-0.5 text-rose-700">
                 {Object.values(formErrors).map((err, i) => (
                   <li key={i}>{err}</li>
@@ -1001,1219 +993,982 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         </div>
       )}
 
-      {/* MAIN FORM CONTAINER */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-10">
+      {/* MAIN FORM CONTENT */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-8">
 
-        {/* 1. PRODUCT DETAILS (INCLUDING CATEGORY, SUBCATEGORY & BRAND) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
-          <div className="lg:col-span-3 space-y-1">
-            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">Product Details</h2>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Define the title, category classification, display subtitle, and storefront visibility status
+        {/* 1. TYPE & CONFIGURATION */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-neutral-950">Type &amp; Configuration</h2>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Choose between a Simple Product (single item) or Variable Product (multiple variations).
             </p>
           </div>
 
-          <div className="lg:col-span-9">
-            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-5">
-              
-              {/* Product Title / Name */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Simple Product Button */}
+            <div
+              onClick={() => {
+                setProductType('Simple');
+                setIsDirty(true);
+              }}
+              className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${
+                productType === 'Simple'
+                  ? 'border-neutral-950 bg-neutral-50/50 shadow-xs ring-1 ring-neutral-950/10'
+                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                  productType === 'Simple' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600'
+                }`}
+              >
+                <Package className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-neutral-900">Simple Product</h3>
+                <p className="text-[11px] text-neutral-400">Single item, no variations</p>
+              </div>
+            </div>
+
+            {/* Variable Product Button */}
+            <div
+              onClick={() => {
+                setProductType('Variable');
+                setIsDirty(true);
+              }}
+              className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${
+                productType === 'Variable'
+                  ? 'border-neutral-950 bg-neutral-50/50 shadow-xs ring-1 ring-neutral-950/10'
+                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                  productType === 'Variable' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600'
+                }`}
+              >
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-neutral-900">Variable Product</h3>
+                <p className="text-[11px] text-neutral-400">Multiple variations (Color, Size, etc.)</p>
+              </div>
+            </div>
+          </div>
+
+          {productType === 'Variable' && (
+            <div className="bg-[#eff6ff] border border-[#dbeafe] rounded-xl p-3.5 flex items-center gap-2.5 text-xs text-[#2563eb]">
+              <Info className="w-4 h-4 shrink-0" />
+              <span>Add attributes like Color, Size etc. and generate variations automatically.</span>
+            </div>
+          )}
+        </div>
+
+        {/* 2. PRODUCT INFORMATION */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-5">
+          <div>
+            <h2 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+              {productType === 'Simple' ? 'SIMPLE PRODUCT INFORMATION' : 'PRODUCT INFORMATION'}
+            </h2>
+            <p className="text-[11px] text-neutral-400 mt-0.5">
+              Add basic information about your product.
+            </p>
+          </div>
+
+          {/* Row 1: Name, Category, Subcategory */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Product Name */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-neutral-700">
+                Product Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setIsDirty(true);
+                }}
+                placeholder="e.g. Royal Mirror Latkan"
+                className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium"
+              />
+            </div>
+
+            {/* Category */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-neutral-700">
+                Category <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={category}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium cursor-pointer"
+              >
+                <option value="" disabled>Select category</option>
+                {mainCategories.map((c) => (
+                  <option key={c.id || c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Subcategory */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-neutral-700">
+                Subcategory <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={subcategory}
+                onChange={(e) => {
+                  setSubcategory(e.target.value);
+                  setIsDirty(true);
+                }}
+                disabled={!category || filteredSubcategories.length === 0}
+                className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium cursor-pointer disabled:bg-neutral-50 disabled:text-neutral-400"
+              >
+                <option value="">
+                  {!category ? 'Select category first' : filteredSubcategories.length === 0 ? 'None / General' : 'Select subcategory'}
+                </option>
+                {filteredSubcategories.map((s) => (
+                  <option key={s.id || s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Row 2: For Simple vs Variable */}
+          {productType === 'Simple' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-1">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">
-                  Product Title / Name <span className="text-rose-500">*</span>
-                </label>
+                <label className="text-xs font-semibold text-neutral-700">SKU</label>
                 <input
                   type="text"
-                  value={name}
+                  value={sku}
                   onChange={(e) => {
-                    setName(e.target.value);
+                    setSku(e.target.value);
                     setIsDirty(true);
                   }}
-                  placeholder="e.g. Royal Mirror Latkan Pair with Golden Tassels"
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all font-medium"
+                  placeholder="e.g. AH-LAT-W"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-mono"
                 />
               </div>
 
-              {/* Category & Subcategory Dropdowns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                {/* Main Category */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-neutral-700">
-                    Category <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => {
-                      setCategory(e.target.value);
-                      setIsDirty(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all cursor-pointer font-medium"
-                  >
-                    {mainCategories.map((c) => (
-                      <option key={c.id || c.name} value={c.name}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Subcategory */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-neutral-700">
-                    Subcategory
-                  </label>
-                  <select
-                    value={subcategory}
-                    onChange={(e) => {
-                      setSubcategory(e.target.value);
-                      setIsDirty(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all cursor-pointer font-medium"
-                  >
-                    <option value="">None / General</option>
-                    {filteredSubcategories.map((s) => (
-                      <option key={s.id || s.name} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* URL Slug */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-neutral-700">
-                  URL Slug <span className="text-rose-500">*</span>
+                  Selling Price (₹) <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={slug}
-                    onChange={(e) => {
-                      setSlug(e.target.value);
-                      setIsSlugManuallyEdited(true);
-                      setIsDirty(true);
-                    }}
-                    placeholder="royal-mirror-latkan-pair"
-                    className="w-full pl-3.5 pr-8 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 transition-all font-mono"
-                  />
-                  {slug && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSlug('');
-                        setIsSlugManuallyEdited(true);
-                        setIsDirty(true);
-                      }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 p-0.5 cursor-pointer"
-                      title="Clear slug"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+                <input
+                  type="number"
+                  value={sellingPrice}
+                  onChange={(e) => {
+                    setSellingPrice(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g. 799"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-semibold"
+                />
               </div>
 
-              {/* STOREFRONT VISIBILITY TOGGLE SWITCH */}
-              <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
-                <div>
-                  <label className="text-xs font-semibold text-neutral-900 block">
-                    Storefront Visibility
-                  </label>
-                  <p className="text-[11px] text-neutral-400">
-                    {status === 'Active'
-                      ? 'Product is Active and visible on the website store'
-                      : 'Product is saved as Draft and hidden from the website store'}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`text-xs font-semibold ${
-                      status === 'Active' ? 'text-emerald-700' : 'text-neutral-500'
-                    }`}
-                  >
-                    {status === 'Active' ? 'Active (Live)' : 'Draft (Hidden)'}
-                  </span>
-
-                  {/* Toggle Switch */}
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={status === 'Active'}
-                    onClick={() => {
-                      setStatus(status === 'Active' ? 'Draft' : 'Active');
-                      setIsDirty(true);
-                    }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      status === 'Active' ? 'bg-emerald-600' : 'bg-neutral-300'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        status === 'Active' ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">Regular Price (₹)</label>
+                <input
+                  type="number"
+                  value={regularPrice}
+                  onChange={(e) => {
+                    setRegularPrice(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g. 999"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                />
               </div>
 
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">
+                  Stock Quantity <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={stock}
+                  onChange={(e) => {
+                    setStock(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g. 25"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">SKU</label>
+                <input
+                  type="text"
+                  value={sku}
+                  onChange={(e) => {
+                    setSku(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g. AH-LAT"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">Brand (Optional)</label>
+                <input
+                  type="text"
+                  value={brand}
+                  onChange={(e) => {
+                    setBrand(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g. Awesome Handmade"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-700">Tags (Optional)</label>
+                <input
+                  type="text"
+                  value={tags}
+                  onChange={(e) => {
+                    setTags(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g. handmade, bridal"
+                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 2. PRODUCT TYPE & MEDIA / PRICING CONFIGURATION (SIMPLE vs VARIABLE) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
-          <div className="lg:col-span-3 space-y-1">
-            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">Type &amp; Configuration</h2>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Choose between a Simple Product (Single item with media) or Variable Product (Multiple color/size variations with photos)
-            </p>
-          </div>
+        {/* 3. VARIANT ATTRIBUTES & GENERATION (ONLY IN VARIABLE PRODUCT MODE) */}
+        {productType === 'Variable' && (
+          <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-6">
+            <div>
+              <h2 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                VARIANT ATTRIBUTES
+              </h2>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Select attributes and their values to create product variations.
+              </p>
+            </div>
 
-          <div className="lg:col-span-9 space-y-6">
-            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-6">
-              
-              {/* TYPE SWITCHER */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-neutral-900 uppercase tracking-wider block">
-                  Product Classification Type
-                </label>
-                <div className="grid grid-cols-2 gap-3 p-1.5 bg-neutral-100 rounded-xl border border-neutral-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductType('Simple');
-                      setIsDirty(true);
-                    }}
-                    className={`py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      productType === 'Simple'
-                        ? 'bg-white text-neutral-950 shadow-sm border border-neutral-200/80'
-                        : 'text-neutral-600 hover:text-neutral-950'
-                    }`}
-                  >
-                    <Package className="w-4 h-4" />
-                    <span>Simple Product (Single Item)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductType('Variable');
-                      setIsDirty(true);
-                    }}
-                    className={`py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      productType === 'Variable'
-                        ? 'bg-white text-neutral-950 shadow-sm border border-neutral-200/80'
-                        : 'text-neutral-600 hover:text-neutral-950'
-                    }`}
-                  >
-                    <Layers className="w-4 h-4" />
-                    <span>Variable Product (With Variations)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* ============================================================ */}
-              {/* A. SIMPLE PRODUCT SECTION (Pricing + Inventory + Media) */}
-              {/* ============================================================ */}
-              {productType === 'Simple' && (
-                <div className="space-y-6 pt-2">
-                  
-                  {/* Pricing & Inventory */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                      Pricing &amp; Inventory Details
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                      {/* Sale Price */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-neutral-700">
-                          Selling Price (₹) <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          value={salePrice}
-                          onChange={(e) => {
-                            setSalePrice(Number(e.target.value));
-                            setIsDirty(true);
-                          }}
-                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-semibold"
-                        />
-                      </div>
-
-                      {/* Regular / M.R.P. Price */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-neutral-700">
-                          Regular / M.R.P. (₹)
-                        </label>
-                        <input
-                          type="number"
-                          value={regularPrice}
-                          onChange={(e) => {
-                            setRegularPrice(Number(e.target.value));
-                            setIsDirty(true);
-                          }}
-                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                        />
-                      </div>
-
-                      {/* SKU */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-neutral-700">
-                          SKU
-                        </label>
-                        <input
-                          type="text"
-                          value={sku}
-                          onChange={(e) => {
-                            setSku(e.target.value);
-                            setIsDirty(true);
-                          }}
-                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-mono"
-                        />
-                      </div>
-
-                      {/* Stock Quantity */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-neutral-700">
-                          Stock Quantity
-                        </label>
-                        <input
-                          type="number"
-                          value={stock}
-                          onChange={(e) => {
-                            setStock(Number(e.target.value));
-                            setIsDirty(true);
-                          }}
-                          className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                        />
-                      </div>
-                    </div>
+            {/* Attributes List */}
+            <div className="space-y-4">
+              {attributes.map((attr, attrIdx) => (
+                <div key={attr.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                  {/* Attribute Name Select */}
+                  <div className="sm:col-span-4 space-y-1">
+                    <label className="text-[11px] font-semibold text-neutral-600">Attribute</label>
+                    <select
+                      value={attr.name}
+                      onChange={(e) => handleAttributeNameChange(attrIdx, e.target.value)}
+                      className="w-full px-3 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium cursor-pointer"
+                    >
+                      {STANDARD_ATTRIBUTES.map((sa) => (
+                        <option key={sa.name} value={sa.name}>
+                          {sa.name}
+                        </option>
+                      ))}
+                      {masterAttributes
+                        .filter((ma) => !STANDARD_ATTRIBUTES.some((sa) => sa.name.toLowerCase() === ma.name.toLowerCase()))
+                        .map((ma) => (
+                          <option key={ma.id} value={ma.name}>
+                            {ma.name}
+                          </option>
+                        ))}
+                    </select>
                   </div>
 
-                  {/* Simple Product Photos & Gallery (Unified Uploader: 1st image is Main Cover Image) */}
-                  {(() => {
-                    const allSimpleImages = [mainImage, ...galleryImages].filter(Boolean);
-                    const [simpleUrlInput, setSimpleUrlInput] = [
-                      newOptionValueInputs['simple-url'] || '',
-                      (val: string) => setNewOptionValueInputs((prev) => ({ ...prev, 'simple-url': val }))
-                    ];
-
-                    return (
-                      <div className="space-y-4 pt-4 border-t border-neutral-100">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div>
-                            <label className="text-xs font-bold text-neutral-900 flex items-center gap-1.5 uppercase tracking-wider">
-                              <ImageIcon className="w-4 h-4 text-neutral-700" />
-                              <span>Product Photos &amp; Gallery ({allSimpleImages.length})</span>
-                              <span className="text-rose-500">*</span>
-                            </label>
-                            <p className="text-[11px] text-neutral-500">
-                              First photo is automatically used as the <strong>Main Display Thumbnail</strong> on the store.
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <label className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-black text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-2xs transition-all">
-                              <UploadCloud className="w-3.5 h-3.5" />
-                              <span>Upload Photos</span>
-                              <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                onChange={(e) => handleSimpleGalleryFiles(e.target.files)}
-                                className="hidden"
-                              />
-                            </label>
-                          </div>
+                  {/* Attribute Values Multi-Select Box */}
+                  <div className="sm:col-span-7 space-y-1 relative">
+                    <label className="text-[11px] font-semibold text-neutral-600">Values</label>
+                    <div
+                      onClick={() => setOpenValueDropdownId(openValueDropdownId === attr.id ? null : attr.id)}
+                      className="min-h-[38px] px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg cursor-pointer flex items-center justify-between gap-2 flex-wrap hover:border-neutral-300 transition-colors"
+                    >
+                      {attr.values.length === 0 ? (
+                        <span className="text-xs text-neutral-400 select-none">Select or add values...</span>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {attr.values.map((val, vIdx) => (
+                            <span
+                              key={vIdx}
+                              className="inline-flex items-center gap-1 bg-neutral-100 border border-neutral-200 text-neutral-800 text-[11px] font-medium px-2 py-0.5 rounded-md"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {attr.name.toLowerCase() === 'color' && (
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0 inline-block"
+                                  style={{ backgroundColor: findHexByColorName(val) }}
+                                />
+                              )}
+                              <span>{val}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveAttributeValue(attr.id, vIdx);
+                                }}
+                                className="text-neutral-400 hover:text-rose-600 p-0.5 cursor-pointer"
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            </span>
+                          ))}
                         </div>
+                      )}
+                      <ChevronDown className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                    </div>
 
-                        {/* URL Input & Paste Row */}
+                    {/* Popover for Values */}
+                    {openValueDropdownId === attr.id && (
+                      <div
+                        className="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-neutral-200 rounded-xl shadow-lg p-3 space-y-2.5 animate-in fade-in zoom-in-95"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
-                            placeholder="Paste image URL here or press Ctrl + V..."
-                            value={simpleUrlInput}
-                            onFocus={() => setActivePasteTarget('root_gallery')}
-                            onChange={(e) => setSimpleUrlInput(e.target.value)}
+                            placeholder="Type value and press Enter..."
+                            value={valueSearchQueries[attr.id] || ''}
+                            onChange={(e) =>
+                              setValueSearchQueries((prev) => ({ ...prev, [attr.id]: e.target.value }))
+                            }
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                if (simpleUrlInput.trim()) {
-                                  handleSimpleAddImages([simpleUrlInput.trim()]);
-                                  setSimpleUrlInput('');
-                                }
+                                handleAddAttributeValue(attr.id, valueSearchQueries[attr.id] || '');
                               }
                             }}
-                            className="flex-1 h-8 text-xs bg-white px-3 border border-neutral-300 rounded-lg focus:outline-none focus:border-black font-medium"
+                            className="flex-1 px-2.5 py-1.5 text-xs bg-neutral-50 border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-medium"
+                            autoFocus
                           />
-                          {simpleUrlInput.trim() && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleSimpleAddImages([simpleUrlInput.trim()]);
-                                setSimpleUrlInput('');
-                              }}
-                              className="h-8 px-3 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-lg cursor-pointer shrink-0"
-                            >
-                              Add URL
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleAddAttributeValue(attr.id, valueSearchQueries[attr.id] || '')}
+                            className="px-3 py-1.5 text-xs bg-neutral-900 text-white font-bold rounded-lg cursor-pointer shrink-0"
+                          >
+                            + Add
+                          </button>
                         </div>
 
-                        {/* Drag & Drop Zone */}
-                        <div
-                          tabIndex={0}
-                          onFocus={() => setActivePasteTarget('root_gallery')}
-                          onClick={() => setActivePasteTarget('root_gallery')}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setIsGalleryDragOver(true);
-                          }}
-                          onDragLeave={() => setIsGalleryDragOver(false)}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setIsGalleryDragOver(false);
-                            if (e.dataTransfer.files) handleSimpleGalleryFiles(e.dataTransfer.files);
-                          }}
-                          className={`border-2 border-dashed rounded-xl p-4 text-center transition-colors cursor-pointer outline-none bg-white ${
-                            isGalleryDragOver
-                              ? 'border-neutral-900 bg-neutral-100'
-                              : 'border-neutral-200 hover:border-neutral-300'
-                          }`}
-                        >
-                          <p className="text-xs text-neutral-500 font-medium">
-                            Drag &amp; drop multiple product photos here, click "Upload Photos" or press <span className="font-mono bg-neutral-100 px-1 py-0.5 rounded border">Ctrl + V</span>
-                          </p>
-                        </div>
-
-                        {/* Uploaded Photos Grid */}
-                        {allSimpleImages.length > 0 && (
-                          <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-3 pt-1">
-                            {allSimpleImages.map((img, imgIdx) => (
-                              <div
-                                key={imgIdx}
-                                className={`relative aspect-square rounded-xl border-2 overflow-hidden bg-neutral-100 group shadow-2xs ${
-                                  imgIdx === 0 ? 'border-neutral-900 ring-2 ring-neutral-900/20' : 'border-neutral-200'
-                                }`}
-                              >
-                                <img
-                                  src={img}
-                                  alt={`Product Image ${imgIdx + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-
-                                {/* First Image Main Badge */}
-                                {imgIdx === 0 && (
-                                  <div className="absolute top-1 left-1 bg-neutral-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
-                                    ★ Main Cover
-                                  </div>
-                                )}
-
-                                {/* Hover Actions */}
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
-                                  {imgIdx !== 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSimpleSetMainImage(imgIdx)}
-                                      className="text-[9px] bg-white text-black font-bold px-1.5 py-0.5 rounded hover:bg-neutral-100 cursor-pointer w-full text-center"
-                                    >
-                                      Set as Main
-                                    </button>
+                        {/* Quick Suggestions */}
+                        <div className="pt-1 border-t border-neutral-100">
+                          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">
+                            Suggestions
+                          </span>
+                          <div className="flex flex-wrap gap-1 max-h-36 overflow-y-auto">
+                            {(STANDARD_ATTRIBUTES.find((sa) => sa.name.toLowerCase() === attr.name.toLowerCase())?.defaultValues || DEFAULT_COLOR_PALETTES.map((c) => c.name)).map((sug) => {
+                              const isAdded = attr.values.includes(sug);
+                              return (
+                                <button
+                                  key={sug}
+                                  type="button"
+                                  disabled={isAdded}
+                                  onClick={() => handleAddAttributeValue(attr.id, sug)}
+                                  className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                                    isAdded
+                                      ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                                      : 'bg-neutral-50 border border-neutral-200 text-neutral-700 hover:bg-neutral-100 cursor-pointer'
+                                  }`}
+                                >
+                                  {attr.name.toLowerCase() === 'color' && (
+                                    <span
+                                      className="w-2 h-2 rounded-full shrink-0"
+                                      style={{ backgroundColor: findHexByColorName(sug) }}
+                                    />
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSimpleRemoveImage(imgIdx)}
-                                    className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded hover:bg-rose-700 cursor-pointer w-full text-center"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                                  <span>{sug}</span>
+                                </button>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+                        </div>
 
-                </div>
-              )}
-
-              {/* ============================================================ */}
-              {/* B. VARIABLE PRODUCT SECTION (Options + Variants with Media) */}
-              {/* ============================================================ */}
-              {productType === 'Variable' && (
-                <div className="space-y-6 pt-2">
-                  <div className="bg-[#eff6ff] border border-[#dbeafe] text-[#2563eb] rounded-xl p-4 flex items-center gap-3 text-xs font-medium shadow-2xs">
-                    <Info className="w-4 h-4 shrink-0 text-[#2563eb]" />
-                    <span>
-                      Variable Product Mode: Configure options and variants below. Each variation has its own Main Photo, Gallery Photos (Drag &amp; Drop / Ctrl + V), Color Swatch, Price, SKU, and Stock.
-                    </span>
-                  </div>
-
-                  {/* Variation Options Editor */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                        VARIATION ATTRIBUTES
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={handleAddOption}
-                        className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Custom Option</span>
-                      </button>
-                    </div>
-
-                    {/* Quick Add from Master Attributes */}
-                    {masterAttributes.length > 0 && (
-                      <div className="flex items-center gap-2 flex-wrap p-3 bg-white border border-neutral-200 rounded-xl">
-                        <span className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                          <Sliders className="w-3.5 h-3.5 text-neutral-500" /> Pre-built Attributes:
-                        </span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {masterAttributes.map((attr) => {
-                            const isAdded = options.some(
-                              (o) => o.name.toLowerCase() === attr.name.toLowerCase()
-                            );
-                            return (
-                              <button
-                                key={attr.id}
-                                type="button"
-                                onClick={() => handleAddOptionFromMaster(attr)}
-                                disabled={isAdded}
-                                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
-                                  isAdded
-                                    ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed'
-                                    : 'bg-[#FAF8F4] text-neutral-800 border-neutral-200 hover:border-black hover:bg-neutral-100 shadow-2xs'
-                                }`}
-                              >
-                                <Plus className="w-3 h-3 text-neutral-500" />
-                                <span>{attr.name}</span>
-                              </button>
-                            );
-                          })}
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setOpenValueDropdownId(null)}
+                            className="text-xs text-neutral-600 hover:text-black font-semibold cursor-pointer"
+                          >
+                            Done
+                          </button>
                         </div>
                       </div>
                     )}
-
-                    {/* Options List */}
-                    {options.map((opt, optIdx) => {
-                      const matchedMasterAttr = masterAttributes.find(
-                        (ma) => ma.name.toLowerCase() === opt.name.toLowerCase()
-                      );
-
-                      const isDropdownOpen = openValueDropdownId === opt.id;
-                      const searchQuery = (valueSearchQueries[opt.id] || '').toLowerCase();
-                      const availableMasterValues = matchedMasterAttr?.values || [];
-                      const filteredMasterValues = availableMasterValues.filter((v) =>
-                        (v.label || v.value).toLowerCase().includes(searchQuery)
-                      );
-
-                      return (
-                        <div
-                          key={opt.id}
-                          className="bg-neutral-50/90 border border-neutral-200 rounded-xl p-4 sm:p-5 space-y-4 shadow-2xs"
-                        >
-                          <div className="flex items-center justify-between border-b border-neutral-200/80 pb-3">
-                            <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
-                              Option {optIdx + 1}
-                            </span>
-                            {options.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveOption(optIdx)}
-                                className="text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer flex items-center gap-1"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Remove Option</span>
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                            {/* Attribute Name* Dropdown */}
-                            <div className="md:col-span-4 space-y-1.5">
-                              <label className="text-xs font-bold text-neutral-800 flex items-center gap-1">
-                                <span>Attribute Name*</span>
-                              </label>
-                              
-                              <div className="space-y-2">
-                                <select
-                                  value={
-                                    masterAttributes.some((ma) => ma.name.toLowerCase() === opt.name.toLowerCase())
-                                      ? masterAttributes.find((ma) => ma.name.toLowerCase() === opt.name.toLowerCase())?.name
-                                      : '__custom__'
-                                  }
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === '__custom__') {
-                                      handleOptionNameChange(optIdx, 'Custom Attribute');
-                                    } else {
-                                      handleOptionNameChange(optIdx, val);
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-none focus:border-black font-medium cursor-pointer shadow-2xs"
-                                >
-                                  <option value="" disabled>Select Attribute Name...</option>
-                                  {masterAttributes.map((ma) => (
-                                    <option key={ma.id} value={ma.name}>
-                                      {ma.name}
-                                    </option>
-                                  ))}
-                                  <option value="__custom__">+ Custom Attribute...</option>
-                                </select>
-
-                                {!masterAttributes.some((ma) => ma.name.toLowerCase() === opt.name.toLowerCase()) && (
-                                  <input
-                                    type="text"
-                                    value={opt.name}
-                                    onChange={(e) => handleOptionNameChange(optIdx, e.target.value)}
-                                    placeholder="Enter custom attribute name..."
-                                    className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-none focus:border-black"
-                                  />
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Attribute Value* Searchable Multi-Select Dropdown */}
-                            <div className="md:col-span-8 space-y-1.5 relative">
-                              <label className="text-xs font-bold text-neutral-800 flex items-center justify-between">
-                                <span>Attribute Value*</span>
-                                {opt.values.length > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = options.map((o) =>
-                                        o.id === opt.id ? { ...o, values: [] } : o
-                                      );
-                                      setOptions(updated);
-                                      syncVariantsFromOptions(updated);
-                                      setIsDirty(true);
-                                    }}
-                                    className="text-[10px] text-neutral-500 hover:text-rose-600 font-semibold cursor-pointer"
-                                  >
-                                    Clear all ({opt.values.length})
-                                  </button>
-                                )}
-                              </label>
-
-                              {/* Multi-Select Input Trigger Box */}
-                              <div
-                                onClick={() => setOpenValueDropdownId(isDropdownOpen ? null : opt.id)}
-                                className="min-h-[38px] p-2 bg-white border border-neutral-300 rounded-lg cursor-pointer flex items-center justify-between gap-2 flex-wrap shadow-2xs hover:border-neutral-400 transition-colors"
-                              >
-                                {opt.values.length === 0 ? (
-                                  <span className="text-xs text-neutral-400 select-none pl-1">Select...</span>
-                                ) : (
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    {opt.values.map((val, valIdx) => (
-                                      <span
-                                        key={valIdx}
-                                        className="inline-flex items-center gap-1.5 bg-neutral-900 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md shadow-2xs"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {opt.name.toLowerCase().includes('color') && (
-                                          <span
-                                            className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-xs shrink-0 inline-block"
-                                            style={{ backgroundColor: getColorHex(val) }}
-                                          />
-                                        )}
-                                        <span>{val}</span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemoveOptionValue(opt.id, valIdx);
-                                          }}
-                                          className="hover:bg-neutral-700 rounded-full p-0.5 cursor-pointer ml-0.5"
-                                        >
-                                          <X className="w-2.5 h-2.5" />
-                                        </button>
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                <ChevronDown className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                              </div>
-
-                              {/* Dropdown Menu Popover */}
-                              {isDropdownOpen && (
-                                <div
-                                  className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-neutral-200 rounded-xl shadow-xl p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-100"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {/* Search & Actions Bar */}
-                                  <div className="flex items-center gap-2">
-                                    <div className="relative flex-1">
-                                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-neutral-400" />
-                                      <input
-                                        type="text"
-                                        placeholder="Search or type value..."
-                                        value={valueSearchQueries[opt.id] || ''}
-                                        onChange={(e) =>
-                                          setValueSearchQueries((prev) => ({
-                                            ...prev,
-                                            [opt.id]: e.target.value
-                                          }))
-                                        }
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            const v = (valueSearchQueries[opt.id] || '').trim();
-                                            if (v) {
-                                              handleAddOptionValue(opt.id, v);
-                                              setValueSearchQueries((prev) => ({ ...prev, [opt.id]: '' }));
-                                            }
-                                          }
-                                        }}
-                                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-neutral-50 border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-medium"
-                                        autoFocus
-                                      />
-                                    </div>
-                                    {(valueSearchQueries[opt.id] || '').trim() && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const v = (valueSearchQueries[opt.id] || '').trim();
-                                          if (v) {
-                                            handleAddOptionValue(opt.id, v);
-                                            setValueSearchQueries((prev) => ({ ...prev, [opt.id]: '' }));
-                                          }
-                                        }}
-                                        className="text-xs bg-neutral-900 text-white font-bold px-3 py-1.5 rounded-lg cursor-pointer shrink-0"
-                                      >
-                                        + Add
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  {/* Quick Select All from Master */}
-                                  {matchedMasterAttr && matchedMasterAttr.values && matchedMasterAttr.values.length > 0 && (
-                                    <div className="flex items-center justify-between border-b border-neutral-100 pb-1.5 text-[11px]">
-                                      <span className="text-neutral-500 font-medium">
-                                        Available from {matchedMasterAttr.name}:
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleAddAllValuesFromMaster(opt.id, matchedMasterAttr)}
-                                        className="text-neutral-900 font-bold hover:underline cursor-pointer"
-                                      >
-                                        + Select All
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* Values List */}
-                                  <div className="max-h-52 overflow-y-auto space-y-1 divide-y divide-neutral-100 pr-1">
-                                    {filteredMasterValues.length > 0 ? (
-                                      filteredMasterValues.map((v) => {
-                                        const valStr = (v.label || v.value).trim();
-                                        const isSelected = opt.values.includes(valStr);
-
-                                        return (
-                                          <div
-                                            key={v.id || valStr}
-                                            onClick={() => {
-                                              if (isSelected) {
-                                                const idx = opt.values.indexOf(valStr);
-                                                if (idx !== -1) handleRemoveOptionValue(opt.id, idx);
-                                              } else {
-                                                handleAddOptionValue(opt.id, valStr);
-                                              }
-                                            }}
-                                            className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                                              isSelected
-                                                ? 'bg-neutral-900 text-white'
-                                                : 'hover:bg-neutral-100 text-neutral-800'
-                                            }`}
-                                          >
-                                            <div className="flex items-center gap-2">
-                                              {v.colorCode ? (
-                                                <span
-                                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
-                                                  style={{ backgroundColor: v.colorCode }}
-                                                />
-                                              ) : opt.name.toLowerCase().includes('color') ? (
-                                                <span
-                                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
-                                                  style={{ backgroundColor: getColorHex(valStr) }}
-                                                />
-                                              ) : null}
-                                              <span>{valStr}</span>
-                                            </div>
-                                            {isSelected && <Check className="w-3.5 h-3.5" />}
-                                          </div>
-                                        );
-                                      })
-                                    ) : (
-                                      <div className="p-3 text-center text-xs text-neutral-400">
-                                        No matching values. Press "Enter" to add custom value.
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center justify-end pt-1 border-t border-neutral-100">
-                                    <button
-                                      type="button"
-                                      onClick={() => setOpenValueDropdownId(null)}
-                                      className="text-xs bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold px-3 py-1 rounded-md cursor-pointer"
-                                    >
-                                      Done
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Live Color Picker for Color Attribute */}
-                          {opt.name.toLowerCase().includes('color') && (
-                            <div className="bg-white border border-neutral-200/90 rounded-xl p-3.5 space-y-3 shadow-2xs">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
-                                  <Palette className="w-4 h-4 text-brand-maroon" />
-                                  <span>Color Code Picker &amp; Live Name Detection</span>
-                                </span>
-                                <span className="text-[11px] text-neutral-400">
-                                  Pick any color — name will detect automatically
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-3 flex-wrap bg-neutral-50 p-2.5 rounded-lg border border-neutral-200/80">
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="color"
-                                    value={activePickerHex}
-                                    onChange={(e) => handleColorPickerChange(e.target.value)}
-                                    className="w-9 h-9 rounded-lg border border-neutral-300 cursor-pointer p-0.5 bg-white shadow-2xs shrink-0"
-                                    title="Click to open color spectrum picker"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={activePickerHex}
-                                    onChange={(e) => handleColorPickerChange(e.target.value)}
-                                    placeholder="#000000"
-                                    className="w-24 px-2.5 py-1.5 text-xs font-mono font-semibold bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
-                                  />
-                                </div>
-
-                                <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-                                  <span className="text-[11px] font-semibold text-neutral-500 shrink-0">
-                                    Color Name:
-                                  </span>
-                                  <input
-                                    type="text"
-                                    value={activePickerName}
-                                    onChange={(e) => setActivePickerName(e.target.value)}
-                                    placeholder="Color name"
-                                    className="w-full px-3 py-1.5 text-xs font-bold text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
-                                  />
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nameToAdd = (activePickerName || '').trim() || getClosestColorName(activePickerHex).name;
-                                    handleAddOptionValue(opt.id, nameToAdd);
-                                  }}
-                                  className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-lg shadow-2xs transition-all cursor-pointer shrink-0"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  <span>Add Color</span>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Add an option Button (Styled as in user screenshot) */}
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={handleAddOption}
-                        className="inline-flex items-center gap-2 bg-neutral-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add an option</span>
-                      </button>
-                    </div>
                   </div>
 
-                  {/* Configured Variants Matrix */}
-                  <div className="border-t border-dashed border-neutral-300 pt-6 space-y-6">
-                    <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                      CONFIGURED VARIANTS ({variants.length})
-                    </h4>
-
-                    <div className="space-y-6">
-                      {variants.map((v, vIdx) => {
-                        const vMainImg = v.mainImage || v.images?.[0] || mainImage || '/images/category/Latkan.webp';
-                        const vGals = v.galleryImages || [];
-
-                        return (
-                          <div
-                            key={v.id || vIdx}
-                            className="border border-neutral-200 rounded-xl p-5 space-y-5 bg-neutral-50/60 shadow-2xs"
-                          >
-                            <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
-                              <div className="flex items-center gap-2.5">
-                                <span
-                                  className="w-4 h-4 rounded-full border border-neutral-300 shadow-2xs shrink-0"
-                                  style={{ backgroundColor: (v as any).colorHex || '#800000' }}
-                                />
-                                <h5 className="text-xs font-bold text-neutral-900">
-                                  {v.name || v.optionValue}
-                                </h5>
-                              </div>
-                            </div>
-
-                            {/* 4-Column Pricing & Inventory */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                              {/* Variant Selling Price */}
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-neutral-700">
-                                  Selling Price (₹) *
-                                </label>
-                                <input
-                                  type="number"
-                                  value={v.price}
-                                  onChange={(e) =>
-                                    handleUpdateVariantField(vIdx, 'price', Number(e.target.value))
-                                  }
-                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-semibold"
-                                />
-                              </div>
-
-                              {/* Variant Regular Price */}
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-neutral-700">
-                                  Regular Price (₹)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={v.salePrice || ''}
-                                  onChange={(e) =>
-                                    handleUpdateVariantField(
-                                      vIdx,
-                                      'salePrice',
-                                      e.target.value ? Number(e.target.value) : undefined
-                                    )
-                                  }
-                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
-                                />
-                              </div>
-
-                              {/* Variant SKU */}
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-neutral-700">
-                                  SKU
-                                </label>
-                                <input
-                                  type="text"
-                                  value={v.sku}
-                                  onChange={(e) =>
-                                    handleUpdateVariantField(vIdx, 'sku', e.target.value)
-                                  }
-                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-mono"
-                                />
-                              </div>
-
-                              {/* Variant Stock */}
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-neutral-700">
-                                  Stock Qty *
-                                </label>
-                                <input
-                                  type="number"
-                                  value={v.quantity}
-                                  onChange={(e) =>
-                                    handleUpdateVariantField(vIdx, 'quantity', Number(e.target.value))
-                                  }
-                                  className="w-full px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black"
-                                />
-                              </div>
-                            </div>
-
-                            {/* VARIANT GALLERY & PHOTOS (Unified Uploader: 1st image is Main Image) */}
-                            {(() => {
-                              const variantImages = (v.images && v.images.length > 0)
-                                ? v.images
-                                : [v.mainImage, ...(v.galleryImages || [])].filter(Boolean);
-                              const [varUrlInput, setVarUrlInput] = [newOptionValueInputs[`var-url-${vIdx}`] || '', (val: string) => setNewOptionValueInputs((prev) => ({ ...prev, [`var-url-${vIdx}`]: val }))];
-
-                              return (
-                                <div className="space-y-3 pt-3 border-t border-neutral-200/80">
-                                  <div className="flex items-center justify-between flex-wrap gap-2">
-                                    <div>
-                                      <label className="text-xs font-bold text-neutral-900 flex items-center gap-1.5 uppercase tracking-wider">
-                                        <ImageIcon className="w-4 h-4 text-neutral-700" />
-                                        <span>Variant Photos &amp; Gallery ({variantImages.length})</span>
-                                      </label>
-                                      <p className="text-[11px] text-neutral-500">
-                                        First photo is automatically used as the <strong>Main Product Image</strong> for this variant.
-                                      </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                      <label className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-black text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-2xs transition-all">
-                                        <UploadCloud className="w-3.5 h-3.5" />
-                                        <span>Upload Variant Photos</span>
-                                        <input
-                                          type="file"
-                                          multiple
-                                          accept="image/*"
-                                          onChange={(e) => handleVariantGalleryFiles(vIdx, e.target.files)}
-                                          className="hidden"
-                                        />
-                                      </label>
-                                    </div>
-                                  </div>
-
-                                  {/* URL Input & Paste Row */}
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="text"
-                                      placeholder="Paste image URL here or press Ctrl + V..."
-                                      value={varUrlInput}
-                                      onFocus={() => setActivePasteTarget({ type: 'var_gallery', index: vIdx })}
-                                      onChange={(e) => setVarUrlInput(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          if (varUrlInput.trim()) {
-                                            handleVariantAddImages(vIdx, [varUrlInput.trim()]);
-                                            setVarUrlInput('');
-                                          }
-                                        }
-                                      }}
-                                      className="flex-1 h-8 text-xs bg-white px-3 border border-neutral-300 rounded-lg focus:outline-none focus:border-black"
-                                    />
-                                    {varUrlInput.trim() && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleVariantAddImages(vIdx, [varUrlInput.trim()]);
-                                          setVarUrlInput('');
-                                        }}
-                                        className="h-8 px-3 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-lg cursor-pointer shrink-0"
-                                      >
-                                        Add URL
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  {/* Drag & Drop Zone */}
-                                  <div
-                                    tabIndex={0}
-                                    onFocus={() => setActivePasteTarget({ type: 'var_gallery', index: vIdx })}
-                                    onClick={() => setActivePasteTarget({ type: 'var_gallery', index: vIdx })}
-                                    onDragOver={(e) => {
-                                      e.preventDefault();
-                                      setActiveVarDragGal(vIdx);
-                                    }}
-                                    onDragLeave={() => setActiveVarDragGal(null)}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      setActiveVarDragGal(null);
-                                      if (e.dataTransfer.files) handleVariantGalleryFiles(vIdx, e.dataTransfer.files);
-                                    }}
-                                    className={`border-2 border-dashed rounded-xl p-3 text-center transition-colors cursor-pointer outline-none bg-white ${
-                                      activeVarDragGal === vIdx
-                                        ? 'border-neutral-900 bg-neutral-100'
-                                        : 'border-neutral-200 hover:border-neutral-300'
-                                    }`}
-                                  >
-                                    <p className="text-[11px] text-neutral-500">
-                                      Drag &amp; drop photos here, or click to activate clipboard <span className="font-mono bg-neutral-100 px-1 py-0.5 rounded border">Ctrl + V</span>
-                                    </p>
-                                  </div>
-
-                                  {/* Uploaded Photos Grid */}
-                                  {variantImages.length > 0 && (
-                                    <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2.5 pt-1">
-                                      {variantImages.map((img, imgIdx) => (
-                                        <div
-                                          key={imgIdx}
-                                          className={`relative aspect-square rounded-xl border-2 overflow-hidden bg-neutral-100 group shadow-2xs ${
-                                            imgIdx === 0 ? 'border-neutral-900 ring-2 ring-neutral-900/20' : 'border-neutral-200'
-                                          }`}
-                                        >
-                                          <img
-                                            src={img}
-                                            alt={`Variant ${v.optionValue} image ${imgIdx + 1}`}
-                                            className="w-full h-full object-cover"
-                                          />
-
-                                          {/* First Image Main Badge */}
-                                          {imgIdx === 0 && (
-                                            <div className="absolute top-1 left-1 bg-neutral-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
-                                              ★ Main Cover
-                                            </div>
-                                          )}
-
-                                          {/* Hover Actions */}
-                                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
-                                            {imgIdx !== 0 && (
-                                              <button
-                                                type="button"
-                                                onClick={() => handleVariantSetMainImage(vIdx, imgIdx)}
-                                                className="text-[9px] bg-white text-black font-bold px-1.5 py-0.5 rounded hover:bg-neutral-100 cursor-pointer w-full text-center"
-                                              >
-                                                Set as Main
-                                              </button>
-                                            )}
-                                            <button
-                                              type="button"
-                                              onClick={() => handleVariantRemoveImage(vIdx, imgIdx)}
-                                              className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded hover:bg-rose-700 cursor-pointer w-full text-center"
-                                            >
-                                              Delete
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-            </div>
-          </div>
-        </div>
-
-        {/* 3. DESCRIPTIONS SECTION */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start border-b border-neutral-200/80 pb-10">
-          <div className="lg:col-span-3 space-y-1">
-            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">Descriptions</h2>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Write engaging overview text and detailed rich product specifications for customer education
-            </p>
-          </div>
-
-          <div className="lg:col-span-9 space-y-6">
-            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-5">
-              
-              {/* Short Description */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">
-                  Short Description / Overview Summary
-                </label>
-                <textarea
-                  rows={3}
-                  value={shortDescription}
-                  onChange={(e) => {
-                    setShortDescription(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="Concise 1-2 sentence overview shown near the Buy buttons..."
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-normal leading-relaxed"
-                />
-              </div>
-
-              {/* Rich Product Description */}
-              <div className="space-y-1.5 pt-2">
-                <label className="text-xs font-semibold text-neutral-700">
-                  Full Product Description (Detailed Content Tab)
-                </label>
-                <RichTextEditor
-                  value={longDescription}
-                  onChange={(val) => {
-                    setLongDescription(val);
-                    setIsDirty(true);
-                  }}
-                  minHeight="200px"
-                  placeholder="Write complete product specifications, materials, highlights, and care details..."
-                />
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        {/* 4. ADDITIONAL INFORMATION / SPECIFICATIONS TABLE */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-10">
-          <div className="lg:col-span-3 space-y-1">
-            <h2 className="text-sm font-bold text-neutral-900 tracking-tight">
-              Additional Information
-            </h2>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Define custom attribute rows (Material, Dimensions, Weight, Craft Type, Care Instructions) displayed in the website's Additional Information table
-            </p>
-          </div>
-
-          <div className="lg:col-span-9">
-            <div className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                  SPECIFICATIONS &amp; ATTRIBUTES TABLE ({specifications.length})
-                </h4>
-                <button
-                  type="button"
-                  onClick={handleAddSpecRow}
-                  className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Attribute Row</span>
-                </button>
-              </div>
-
-              <div className="space-y-2.5 pt-2">
-                {specifications.map((spec, sIdx) => (
-                  <div key={spec.id || sIdx} className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      value={spec.key}
-                      onChange={(e) => handleUpdateSpecRow(sIdx, 'key', e.target.value)}
-                      placeholder="Attribute (e.g. Material, Dimensions)"
-                      className="w-1/3 px-3 py-2 text-xs bg-white border border-neutral-200 rounded-lg font-semibold text-neutral-800 focus:outline-none focus:border-black"
-                    />
-                    <input
-                      type="text"
-                      value={spec.value}
-                      onChange={(e) => handleUpdateSpecRow(sIdx, 'value', e.target.value)}
-                      placeholder="Value (e.g. Pure Silk, 15x10 cm)"
-                      className="flex-1 px-3 py-2 text-xs bg-white border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:border-black"
-                    />
+                  {/* Delete Attribute */}
+                  <div className="sm:col-span-1 pt-6 flex justify-center">
                     <button
                       type="button"
-                      onClick={() => handleRemoveSpecRow(sIdx)}
-                      className="text-neutral-400 hover:text-rose-600 p-2 cursor-pointer transition-colors"
-                      title="Delete row"
+                      onClick={() => handleRemoveAttribute(attrIdx)}
+                      className="p-2 text-neutral-400 hover:text-rose-600 rounded-lg cursor-pointer"
+                      title="Remove attribute"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Actions: Add Attribute & Generate Variants */}
+            <div className="pt-2 flex items-center justify-between flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleAddAttribute}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 px-3.5 py-2 rounded-lg transition-colors cursor-pointer border border-neutral-200"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Attribute</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGenerateVariants}
+                className="inline-flex items-center gap-2 bg-neutral-950 hover:bg-black text-white text-xs font-bold px-5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Generate Variants</span>
+              </button>
+            </div>
+
+            {/* 4. GENERATED VARIANTS COMPACT TABLE */}
+            {variants.length > 0 && (
+              <div className="pt-6 border-t border-neutral-200/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-neutral-900">
+                    {variants.length} Variants Generated
+                  </h3>
+                  <span className="text-[11px] text-neutral-400">
+                    Variants are generated automatically based on selected attributes.
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto border border-neutral-200 rounded-xl">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-neutral-50/80 border-b border-neutral-200 text-neutral-500 font-semibold text-[11px]">
+                        <th className="py-2.5 px-3">Variant</th>
+                        <th className="py-2.5 px-3">SKU</th>
+                        <th className="py-2.5 px-3">Selling Price (₹)</th>
+                        <th className="py-2.5 px-3">Regular Price (₹)</th>
+                        <th className="py-2.5 px-3">Stock</th>
+                        <th className="py-2.5 px-3 text-center">Images</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-200">
+                      {variants.map((v, vIdx) => {
+                        const variantImgCount = (v.images && v.images.length > 0)
+                          ? v.images.length
+                          : (v.mainImage ? 1 : 0);
+
+                        return (
+                          <tr key={v.id || vIdx} className="hover:bg-neutral-50/50">
+                            {/* Variant Name & Dot */}
+                            <td className="py-2.5 px-3 font-semibold text-neutral-900 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0 inline-block"
+                                  style={{ backgroundColor: (v as any).colorHex || '#16A34A' }}
+                                />
+                                <span>{v.optionValue || v.name}</span>
+                              </div>
+                            </td>
+
+                            {/* SKU */}
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="text"
+                                value={v.sku}
+                                onChange={(e) => handleUpdateVariantField(vIdx, 'sku', e.target.value)}
+                                className="w-28 px-2 py-1 text-xs font-mono bg-white border border-neutral-200 rounded-md focus:outline-none focus:border-black"
+                              />
+                            </td>
+
+                            {/* Selling Price */}
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="number"
+                                value={v.price}
+                                onChange={(e) => handleUpdateVariantField(vIdx, 'price', Number(e.target.value))}
+                                className="w-20 px-2 py-1 text-xs font-semibold bg-white border border-neutral-200 rounded-md focus:outline-none focus:border-black"
+                              />
+                            </td>
+
+                            {/* Regular Price */}
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="number"
+                                value={v.salePrice || ''}
+                                onChange={(e) =>
+                                  handleUpdateVariantField(
+                                    vIdx,
+                                    'salePrice',
+                                    e.target.value ? Number(e.target.value) : undefined
+                                  )
+                                }
+                                className="w-20 px-2 py-1 text-xs bg-white border border-neutral-200 rounded-md focus:outline-none focus:border-black"
+                              />
+                            </td>
+
+                            {/* Stock */}
+                            <td className="py-2.5 px-3">
+                              <input
+                                type="number"
+                                value={v.quantity}
+                                onChange={(e) =>
+                                  handleUpdateVariantField(vIdx, 'quantity', Number(e.target.value))
+                                }
+                                className="w-16 px-2 py-1 text-xs bg-white border border-neutral-200 rounded-md focus:outline-none focus:border-black"
+                              />
+                            </td>
+
+                            {/* Images Button */}
+                            <td className="py-2.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setActiveVariantImageModal(vIdx)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium border border-neutral-200 hover:bg-neutral-100 cursor-pointer shadow-2xs"
+                                title="Manage variant photos"
+                              >
+                                <UploadCloud className="w-3.5 h-3.5 text-neutral-600" />
+                                <span>{variantImgCount}</span>
+                              </button>
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-2.5 px-3">
+                              <select
+                                value={(v as any).status || 'Active'}
+                                onChange={(e) => handleUpdateVariantField(vIdx, 'status', e.target.value)}
+                                className="px-2 py-1 text-xs bg-white border border-neutral-200 rounded-md focus:outline-none focus:border-black cursor-pointer font-medium"
+                              >
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                              </select>
+                            </td>
+
+                            {/* Action Delete */}
+                            <td className="py-2.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveVariant(vIdx)}
+                                className="p-1 text-neutral-400 hover:text-rose-600 rounded cursor-pointer"
+                                title="Delete variant"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-neutral-500 pt-1">
+                  <Info className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  <span>You can upload images for each variant. These images will be shown to customers.</span>
+                </div>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. PRODUCT IMAGES (FOR SIMPLE PRODUCT ONLY) */}
+        {productType === 'Simple' && (
+          <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                  PRODUCT IMAGES <span className="text-rose-500">*</span>
+                </h2>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Upload main product image and gallery images.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                  className="text-xs font-semibold text-neutral-600 hover:text-black px-2.5 py-1.5 rounded-lg border border-neutral-200 cursor-pointer"
+                >
+                  + Image URL
+                </button>
+                <label className="inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer shadow-sm transition-all">
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Upload Images</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* URL Input Form */}
+            {showUrlInput && (
+              <div className="flex items-center gap-2 p-2 bg-neutral-50 border border-neutral-200 rounded-xl">
+                <input
+                  type="text"
+                  placeholder="Paste image URL here..."
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (urlInput.trim()) {
+                        handleAddImages([urlInput.trim()]);
+                        setUrlInput('');
+                        setShowUrlInput(false);
+                      }
+                    }
+                  }}
+                  className="flex-1 px-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-black font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (urlInput.trim()) {
+                      handleAddImages([urlInput.trim()]);
+                      setUrlInput('');
+                      setShowUrlInput(false);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs bg-neutral-900 text-white font-bold rounded-lg cursor-pointer"
+                >
+                  Add
+                </button>
+              </div>
+            )}
+
+            {/* Drag & Drop Zone */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+              }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                if (e.dataTransfer.files) handleFileUpload(e.dataTransfer.files);
+              }}
+              className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer bg-white ${
+                isDragOver ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200 hover:border-neutral-300'
+              }`}
+            >
+              <UploadCloud className="w-6 h-6 text-neutral-400 mx-auto mb-1.5" />
+              <p className="text-xs font-semibold text-neutral-700">
+                Drag &amp; drop images here or click to upload
+              </p>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                You can upload multiple images
+              </p>
+            </div>
+
+            {/* Thumbnails Row */}
+            {images.length > 0 && (
+              <div className="flex items-center gap-3 overflow-x-auto pt-2 pb-1">
+                {images.map((img, i) => (
+                  <div
+                    key={i}
+                    className={`relative w-20 h-20 rounded-xl border-2 overflow-hidden bg-neutral-100 shrink-0 group shadow-2xs ${
+                      i === 0 ? 'border-neutral-950 ring-2 ring-neutral-950/10' : 'border-neutral-200'
+                    }`}
+                  >
+                    <img src={img} alt={`Product ${i}`} className="w-full h-full object-cover" />
+                    {i === 0 && (
+                      <div className="absolute top-1 left-1 bg-neutral-950 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                        ★ Main Image
+                      </div>
+                    )}
+
+                    {/* Hover Actions */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                      {i !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetMainImage(i)}
+                          className="text-[9px] bg-white text-black font-bold px-1.5 py-0.5 rounded hover:bg-neutral-100 cursor-pointer w-full text-center"
+                        >
+                          Set Main
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(i)}
+                        className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded hover:bg-rose-700 cursor-pointer w-full text-center"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add More Box */}
+                <label className="w-20 h-20 rounded-xl border-2 border-dashed border-neutral-300 hover:border-neutral-400 bg-neutral-50 flex flex-col items-center justify-center gap-1 cursor-pointer shrink-0 transition-colors">
+                  <Plus className="w-4 h-4 text-neutral-500" />
+                  <span className="text-[10px] font-semibold text-neutral-600">Add More</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 6. SHORT DESCRIPTION */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                SHORT DESCRIPTION
+              </h2>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Short description about the product (for product page summary)
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAutoGenerateShortDescription}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-200/80 transition-colors cursor-pointer shadow-2xs active:scale-95"
+              title="Generate tailored AI short description based on product name and category"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Auto Generate Content</span>
+            </button>
+          </div>
+
+          <div className="relative">
+            <textarea
+              rows={3}
+              value={shortDescription}
+              maxLength={300}
+              onChange={(e) => {
+                setShortDescription(e.target.value);
+                setIsDirty(true);
+              }}
+              placeholder="Write short description..."
+              className="w-full px-3.5 py-2.5 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-950 font-normal leading-relaxed resize-none"
+            />
+            <span className="absolute bottom-2.5 right-3 text-[10px] text-neutral-400 font-mono">
+              {shortDescription.length} / 300
+            </span>
+          </div>
+        </div>
+
+        {/* 7. FULL DESCRIPTION */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                DESCRIPTION
+              </h2>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Full description about the product
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAutoGenerateLongDescription}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-200/80 transition-colors cursor-pointer shadow-2xs active:scale-95"
+              title="Generate tailored AI full description based on product name and category"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Auto Generate Description</span>
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            <RichTextEditor
+              value={description}
+              onChange={(val) => {
+                setDescription(val);
+                setIsDirty(true);
+              }}
+              minHeight="180px"
+              placeholder="Write product description..."
+            />
+            <div className="flex justify-end pr-1">
+              <span className="text-[10px] text-neutral-400 font-mono">
+                {description.replace(/<[^>]*>/g, '').length} / 2000
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 8. STATUS TOGGLE */}
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                STATUS
+              </h2>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Choose product status.
+              </p>
+            </div>
+
+            {/* Toggle Switch */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={status === 'Active'}
+              onClick={() => {
+                setStatus(status === 'Active' ? 'Inactive' : 'Active');
+                setIsDirty(true);
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                status === 'Active' ? 'bg-neutral-950' : 'bg-neutral-200'
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  status === 'Active' ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2 border-t border-neutral-100">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${status === 'Active' ? 'bg-emerald-500 ring-4 ring-emerald-50' : 'bg-neutral-300'}`} />
+            <div>
+              <span className="text-xs font-bold text-neutral-900 block">
+                {status === 'Active' ? 'Active' : 'Inactive'}
+              </span>
+              <span className="text-[11px] text-neutral-400">
+                {status === 'Active'
+                  ? 'Product will be visible to customers'
+                  : 'Product will be hidden from store'}
+              </span>
             </div>
           </div>
         </div>
 
       </div>
 
+      {/* VARIANT IMAGE MODAL */}
+      {activeVariantImageModal !== null && variants[activeVariantImageModal] && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-neutral-200 max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900">
+                  Variant Photos: {variants[activeVariantImageModal].optionValue || variants[activeVariantImageModal].name}
+                </h3>
+                <p className="text-[11px] text-neutral-400">
+                  Upload photos specifically for this variation.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveVariantImageModal(null)}
+                className="p-1 text-neutral-400 hover:text-black rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Upload Zone */}
+            <label className="border-2 border-dashed border-neutral-200 hover:border-neutral-300 rounded-xl p-5 text-center block cursor-pointer bg-neutral-50/50">
+              <UploadCloud className="w-6 h-6 text-neutral-400 mx-auto mb-1" />
+              <span className="text-xs font-semibold text-neutral-700 block">Click to upload photos</span>
+              <span className="text-[10px] text-neutral-400">or paste from clipboard (Ctrl + V)</span>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    Array.from(e.target.files).forEach((file) => {
+                      if (!file.type.startsWith('image/')) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        if (reader.result) {
+                          handleVariantAddImages(activeVariantImageModal, [reader.result as string]);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    });
+                  }
+                }}
+                className="hidden"
+              />
+            </label>
+
+            {/* Photos List */}
+            {(() => {
+              const v = variants[activeVariantImageModal];
+              const vImages = v.images && v.images.length > 0 ? v.images : [v.mainImage].filter(Boolean);
+
+              return (
+                <div className="grid grid-cols-4 gap-2.5 max-h-48 overflow-y-auto">
+                  {vImages.map((img, imgIdx) => (
+                    <div key={imgIdx} className="relative aspect-square rounded-lg border border-neutral-200 overflow-hidden group">
+                      <img src={img} alt="Variant" className="w-full h-full object-cover" />
+                      {imgIdx === 0 && (
+                        <span className="absolute top-1 left-1 bg-black text-white text-[8px] font-bold px-1 rounded">
+                          Cover
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleVariantRemoveImage(activeVariantImageModal, imgIdx)}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-rose-400 hover:text-rose-300 text-xs font-bold cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setActiveVariantImageModal(null)}
+                className="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-lg cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* STICKY BOTTOM ACTION FOOTER */}
-      <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-neutral-200 px-6 py-4 shadow-lg flex items-center justify-between">
+      <div className="sticky bottom-0 z-30 bg-white backdrop-blur-md border-t border-neutral-200 px-6 sm:px-10 py-4 flex items-center justify-between">
         <button
           type="button"
-          onClick={() => {
-            if (isDirty) setShowDiscardModal(true);
-            else navigateBack();
-          }}
+          onClick={navigateBack}
           className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 flex items-center gap-1.5 px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -2225,7 +1980,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
             type="button"
             onClick={() => handleSaveProduct('Draft')}
             disabled={isSaving}
-            className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer"
+            className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer disabled:opacity-50"
           >
             Save Draft
           </button>
@@ -2234,145 +1989,14 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
             type="button"
             onClick={() => handleSaveProduct('Active')}
             disabled={isSaving}
-            className="text-xs font-semibold bg-neutral-950 hover:bg-black text-white px-6 py-2 rounded-lg shadow-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="text-xs font-bold text-white bg-neutral-950 hover:bg-black px-5 py-2 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
           >
-            {isSaving ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Saving...</span>
-              </>
-            ) : (
-              <span>{isEditMode ? 'Update Product' : 'Publish Product'}</span>
-            )}
+            {isSaving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+            <span>Publish Product</span>
           </button>
         </div>
       </div>
 
-      {/* DISCARD CONFIRMATION MODAL */}
-      {showDiscardModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-neutral-200">
-            <h3 className="text-sm font-bold text-neutral-900">Discard unsaved changes?</h3>
-            <p className="text-xs text-neutral-500">
-              You have unsaved changes on this product. Are you sure you want to leave without saving?
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowDiscardModal(false)}
-                className="text-xs px-3 py-2 rounded-lg border border-neutral-200 text-neutral-700 hover:bg-neutral-50"
-              >
-                Keep Editing
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDiscardModal(false);
-                  navigateBack();
-                }}
-                className="text-xs px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold"
-              >
-                Discard &amp; Exit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* LIVE PREVIEW MODAL */}
-      {showFinalPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-neutral-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-neutral-800" />
-                <h3 className="text-sm font-bold text-neutral-900">Product Live Preview</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFinalPreviewModal(false)}
-                className="text-neutral-400 hover:text-neutral-600 p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-4">
-                <div className="w-24 h-24 rounded-xl border border-neutral-200 overflow-hidden bg-neutral-100 shrink-0">
-                  <img
-                    src={productType === 'Variable' ? variants[0]?.mainImage || variants[0]?.images?.[0] || mainImage : mainImage}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
-                    {category} {subcategory ? `› ${subcategory}` : ''}
-                  </span>
-                  <h4 className="text-sm font-bold text-neutral-900">{name || 'Untitled Product'}</h4>
-                  <p className="text-xs text-neutral-500 font-mono">SKU: {sku}</p>
-                  <p className="text-sm font-bold text-neutral-950">
-                    ₹{productType === 'Variable' ? variants[0]?.price || salePrice : salePrice}{' '}
-                    {regularPrice > salePrice && (
-                      <span className="text-xs text-neutral-400 line-through font-normal">
-                        ₹{regularPrice}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Short description preview */}
-              {shortDescription && (
-                <div className="p-3 bg-neutral-50 rounded-lg text-xs text-neutral-700">
-                  <p>{shortDescription}</p>
-                </div>
-              )}
-
-              {/* Specifications preview */}
-              {specifications.length > 0 && (
-                <div className="space-y-2 border-t border-neutral-100 pt-3">
-                  <h5 className="text-xs font-bold text-neutral-800">Additional Information Table</h5>
-                  <div className="border border-neutral-200 rounded-lg overflow-hidden text-xs">
-                    <table className="w-full text-left divide-y divide-neutral-200">
-                      <tbody>
-                        {specifications.map((s, i) => (
-                          <tr key={i} className="divide-x divide-neutral-200">
-                            <td className="p-2 bg-neutral-50 font-semibold text-neutral-700 w-1/3">{s.key}</td>
-                            <td className="p-2 text-neutral-800">{s.value}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Full description preview */}
-              {longDescription && (
-                <div className="border-t border-neutral-100 pt-3">
-                  <h5 className="text-xs font-bold text-neutral-800 mb-2">Full Description</h5>
-                  <div
-                    className="text-xs text-neutral-700 leading-relaxed prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: longDescription }}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end border-t border-neutral-100 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowFinalPreviewModal(false)}
-                className="text-xs px-4 py-2 bg-neutral-900 text-white rounded-lg font-semibold hover:bg-black cursor-pointer"
-              >
-                Close Preview
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

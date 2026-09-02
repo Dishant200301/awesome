@@ -252,12 +252,28 @@ export const CartDrawer: React.FC = () => {
                               </span>
                               <button
                                 type="button"
+                                disabled={it.stock !== undefined && it.stock !== null && it.quantity >= Number(it.stock)}
                                 onClick={() => updateQuantity(it.id, it.quantity + 1)}
-                                className="px-2 py-1 text-neutral-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                className={`px-2 py-1 transition-colors ${
+                                  it.stock !== undefined && it.stock !== null && it.quantity >= Number(it.stock)
+                                    ? "text-neutral-300 cursor-not-allowed"
+                                    : "text-neutral-600 hover:bg-neutral-100 cursor-pointer"
+                                }`}
+                                title={
+                                  it.stock !== undefined && it.quantity >= Number(it.stock)
+                                    ? `Maximum available pieces reached (${it.stock})`
+                                    : "Increase quantity"
+                                }
                               >
                                 <Plus className="w-3 h-3" />
                               </button>
                             </div>
+
+                            {it.stock !== undefined && it.quantity >= Number(it.stock) && (
+                              <span className="text-[10px] text-amber-700 font-bold">
+                                Max {it.stock} available
+                              </span>
+                            )}
 
                             <button
                               type="button"

@@ -229,6 +229,7 @@ export interface ProductVariantDetail {
   totalCarat?: string;
   goldCarat?: string;
   images: string[];
+  status?: 'Active' | 'Inactive' | string;
 }
 
 export interface ProductAddonOption {

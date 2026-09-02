@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import Lenis from "lenis";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navbar from "@/modules/core/components/Navbar";
@@ -20,18 +20,26 @@ import { useRecentlyViewed } from "../context/RecentlyViewedContext";
 
 export const ProductDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
+  const [searchParams] = useSearchParams();
   const [product, setProduct] = useState(() => getLiveProductById(id));
   const { addRecentlyViewed } = useRecentlyViewed();
 
-
   const prodAny = product as any;
 
+  const initialColorFromQuery = searchParams.get("color");
   const [selectedColor, setSelectedColor] = useState<string>(
-    () => product.colors?.[0]?.colorName || (product as any).colorMediaConfigs?.[0]?.colorName || product.variations?.[0]?.colorName || "Standard"
+    () => initialColorFromQuery || product.colors?.[0]?.colorName || (product as any).colorMediaConfigs?.[0]?.colorName || product.variations?.[0]?.colorName || "Standard"
   );
   const [selectedSize, setSelectedSize] = useState<string>(
     () => product.colors?.[0]?.sizes?.[0] || product.variations?.[0]?.size || product.availableSizes?.[0] || "Standard Pair"
   );
+
+  useEffect(() => {
+    const qColor = searchParams.get("color");
+    if (qColor) {
+      setSelectedColor(qColor);
+    }
+  }, [searchParams]);
 
   // Dynamic computation of active variation based on Color AND Size selection
   const activeVariation: ProductColorVariation = React.useMemo(() => {
@@ -254,7 +262,11 @@ export const ProductDetailsPage: React.FC = () => {
         <ProductBreadcrumb
           category={product.category || product.categories?.[0] || "Handmade"}
           subCategory={product.subcategory || (product as any).subCategory}
-          productName={product.name}
+          productName={
+            activeVariation?.colorName && !["standard", "default", "none"].includes(activeVariation.colorName.toLowerCase()) && !product.name.toLowerCase().includes(activeVariation.colorName.toLowerCase())
+              ? `${product.name} - ${activeVariation.colorName}`
+              : product.name
+          }
         />
 
         {/* TOP PRODUCT HERO SECTION */}

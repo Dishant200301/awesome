@@ -556,7 +556,7 @@ export default function CollectionPage() {
                   className="w-full bg-[#FAF8F4] border border-[#EDE5DA] rounded-xl px-3 py-2 text-xs font-medium text-brand-ink focus:outline-none focus:border-brand-maroon"
                 >
                   <option value="all">All Collections ({liveProducts.length})</option>
-                  {categories.map((c) => (
+                  {liveCategories.map((c) => (
                     <option key={c.slug} value={c.slug}>
                       {c.name}
                     </option>

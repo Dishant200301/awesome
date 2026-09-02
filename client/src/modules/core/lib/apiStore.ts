@@ -407,6 +407,14 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
   const discountPct = Math.max(0, Math.round(((varOrigPrice - varPrice) / varOrigPrice) * 100));
   const defaultSize = (colorObj?.sizes && colorObj.sizes[0]) || (parentProduct?.availableSizes && parentProduct.availableSizes[0]) || "Standard Pair";
 
+  const varStock = (v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)))
+    ? Number(v.stock)
+    : ((v.quantity !== undefined && v.quantity !== null && !isNaN(Number(v.quantity)))
+      ? Number(v.quantity)
+      : (parentProduct?.stock !== undefined && parentProduct?.stock !== null && !isNaN(Number(parentProduct.stock)))
+        ? Number(parentProduct.stock)
+        : 25);
+
   return {
     id: v.id || `var-${index}`,
     colorName,
@@ -418,7 +426,7 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
     originalPrice: varOrigPrice,
     discountPercentage: discountPct,
     sku: v.sku || parentProduct?.defaultSku || parentProduct?.sku || `AH-${colorName}-${v.size || defaultSize}`,
-    stock: Number(v.stock) !== undefined ? Number(v.stock) : (Number(parentProduct?.stock) || 50),
+    stock: varStock,
     images: galleryList,
   };
 };
@@ -664,7 +672,113 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails => {
     idealForPills: found.idealForPills || (found.category ? [found.category] : []),
     washingInstructions: found.washingInstructions || [],
     reviews: getLiveReviews(String(found.id)),
+    sizeChart: found.sizeChart || [],
+    extendedDetails: found.extendedDetails || {
+      description: found.fullDescription || found.shortDescription || found.subtitle || '',
+      specifications: found.specs || {},
+      careInstructions: [],
+      materialDetails: found.material || ''
+    },
+    manufacturingInfo: found.manufacturingInfo || {
+      countryOfOrigin: 'India',
+      manufacturedBy: 'Awesome Handmade Surat',
+      marketdBy: 'Awesome Handmade Surat',
+      customerCare: {
+        email: 'support@awesomehandmade.com',
+        phone: '+91 98765 43210',
+        address: 'Surat, Gujarat, India'
+      }
+    },
+    relatedProducts: found.relatedProducts || []
   };
+};
+
+/**
+ * Real-time stock reduction on purchase/checkout
+ * Synchronizes immediately across client & admin
+ */
+export const deductLiveStock = async (
+  items: Array<{ productId: string; colorName?: string; size?: string; quantity: number }>
+) => {
+  let updated = false;
+
+  liveProducts = liveProducts.map((p) => {
+    const matchingItems = items.filter((i) => String(i.productId) === String(p.id));
+    if (matchingItems.length === 0) return p;
+
+    updated = true;
+    const totalDeducted = matchingItems.reduce((acc, i) => acc + (Number(i.quantity) || 1), 0);
+    const oldStock = Number(p.stock) || 0;
+    const newStock = Math.max(0, oldStock - totalDeducted);
+
+    // Also deduct matching variations
+    const updatedVariations = Array.isArray(p.variations)
+      ? p.variations.map((v: any) => {
+          const matchItem = matchingItems.find(
+            (i) => !i.colorName || (v.colorName || "").toLowerCase() === i.colorName.toLowerCase()
+          );
+          if (matchItem) {
+            const vOldStock = Number(v.stock) || 0;
+            return {
+              ...v,
+              stock: Math.max(0, vOldStock - (Number(matchItem.quantity) || 1))
+            };
+          }
+          return v;
+        })
+      : p.variations;
+
+    // Also deduct matching variantDetails
+    const updatedVariantDetails = Array.isArray(p.variantDetails)
+      ? p.variantDetails.map((v: any) => {
+          const matchItem = matchingItems.find(
+            (i) => !i.colorName || (v.optionValue || v.name || "").toLowerCase().includes(i.colorName.toLowerCase())
+          );
+          if (matchItem) {
+            const vOldQty = Number(v.quantity) || Number(v.stock) || 0;
+            const finalQty = Math.max(0, vOldQty - (Number(matchItem.quantity) || 1));
+            return {
+              ...v,
+              quantity: finalQty,
+              stock: finalQty
+            };
+          }
+          return v;
+        })
+      : p.variantDetails;
+
+    return {
+      ...p,
+      stock: newStock,
+      stockStatus: newStock > 0 ? 'in_stock' : 'out_of_stock',
+      variations: updatedVariations,
+      variantDetails: updatedVariantDetails
+    };
+  });
+
+  if (updated) {
+    if (typeof window !== "undefined") {
+      idbSet('awesome_admin_sync', {
+        timestamp: Date.now(),
+        products: liveProducts,
+        deletedIds: Array.from(deletedProductIds)
+      });
+      try {
+        localStorage.setItem('awesome_admin_sync', JSON.stringify({
+          timestamp: Date.now(),
+          products: liveProducts,
+          deletedIds: Array.from(deletedProductIds)
+        }));
+      } catch (e) {}
+
+      window.dispatchEvent(new Event('awesome_product_sync'));
+      try {
+        const channel = new BroadcastChannel('awesome_product_sync');
+        channel.postMessage({ type: 'SYNC', timestamp: Date.now() });
+      } catch (e) {}
+    }
+    notifyListeners();
+  }
 };
 
 // ==========================================
@@ -948,51 +1062,170 @@ export const fetchLiveFilters = async () => {
 export const getLiveFilters = () => {
   const currentLiveProds = getLiveProductsList();
 
-  // 1. Dynamic Categories with Live Counts from actual products
+  // Helper matching function for accurate category counting
+  const matchCat = (prod: any, targetCategory: string): boolean => {
+    if (!targetCategory || targetCategory.toLowerCase() === "all") return true;
+    const clean = (s?: string) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
+    const target = clean(targetCategory);
+    const targetStem = target.endsWith("s") && target.length > 3 ? target.slice(0, -1) : target;
+    const cat = clean(prod.category);
+    const subcat = clean(prod.subcategory || prod.subCategory);
+    const name = clean(prod.name);
+    const categoriesList = Array.isArray(prod.categories) ? prod.categories.map(clean) : [];
+
+    if (cat === target || cat === targetStem || subcat === target || subcat === targetStem) return true;
+    if (categoriesList.includes(target) || categoriesList.includes(targetStem)) return true;
+    if (cat.includes(targetStem) || subcat.includes(targetStem) || target.includes(cat) || targetStem.includes(cat)) return true;
+    if (name.includes(targetStem)) return true;
+    return false;
+  };
+
+  // 1. Dynamic Categories with REAL live counts from actual products
   const liveCats = getLiveCategories()
-    .map((c) => ({
-      name: c.name,
-      key: c.name,
-      count: c.productCount || 0,
-    }))
+    .map((c) => {
+      const realCount = currentLiveProds.filter((p) => matchCat(p, c.name)).length;
+      return {
+        name: c.name,
+        key: c.name,
+        count: realCount,
+      };
+    })
     .filter((c) => c.count > 0);
 
-  // Also include any product categories not present in the default list
+  // Also include any product categories from live products not present in list
   const catNamesSet = new Set(liveCats.map((c) => c.name.toLowerCase()));
   currentLiveProds.forEach((p) => {
     if (p.category && !catNamesSet.has(p.category.toLowerCase())) {
-      const cCount = currentLiveProds.filter(
-        (x) => (x.category || "").toLowerCase() === p.category.toLowerCase()
-      ).length;
-      liveCats.push({
-        name: p.category,
-        key: p.category,
-        count: cCount,
-      });
-      catNamesSet.add(p.category.toLowerCase());
+      const cCount = currentLiveProds.filter((x) => matchCat(x, p.category)).length;
+      if (cCount > 0) {
+        liveCats.push({
+          name: p.category,
+          key: p.category,
+          count: cCount,
+        });
+        catNamesSet.add(p.category.toLowerCase());
+      }
     }
   });
 
-  // 2. Dynamic Colors extracted directly from live products
+  // Color hex lookup
+  const colorHexLookup = (name: string): string => {
+    const lower = name.toLowerCase();
+    if (lower.includes("black")) return "#000000";
+    if (lower.includes("white")) return "#FFFFFF";
+    if (lower.includes("pink")) return "#FFB6C1";
+    if (lower.includes("beige") || lower.includes("nude")) return "#F5F5DC";
+    if (lower.includes("maroon")) return "#520618";
+    if (lower.includes("red")) return "#DC2626";
+    if (lower.includes("blue") || lower.includes("navy")) return "#1A3B8B";
+    if (lower.includes("green") || lower.includes("olive")) return "#1A5235";
+    if (lower.includes("gold") || lower.includes("yellow")) return "#C89B3C";
+    if (lower.includes("purple") || lower.includes("violet")) return "#9333EA";
+    if (lower.includes("orange")) return "#EA580C";
+    if (lower.includes("brown")) return "#78350F";
+    if (lower.includes("grey") || lower.includes("gray")) return "#6B7280";
+    return "#520618";
+  };
+
+  // 2. Dynamic Pure Colors extracted directly from live products (Cleaned, no "/ S" or size bleed)
   const colorMap = new Map<string, string>();
+  const addCleanColor = (rawName: any, hex?: string) => {
+    if (!rawName || typeof rawName !== "string") return;
+    const parts = rawName.split("/").map((s) => s.trim());
+    const pureColor = parts[0];
+    if (pureColor && pureColor.toLowerCase() !== "standard" && pureColor.toLowerCase() !== "free size") {
+      const finalHex = hex || colorHexLookup(pureColor);
+      colorMap.set(pureColor, finalHex);
+    }
+  };
+
+  // 3. Dynamic Pure Sizes extracted directly from live products (Cleaned, no "Color /")
+  const sizesSet = new Set<string>();
+  const addCleanSize = (rawSize: any) => {
+    if (!rawSize || typeof rawSize !== "string") return;
+    const parts = rawSize.split("/").map((s) => s.trim());
+    if (parts.length > 1) {
+      const pureSize = parts[1];
+      if (pureSize && pureSize.toLowerCase() !== "standard") {
+        sizesSet.add(pureSize);
+      }
+    } else {
+      const pureSize = parts[0];
+      if (
+        pureSize &&
+        pureSize.toLowerCase() !== "standard" &&
+        !colorHexLookup(pureSize).startsWith("#") &&
+        pureSize.length <= 15
+      ) {
+        sizesSet.add(pureSize);
+      }
+    }
+  };
+
   currentLiveProds.forEach((p) => {
+    // Colors from p.colors
     if (Array.isArray(p.colors)) {
       p.colors.forEach((col: any) => {
         const name = typeof col === "string" ? col : col.colorName || col.name || col.color;
-        const hex = typeof col === "object" ? col.colorHex || col.hex || "#520618" : "#520618";
-        if (name && name.trim() && name.toLowerCase() !== "standard") {
-          colorMap.set(name.trim(), hex);
+        const hex = typeof col === "object" ? col.colorHex || col.hex : undefined;
+        addCleanColor(name, hex);
+      });
+    }
+    // Colors & Sizes from p.variations
+    if (Array.isArray(p.variations)) {
+      p.variations.forEach((v: any) => {
+        addCleanColor(v.colorName || v.color, v.colorHex);
+        if (v.size) addCleanSize(v.size);
+        if (v.sizeName) addCleanSize(v.sizeName);
+        if (v.colorName && v.colorName.includes("/")) addCleanSize(v.colorName);
+      });
+    }
+    // Colors & Sizes from p.variantDetails
+    if (Array.isArray(p.variantDetails)) {
+      p.variantDetails.forEach((v: any) => {
+        addCleanColor(v.optionValue || v.name, v.colorHex);
+        if (v.optionValue && v.optionValue.includes("/")) addCleanSize(v.optionValue);
+        else if (v.name && v.name.includes("/")) addCleanSize(v.name);
+      });
+    }
+    // Colors & Sizes from p.variants
+    if (Array.isArray(p.variants)) {
+      p.variants.forEach((v: any) => {
+        addCleanColor(v.title || v.name || v.colorName, v.colorHex);
+        if (v.title && v.title.includes("/")) addCleanSize(v.title);
+        else if (v.name && v.name.includes("/")) addCleanSize(v.name);
+      });
+    }
+    // Explicit options from p.productOptions
+    if (Array.isArray(p.productOptions)) {
+      p.productOptions.forEach((opt: any) => {
+        const optName = (opt.name || "").toLowerCase();
+        if (optName.includes("color") || optName.includes("colour")) {
+          (opt.values || []).forEach((v: string) => addCleanColor(v));
+        }
+        if (optName.includes("size")) {
+          (opt.values || []).forEach((v: string) => addCleanSize(v));
         }
       });
     }
-    if (Array.isArray(p.variations)) {
-      p.variations.forEach((v: any) => {
-        const name = v.colorName || v.color;
-        const hex = v.colorHex || "#520618";
-        if (name && name.trim() && name.toLowerCase() !== "standard") {
-          colorMap.set(name.trim(), hex);
+    // Explicit attributes from p.attributes
+    if (Array.isArray(p.attributes)) {
+      p.attributes.forEach((attr: any) => {
+        const attrName = (attr.name || attr.key || "").toLowerCase();
+        if (attrName.includes("color") || attrName.includes("colour")) {
+          (attr.values || []).forEach((v: string) => addCleanColor(v));
+        }
+        if (attrName.includes("size")) {
+          (attr.values || []).forEach((v: string) => addCleanSize(v));
         }
       });
+    }
+    // Available sizes
+    if (Array.isArray(p.availableSizes)) {
+      p.availableSizes.forEach((s: string) => addCleanSize(s));
+    }
+    if (Array.isArray(p.sizes)) {
+      p.sizes.forEach((s: string) => addCleanSize(s));
     }
   });
 
@@ -1001,28 +1234,9 @@ export const getLiveFilters = () => {
     hex,
   }));
 
-  // 3. Dynamic Sizes extracted directly from live products
-  const sizesSet = new Set<string>();
-  currentLiveProds.forEach((p) => {
-    if (Array.isArray(p.availableSizes)) {
-      p.availableSizes.forEach((s: string) => {
-        if (s && s.trim()) sizesSet.add(s.trim());
-      });
-    }
-    if (Array.isArray(p.sizes)) {
-      p.sizes.forEach((s: string) => {
-        if (s && s.trim()) sizesSet.add(s.trim());
-      });
-    }
-    if (Array.isArray(p.variations)) {
-      p.variations.forEach((v: any) => {
-        if (v.size && v.size.trim()) sizesSet.add(v.size.trim());
-        if (v.sizeName && v.sizeName.trim()) sizesSet.add(v.sizeName.trim());
-      });
-    }
-  });
-
-  const dynamicSizes = Array.from(sizesSet);
+  const dynamicSizes = Array.from(sizesSet).filter(
+    (sz) => !dynamicColors.some((c) => c.name.toLowerCase() === sz.toLowerCase())
+  );
 
   // 4. Dynamic Max Price from live products
   const prices = currentLiveProds.map((p) => Number(p.price) || 0).filter((pr) => pr > 0);

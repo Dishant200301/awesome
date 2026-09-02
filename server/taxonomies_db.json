@@ -1,6 +1,14 @@
 {
   "categories": [
     {
+      "id": "cat-1788347632497",
+      "name": "efef",
+      "slug": "efef",
+      "image": "/images/category/Latkan.webp",
+      "productCount": 0,
+      "isActive": true
+    },
+    {
       "id": "cat-1788159880363",
       "name": "Latkan",
       "slug": "latkan",
@@ -10,6 +18,14 @@
     }
   ],
   "subcategories": [
+    {
+      "id": "sub-1788347656976",
+      "categoryId": "cat-1788347632497",
+      "categoryName": "efef",
+      "name": "fefe",
+      "slug": "fefe",
+      "image": "/images/category/Latkan.webp"
+    },
     {
       "id": "cat-1788159938783",
       "categoryId": "",

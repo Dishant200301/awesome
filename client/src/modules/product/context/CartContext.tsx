@@ -137,18 +137,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = (newItem: Omit<CartItem, "id">) => {
     const itemKey = `${newItem.productId}-${newItem.colorName || "default"}-${newItem.size || "default"}`;
+    const maxStock = newItem.stock !== undefined && newItem.stock !== null ? Number(newItem.stock) : 999;
+    if (maxStock <= 0) return;
 
     setCartItems((prev) => {
       const existingIndex = prev.findIndex((i) => i.id === itemKey);
       if (existingIndex > -1) {
         const updated = [...prev];
+        const currentStock = updated[existingIndex].stock !== undefined ? Number(updated[existingIndex].stock) : maxStock;
+        const targetQty = Math.min(currentStock, updated[existingIndex].quantity + newItem.quantity);
         updated[existingIndex] = {
           ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + newItem.quantity,
+          stock: currentStock,
+          quantity: targetQty,
         };
         return updated;
       } else {
-        return [...prev, { ...newItem, id: itemKey }];
+        const targetQty = Math.min(maxStock, newItem.quantity);
+        return [...prev, { ...newItem, stock: maxStock, quantity: targetQty, id: itemKey }];
       }
     });
 
@@ -183,8 +189,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       removeFromCart(id);
       return;
     }
+
     setCartItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, quantity } : item))
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const maxLimit = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 999;
+        const clamped = Math.min(maxLimit, quantity);
+        return { ...item, quantity: clamped };
+      })
     );
 
     if (isLoggedIn) {
