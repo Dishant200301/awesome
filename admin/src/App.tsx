@@ -348,7 +348,7 @@ function AdminMainContent() {
 export function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename={import.meta.env.BASE_URL || '/admin'}>
+      <BrowserRouter basename={import.meta.env.BASE_URL || '/'}>
         <AdminMainContent />
       </BrowserRouter>
     </AuthProvider>
