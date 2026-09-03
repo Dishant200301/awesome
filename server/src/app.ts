@@ -22,7 +22,14 @@ const app: Express = express();
 connectDB();
 
 app.use(helmet());
-app.use(cors({ origin: "*", credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    callback(null, origin || true);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
 app.use(compression());
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ limit: "100mb", extended: true }));
