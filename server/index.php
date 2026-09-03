@@ -21,12 +21,34 @@ if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'])) {
 // Forward Request Headers
 $headers = [];
 $incomingHeaders = function_exists('getallheaders') ? getallheaders() : [];
+$hasAuth = false;
+
 foreach ($incomingHeaders as $key => $value) {
     $lowerKey = strtolower($key);
+    if ($lowerKey === 'authorization') {
+        $hasAuth = true;
+    }
     if ($lowerKey !== 'host' && $lowerKey !== 'content-length') {
         $headers[] = "{$key}: {$value}";
     }
 }
+
+// Ensure Authorization header is forwarded even if LiteSpeed/Apache stripped it from getallheaders()
+if (!$hasAuth) {
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        $headers[] = "Authorization: " . $_SERVER['HTTP_AUTHORIZATION'];
+    } elseif (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $headers[] = "Authorization: " . $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    } elseif (function_exists('apache_request_headers')) {
+        $arh = apache_request_headers();
+        if (!empty($arh['Authorization'])) {
+            $headers[] = "Authorization: " . $arh['Authorization'];
+        } elseif (!empty($arh['authorization'])) {
+            $headers[] = "Authorization: " . $arh['authorization'];
+        }
+    }
+}
+
 $headers[] = "Host: {$backendHost}:{$backendPort}";
 $headers[] = "X-Forwarded-For: " . ($_SERVER['REMOTE_ADDR'] ?? '');
 $headers[] = "X-Forwarded-Proto: " . (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http');
