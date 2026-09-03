@@ -42,38 +42,12 @@ export const CartDrawer: React.FC = () => {
     };
   }, [isCartOpen]);
 
-  // Generate recommended products list
+  // Generate recommended products list dynamically from live products
   const recommendedProducts = React.useMemo(() => {
     if (liveProducts && liveProducts.length > 0) {
       return liveProducts.slice(0, 3);
     }
-    // Fallback high quality products
-    return [
-      {
-        id: "rec-1",
-        name: "CONTRAST TIPPING POLO - SKY BLUE",
-        price: 2279,
-        originalPrice: 2399,
-        image: "https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=600&q=80",
-        size: "S"
-      },
-      {
-        id: "rec-2",
-        name: "CONTRAST TIPPING POLO - LAVENDER",
-        price: 2279,
-        originalPrice: 2399,
-        image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=600&q=80",
-        size: "M"
-      },
-      {
-        id: "rec-3",
-        name: "CONTRAST TIPPING POLO - SAGE GREEN",
-        price: 2279,
-        originalPrice: 2399,
-        image: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80",
-        size: "L"
-      }
-    ];
+    return [];
   }, [liveProducts]);
 
   const handleAddRecommended = (prod: any) => {
@@ -294,49 +268,51 @@ export const CartDrawer: React.FC = () => {
             {/* ========================================================================= */}
             {/* MOBILE & TABLET INLINE SECTION: YOU MAY ALSO LIKE (Visible on sm: and below) */}
             {/* ========================================================================= */}
-            <div className="block md:hidden pt-4 border-t border-neutral-200">
-              <div className="bg-[#f5f5f7] p-3.5 rounded-xl space-y-3">
-                <h4 className="text-xs font-bold text-neutral-800 tracking-[0.14em] uppercase">
-                  YOU MAY ALSO LIKE
-                </h4>
+            {recommendedProducts.length > 0 && (
+              <div className="block md:hidden pt-4 border-t border-neutral-200">
+                <div className="bg-[#f5f5f7] p-3.5 rounded-xl space-y-3">
+                  <h4 className="text-xs font-bold text-neutral-800 tracking-[0.14em] uppercase">
+                    YOU MAY ALSO LIKE
+                  </h4>
 
-                <div className="space-y-2.5">
-                  {recommendedProducts.slice(0, 2).map((prod) => {
-                    const img = prod.image || prod.mainImage || (prod.images && prod.images[0]);
-                    const title = prod.name || prod.title;
-                    const saleP = prod.price || prod.salePrice || 2279;
-                    const regP = prod.originalPrice || prod.regularPrice || 2399;
+                  <div className="space-y-2.5">
+                    {recommendedProducts.slice(0, 2).map((prod) => {
+                      const img = prod.image || prod.mainImage || (prod.images && prod.images[0]);
+                      const title = prod.name || prod.title;
+                      const saleP = prod.price || prod.salePrice || 2279;
+                      const regP = prod.originalPrice || prod.regularPrice || 2399;
 
-                    return (
-                      <div
-                        key={prod.id}
-                        onClick={() => handleAddRecommended(prod)}
-                        className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-neutral-200 cursor-pointer active:scale-98 transition-transform overflow-hidden shadow-2xs"
-                      >
-                        <img
-                          src={img}
-                          alt={title}
-                          className="w-12 h-14 object-cover rounded-lg shrink-0 bg-neutral-100"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h5 className="text-xs font-bold text-neutral-900 uppercase truncate">
-                            {title}
-                          </h5>
-                          <div className="flex items-center gap-2 text-xs font-bold mt-1">
-                            <span className="text-neutral-900">Rs. {saleP.toLocaleString("en-IN")}.00</span>
-                            {regP > saleP && (
-                              <span className="text-neutral-400 line-through font-normal text-[11px]">
-                                Rs. {regP.toLocaleString("en-IN")}.00
-                              </span>
-                            )}
+                      return (
+                        <div
+                          key={prod.id}
+                          onClick={() => handleAddRecommended(prod)}
+                          className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-neutral-200 cursor-pointer active:scale-98 transition-transform overflow-hidden shadow-2xs"
+                        >
+                          <img
+                            src={img}
+                            alt={title}
+                            className="w-12 h-14 object-cover rounded-lg shrink-0 bg-neutral-100"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h5 className="text-xs font-bold text-neutral-900 uppercase truncate">
+                              {title}
+                            </h5>
+                            <div className="flex items-center gap-2 text-xs font-bold mt-1">
+                              <span className="text-neutral-900">Rs. {saleP.toLocaleString("en-IN")}.00</span>
+                              {regP > saleP && (
+                                <span className="text-neutral-400 line-through font-normal text-[11px]">
+                                  Rs. {regP.toLocaleString("en-IN")}.00
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Footer Checkout Section */}

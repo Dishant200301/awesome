@@ -1,0 +1,17 @@
+# Hostinger LiteSpeed / Apache Reverse Proxy for api.awesomehandwork.com
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Pass Authorization header to Node.js / Express backend
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # Forward all API traffic internally to Node.js port 5000
+  RewriteRule ^(.*)$ http://127.0.0.1:5000/$1 [P,L]
+</IfModule>
+
+<IfModule mod_proxy.c>
+  ProxyPreserveHost On
+  ProxyRequests Off
+  ProxyPassReverse / http://127.0.0.1:5000/
+</IfModule>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Layers, 
   Plus, 
@@ -14,30 +14,38 @@ import {
   FolderTree,
   Palette
 } from 'lucide-react';
-import { 
-  MOCK_ATTRIBUTES, 
-  MOCK_CATEGORIES, 
-  MOCK_SUBCATEGORIES, 
-  getGlobalVariantsList 
-} from '../data/mockAdminData';
+import { getGlobalVariantsList } from '../data/mockAdminData';
 import { Attribute, AttributeValue, Variant, Category, Subcategory } from '../types/admin';
+import { AdminApiService } from '../services/adminApi';
 
 export const ProductManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'attributes' | 'variants' | 'categories'>('attributes');
 
   // CATEGORIES & SUBCATEGORIES STATE
-  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>(MOCK_SUBCATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [showAddCatModal, setShowAddCatModal] = useState(false);
   const [showAddSubcatModal, setShowAddSubcatModal] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newSubcatName, setNewSubcatName] = useState('');
-  const [selectedParentCatId, setSelectedParentCatId] = useState(MOCK_CATEGORIES[0]?.id || '');
+  const [selectedParentCatId, setSelectedParentCatId] = useState('');
 
   // ATTRIBUTES STATE
-  const [attributes, setAttributes] = useState<Attribute[]>(MOCK_ATTRIBUTES);
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [showAddAttrModal, setShowAddAttrModal] = useState(false);
   const [editingAttr, setEditingAttr] = useState<Attribute | null>(null);
+
+  useEffect(() => {
+    AdminApiService.getCategories().then((res) => {
+      if (res?.categories && Array.isArray(res.categories)) setCategories(res.categories);
+      if (res?.subcategories && Array.isArray(res.subcategories)) setSubcategories(res.subcategories);
+      if (res?.categories?.[0]?.id) setSelectedParentCatId(res.categories[0].id);
+    }).catch(() => {});
+
+    AdminApiService.getAttributes().then((attrs) => {
+      if (Array.isArray(attrs)) setAttributes(attrs);
+    }).catch(() => {});
+  }, []);
 
   // New attribute form state
   const [newAttrName, setNewAttrName] = useState('');
@@ -84,17 +92,16 @@ export const ProductManagementPage: React.FC = () => {
       isActive: true
     };
 
-    MOCK_CATEGORIES.push(newCat);
-    setCategories([...MOCK_CATEGORIES]);
+    setCategories((prev) => [...prev, newCat]);
     setNewCatName('');
     setShowAddCatModal(false);
+    AdminApiService.createCategory(newCat).catch(() => {});
   };
 
   const handleDeleteCategory = (id: string) => {
     if (window.confirm('Delete this Category?')) {
-      const idx = MOCK_CATEGORIES.findIndex((c) => c.id === id);
-      if (idx !== -1) MOCK_CATEGORIES.splice(idx, 1);
-      setCategories([...MOCK_CATEGORIES]);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      AdminApiService.deleteCategory(id).catch(() => {});
     }
   };
 
@@ -106,22 +113,19 @@ export const ProductManagementPage: React.FC = () => {
     const newSubcat: Subcategory = {
       id: `sub-${Date.now()}`,
       categoryId: parent?.id || 'cat-1',
-      categoryName: parent?.name || 'Latkan',
+      categoryName: parent?.name || 'Category',
       name: newSubcatName.trim(),
       slug: newSubcatName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
     };
 
-    MOCK_SUBCATEGORIES.push(newSubcat);
-    setSubcategories([...MOCK_SUBCATEGORIES]);
+    setSubcategories((prev) => [...prev, newSubcat]);
     setNewSubcatName('');
     setShowAddSubcatModal(false);
   };
 
   const handleDeleteSubcategory = (id: string) => {
     if (window.confirm('Delete this Subcategory?')) {
-      const idx = MOCK_SUBCATEGORIES.findIndex((s) => s.id === id);
-      if (idx !== -1) MOCK_SUBCATEGORIES.splice(idx, 1);
-      setSubcategories([...MOCK_SUBCATEGORIES]);
+      setSubcategories((prev) => prev.filter((s) => s.id !== id));
     }
   };
 
@@ -148,8 +152,7 @@ export const ProductManagementPage: React.FC = () => {
       values: tempValues
     };
 
-    MOCK_ATTRIBUTES.push(newAttr);
-    setAttributes([...MOCK_ATTRIBUTES]);
+    setAttributes((prev) => [...prev, newAttr]);
     setShowAddAttrModal(false);
     setNewAttrName('');
     setNewDisplayType('button');
@@ -189,20 +192,13 @@ export const ProductManagementPage: React.FC = () => {
       values: editValues
     };
 
-    const idx = MOCK_ATTRIBUTES.findIndex((a) => a.id === editingAttr.id);
-    if (idx !== -1) {
-      MOCK_ATTRIBUTES[idx] = updatedAttr;
-    }
-
-    setAttributes([...MOCK_ATTRIBUTES]);
+    setAttributes((prev) => prev.map((a) => (a.id === editingAttr.id ? updatedAttr : a)));
     setEditingAttr(null);
   };
 
   const handleDeleteAttribute = (id: string) => {
     if (window.confirm('Delete this attribute?')) {
-      const idx = MOCK_ATTRIBUTES.findIndex((a) => a.id === id);
-      if (idx !== -1) MOCK_ATTRIBUTES.splice(idx, 1);
-      setAttributes([...MOCK_ATTRIBUTES]);
+      setAttributes((prev) => prev.filter((a) => a.id !== id));
     }
   };
 

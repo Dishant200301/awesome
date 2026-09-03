@@ -11,13 +11,15 @@ import {
 } from "../data/mockAdminData";
 import { Product, Category, Subcategory, Brand, Attribute, ContactMessage, SizeGuide, HeroSlide, HomepageBanner, AdminReviewItem } from "../types/admin";
 
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api/v1" : "http://localhost:5000/api/v1");
+import { getAdminApiBase, getAdminAuthHeaders } from "../utils/authHeaders";
+
+const API_BASE = getAdminApiBase();
 
 export class AdminApiService {
   private static async request<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
     try {
       const res = await fetch(`${API_BASE}${endpoint}`, {
-        headers: { "Content-Type": "application/json" },
+        headers: getAdminAuthHeaders(options?.headers as Record<string, string>),
         ...options,
       });
       if (!res.ok) return null;
@@ -694,7 +696,7 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
     try {
       const res = await fetch(`${API_BASE}/products/ai-generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ images: cleanImages, image: cleanImages[0], hint, apiKey: key })
       });
       if (res.ok) {
@@ -849,38 +851,47 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
   // Taxonomies CRUD
   public static async getCategories(): Promise<{ categories: Category[]; subcategories: Subcategory[] }> {
     const remote = await this.request<any>("/taxonomies/categories");
-    if (remote) return remote;
-    return { categories: MOCK_CATEGORIES, subcategories: MOCK_SUBCATEGORIES };
+    if (remote?.categories) return remote;
+    if (remote?.data?.categories) return remote.data;
+    return { categories: [], subcategories: [] };
   }
 
   public static async createCategory(data: Partial<Category>): Promise<Category> {
-    const remote = await this.request<Category>("/taxonomies/categories", {
+    const remote = await this.request<any>("/taxonomies/categories", {
       method: "POST",
       body: JSON.stringify(data)
     });
+    if (remote?.data) return remote.data;
     if (remote) return remote;
 
-    const newCat: Category = {
-      id: `cat-${Date.now()}`,
+    return {
+      id: data.id || `cat-${Date.now()}`,
       name: data.name || "New Category",
       slug: data.slug || (data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : 'new-category'),
       productCount: 0,
       isActive: true
     };
-    MOCK_CATEGORIES.push(newCat);
-    return newCat;
+  }
+
+  public static async deleteCategory(id: string): Promise<boolean> {
+    const res = await this.request<any>(`/taxonomies/categories/${id}`, {
+      method: "DELETE"
+    });
+    return !!res;
   }
 
   public static async getBrands(): Promise<Brand[]> {
-    const remote = await this.request<Brand[]>("/taxonomies/brands");
-    if (remote) return remote;
-    return MOCK_BRANDS;
+    const remote = await this.request<any>("/taxonomies/brands");
+    if (Array.isArray(remote)) return remote;
+    if (Array.isArray(remote?.data)) return remote.data;
+    return [];
   }
 
   public static async getAttributes(): Promise<Attribute[]> {
-    const remote = await this.request<Attribute[]>("/taxonomies/attributes");
-    if (remote) return remote;
-    return MOCK_ATTRIBUTES;
+    const remote = await this.request<any>("/taxonomies/attributes");
+    if (Array.isArray(remote)) return remote;
+    if (Array.isArray(remote?.data)) return remote.data;
+    return [];
   }
 
   // Contact Messages CRUD

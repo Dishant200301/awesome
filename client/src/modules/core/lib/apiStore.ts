@@ -1,9 +1,8 @@
 import { ProductDetails, ProductColorVariation } from "@/modules/product/types/product";
-import { SAMPLE_PRODUCT, CLIENT_SHOP_PRODUCTS } from "@/modules/product/data/productData";
-import { categories as CATALOG_CATEGORIES } from "@/data/catalog";
 import { idbGet, idbSet } from "./idbStorage";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api/v1" : "http://localhost:5000/api/v1");
+const rawApiUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandwork.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
+export const API_BASE_URL = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
 // Live Product Store state listeners
 type Listener = () => void;
@@ -432,11 +431,9 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
 };
 
 // Get single product details dynamically
-export const getLiveProductById = (idOrSlug?: string): ProductDetails => {
+export const getLiveProductById = (idOrSlug?: string): ProductDetails | null => {
   if (!idOrSlug) {
-    const first = liveProducts[0];
-    if (first) return getLiveProductById(first.id);
-    return SAMPLE_PRODUCT;
+    return null;
   }
 
   const query = String(idOrSlug).trim().toLowerCase();
@@ -461,11 +458,7 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails => {
   }
 
   if (!found) {
-    if (liveProducts.length > 0) {
-      found = liveProducts[0];
-    } else {
-      return SAMPLE_PRODUCT;
-    }
+    return null;
   }
 
   const parentImages: string[] = [];
@@ -625,7 +618,7 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails => {
         }
       ];
     } else {
-      descCards = SAMPLE_PRODUCT.descriptionCards;
+      descCards = [];
     }
   }
 
@@ -1020,11 +1013,7 @@ export const getLiveProductsList = () => {
 
 // DYNAMIC FILTER STORE
 const DEFAULT_FILTER_CONFIG = {
-  categories: CATALOG_CATEGORIES.map(c => ({
-    name: c.name.toUpperCase(),
-    key: c.name,
-    count: 12,
-  })),
+  categories: [] as Array<{ name: string; key: string; count: number }>,
   colors: [
     { name: 'Maroon', hex: '#520618' },
     { name: 'Royal Gold', hex: '#C89B3C' },
@@ -1452,16 +1441,6 @@ export const getLiveCategories = () => {
     } catch (e) {}
   }
 
-  // 3. Fallback only if no admin categories loaded yet: use CATALOG_CATEGORIES
-  if (baseCategories.length === 0 && liveCategoryData.length === 0) {
-    baseCategories = CATALOG_CATEGORIES.map((c, i) => ({
-      id: c.id || `cat-${i + 1}`,
-      name: c.name,
-      slug: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      image: c.image || '/images/category/Latkan.webp',
-      subs: c.subs || [],
-    }));
-  }
 
   // 4. Dynamic product count per category
   const countMap = new Map<string, number>();

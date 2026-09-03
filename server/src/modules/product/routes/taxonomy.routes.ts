@@ -13,23 +13,24 @@ import {
   createAttribute,
   addAttributeValue
 } from "../controllers/taxonomy.controller.js";
+import { authenticateAdmin } from "../../auth/middleware/auth.middleware.js";
 
 const router = Router();
 
+// Public Read Endpoints
 router.get("/categories", getCategories);
-router.post("/categories/sync", syncCategories);
-router.post("/categories", createCategory);
-router.put("/categories/:id", updateCategory);
-router.delete("/categories/:id", deleteCategory);
-router.post("/subcategories", createSubcategory);
-
 router.get("/brands", getBrands);
-router.post("/brands", createBrand);
-
 router.get("/collections", getCollections);
-
 router.get("/attributes", getAttributes);
-router.post("/attributes", createAttribute);
-router.post("/attributes/:id/values", addAttributeValue);
+
+// Protected Admin Mutation Endpoints
+router.post("/categories/sync", authenticateAdmin, syncCategories);
+router.post("/categories", authenticateAdmin, createCategory);
+router.put("/categories/:id", authenticateAdmin, updateCategory);
+router.delete("/categories/:id", authenticateAdmin, deleteCategory);
+router.post("/subcategories", authenticateAdmin, createSubcategory);
+router.post("/brands", authenticateAdmin, createBrand);
+router.post("/attributes", authenticateAdmin, createAttribute);
+router.post("/attributes/:id/values", authenticateAdmin, addAttributeValue);
 
 export default router;

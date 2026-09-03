@@ -72,6 +72,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
     if (activeProductId && isOpen) {
       const live = getLiveProductById(String(activeProductId));
       setProduct(live);
+      if (!live) return;
 
       const firstColor =
         live.colors?.[0]?.colorName ||

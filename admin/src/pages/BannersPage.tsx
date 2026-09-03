@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAdminApiBase, getAdminAuthHeaders } from '../utils/authHeaders';
 import {
   Layers,
   Plus,
@@ -31,7 +32,7 @@ interface BannersPageProps {
   onNavigate?: (tab: string) => void;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1');
+const API_BASE = getAdminApiBase();
 
 export const BannersPage: React.FC<BannersPageProps> = ({
   initialTab = 'hero-slider',
@@ -166,7 +167,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
     // Push to backend
     fetch(`${API_BASE}/content/hero-slides/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify({ slides: newSlides }),
     }).catch(() => {});
   };
@@ -199,7 +200,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
     // Push to backend
     fetch(`${API_BASE}/content/promo-banner/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify({ banner: primaryBanner, banners: newBanners }),
     }).catch(() => {});
   };

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getAdminApiBase, getAdminAuthHeaders } from '../utils/authHeaders';
 import { Plus, Trash2, Save, RefreshCw, CheckCircle2, SlidersHorizontal, Palette, Ruler, Tag } from 'lucide-react';
 
 interface CategoryItem {
@@ -110,10 +111,10 @@ export const FilterManagementPage: React.FC = () => {
       }
 
       // Also try posting to backend API if live
-      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1');
+      const apiBase = getAdminApiBase();
       fetch(`${apiBase}/filters`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(payload),
       }).catch(() => {});
 

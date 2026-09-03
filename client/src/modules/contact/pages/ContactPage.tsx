@@ -4,7 +4,6 @@ import { ChevronRight, MapPin, Phone, Mail, Clock, Send, CheckCircle2 } from "lu
 import { toast } from "sonner";
 import Navbar from "@/modules/core/components/Navbar";
 import Footer from "@/modules/core/components/Footer";
-import { MOCK_CONTACT_MESSAGES } from "../../../../../admin/src/data/mockAdminData";
 
 /* ---------- BREADCRUMB COMPONENT ---------- */
 function ContactBreadcrumb() {
@@ -18,6 +17,8 @@ function ContactBreadcrumb() {
     </nav>
   );
 }
+
+import { API_BASE_URL } from "@/modules/core/lib/apiStore";
 
 /* ---------- MAIN CONTACT PAGE COMPONENT ---------- */
 export function ContactPage() {
@@ -44,17 +45,17 @@ export function ContactPage() {
     setIsSubmitting(true);
 
     const payload = {
+      id: `msg-${Date.now()}`,
       name: name.trim(),
       email: email.trim(),
-      phone: phone.trim() || "+91 98000 00000",
+      phone: phone.trim() || undefined,
       subject: subject.trim() || "General Inquiry",
       message: message.trim(),
     };
 
     // 1. Send API HTTP POST Request to Express Server Backend
     try {
-      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api/v1" : "http://localhost:5000/api/v1");
-      await fetch(`${apiBase}/contacts`, {
+      await fetch(`${API_BASE_URL}/contacts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -65,19 +66,15 @@ export function ContactPage() {
 
     // 2. Fallback / Synchronize in-memory dataset & trigger cross-tab storage event
     const newMsg = {
-      id: `msg-${Date.now()}`,
       ...payload,
       date: new Date().toISOString().replace("T", " ").substring(0, 16),
       status: "New" as const,
     };
 
-    MOCK_CONTACT_MESSAGES.unshift(newMsg);
-
     try {
       const syncData = {
         timestamp: Date.now(),
         message: newMsg,
-        messages: MOCK_CONTACT_MESSAGES
       };
       localStorage.setItem("awesome_contact_sync", JSON.stringify(syncData));
       localStorage.setItem("aaramly_contact_sync", JSON.stringify(syncData));

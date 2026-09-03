@@ -1,6 +1,7 @@
 import { AttributeMaster, AttributeValue } from '../types/attribute.types';
+import { getAdminApiBase, getAdminAuthHeaders } from '../utils/authHeaders';
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1')}/attributes`;
+const API_BASE_URL = `${getAdminApiBase()}/attributes`;
 const LOCAL_STORAGE_KEY = 'awesome_admin_attribute_master_v3';
 
 export const INITIAL_DEFAULT_ATTRIBUTES: AttributeMaster[] = [
@@ -177,7 +178,7 @@ export class AttributeService {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(attributeData)
       });
 
@@ -228,7 +229,7 @@ export class AttributeService {
     try {
       const res = await fetch(`${API_BASE_URL}/${id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ status, isActive: status === 'active' })
       });
       if (res.ok) {
@@ -259,7 +260,10 @@ export class AttributeService {
 
   public static async deleteAttribute(id: string): Promise<{ success: boolean; isUsed?: boolean; usedCount?: number; message?: string }> {
     try {
-      const res = await fetch(`${API_BASE_URL}/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/${id}`, {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
       const json = await res.json();
       if (json.success) {
         const local = this.getLocalAttributes().filter((a) => a.id !== id);
@@ -280,7 +284,7 @@ export class AttributeService {
     try {
       const res = await fetch(`${API_BASE_URL}/${attributeId}/values`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(valueData)
       });
       if (res.ok) {

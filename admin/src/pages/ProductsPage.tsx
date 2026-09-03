@@ -29,9 +29,6 @@ import {
   DollarSign
 } from 'lucide-react';
 import { 
-  MOCK_CATEGORIES, 
-  MOCK_SUBCATEGORIES, 
-  MOCK_BRANDS, 
   getAdminProducts,
   getAdminCategoriesAndSubcategories,
   broadcastAdminProductChange
@@ -58,8 +55,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
 
   // Categories & Taxonomy State
   const [categoriesData, setCategoriesData] = useState(() => getAdminCategoriesAndSubcategories());
-  const [categoriesList, setCategoriesList] = useState<Category[]>(MOCK_CATEGORIES);
-  const [subcategoriesList, setSubcategoriesList] = useState<Subcategory[]>(MOCK_SUBCATEGORIES);
+  const [categoriesList, setCategoriesList] = useState<Category[]>(() => categoriesData.mainCategories || []);
+  const [subcategoriesList, setSubcategoriesList] = useState<Subcategory[]>(() => categoriesData.subcategories || []);
+  const [brandsList, setBrandsList] = useState<Brand[]>([]);
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,6 +120,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
     window.addEventListener('aaramly_category_sync', handleCategorySync);
     window.addEventListener('awesome_product_sync', handleProductSync);
     window.addEventListener('aaramly_product_sync', handleProductSync);
+
+    AdminApiService.getBrands().then((b) => {
+      if (Array.isArray(b)) setBrandsList(b);
+    }).catch(() => {});
 
     return () => {
       window.removeEventListener('awesome_category_sync', handleCategorySync);
@@ -631,7 +633,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
                 }}
                 options={[
                   { value: 'ALL', label: 'All Brands' },
-                  ...MOCK_BRANDS.map((b) => ({ value: b.name, label: b.name }))
+                  ...brandsList.map((b) => ({ value: b.name, label: b.name }))
                 ]}
               />
             </div>

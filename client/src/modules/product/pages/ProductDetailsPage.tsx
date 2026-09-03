@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import Lenis from "lenis";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navbar from "@/modules/core/components/Navbar";
@@ -28,10 +28,10 @@ export const ProductDetailsPage: React.FC = () => {
 
   const initialColorFromQuery = searchParams.get("color");
   const [selectedColor, setSelectedColor] = useState<string>(
-    () => initialColorFromQuery || product.colors?.[0]?.colorName || (product as any).colorMediaConfigs?.[0]?.colorName || product.variations?.[0]?.colorName || "Standard"
+    () => initialColorFromQuery || product?.colors?.[0]?.colorName || (product as any)?.colorMediaConfigs?.[0]?.colorName || product?.variations?.[0]?.colorName || "Standard"
   );
   const [selectedSize, setSelectedSize] = useState<string>(
-    () => product.colors?.[0]?.sizes?.[0] || product.variations?.[0]?.size || product.availableSizes?.[0] || "Standard Pair"
+    () => product?.colors?.[0]?.sizes?.[0] || product?.variations?.[0]?.size || product?.availableSizes?.[0] || "Standard Pair"
   );
 
   useEffect(() => {
@@ -43,6 +43,22 @@ export const ProductDetailsPage: React.FC = () => {
 
   // Dynamic computation of active variation based on Color AND Size selection
   const activeVariation: ProductColorVariation = React.useMemo(() => {
+    if (!product) {
+      return {
+        id: "v-default",
+        colorName: selectedColor || "Standard",
+        colorHex: "#C89B3C",
+        size: selectedSize || "Standard Pair",
+        thumbnail: "/images/category/Latkan.webp",
+        price: 799,
+        originalPrice: 1299,
+        discountPercentage: 38,
+        sku: "AH-STD",
+        stock: 50,
+        images: [{ id: "img-0", url: "/images/category/Latkan.webp", alt: "Product" }]
+      };
+    }
+
     // Gather all root product images
     const rootGallery: string[] = [];
     if (prodAny.mainImage && typeof prodAny.mainImage === "string") rootGallery.push(prodAny.mainImage);
@@ -62,7 +78,7 @@ export const ProductDetailsPage: React.FC = () => {
 
     // Find matching color configuration object
     const colorObj = (product.colors || []).find(
-      (c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === (selectedColor || "").toLowerCase()
+      (c: any) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === (selectedColor || "").toLowerCase()
     );
     const colorMedia = ((product as any).colorMediaConfigs || []).find(
       (cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === (selectedColor || "").toLowerCase()
@@ -112,7 +128,7 @@ export const ProductDetailsPage: React.FC = () => {
 
     // 1. Try exact match for both Color AND Size
     const exactMatch = (product.variations || []).find(
-      (v) =>
+      (v: any) =>
         v &&
         (v.colorName || (v as any).color || "").trim().toLowerCase() === (selectedColor || "").trim().toLowerCase() &&
         (((v.size || "").trim().toLowerCase() === (selectedSize || "").trim().toLowerCase()) ||
@@ -132,7 +148,7 @@ export const ProductDetailsPage: React.FC = () => {
 
     // 2. Fallback to Color match
     const colorMatch = (product.variations || []).find(
-      (v) => v && (v.colorName || (v as any).color || "").trim().toLowerCase() === (selectedColor || "").trim().toLowerCase()
+      (v: any) => v && (v.colorName || (v as any).color || "").trim().toLowerCase() === (selectedColor || "").trim().toLowerCase()
     );
 
     if (colorMatch) {
@@ -161,7 +177,7 @@ export const ProductDetailsPage: React.FC = () => {
       stock: (firstVar as any).stock !== undefined ? (firstVar as any).stock : 50,
       images: colorImages.length > 0 ? colorImages : ((firstVar as any).images || [{ id: "img-0", url: "/images/category/Latkan.webp", alt: product.name }])
     };
-  }, [product.colors, (product as any).colorMediaConfigs, product.variations, selectedColor, selectedSize, prodAny]);
+  }, [product?.colors, (product as any)?.colorMediaConfigs, product?.variations, selectedColor, selectedSize, prodAny]);
 
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
 
@@ -208,10 +224,10 @@ export const ProductDetailsPage: React.FC = () => {
   useEffect(() => {
     if (!product) return;
     const validColors = [
-      ...(product.colors || []).map(c => c?.colorName || (c as any)?.name || (c as any)?.color),
+      ...(product.colors || []).map((c: any) => c?.colorName || (c as any)?.name || (c as any)?.color),
       ...((product as any).colorMediaConfigs || []).map((cm: any) => cm?.colorName || cm?.name),
-      ...(product.variations || []).map(v => v?.colorName || (v as any)?.color)
-    ].map(c => (c || "").trim()).filter(Boolean);
+      ...(product.variations || []).map((v: any) => v?.colorName || (v as any)?.color)
+    ].map((c: any) => (c || "").trim()).filter(Boolean);
 
     if (validColors.length > 0) {
       const colorExists = validColors.some(
@@ -221,7 +237,7 @@ export const ProductDetailsPage: React.FC = () => {
         const firstColor = validColors[0] || "Standard";
         setSelectedColor(firstColor);
         const colorObj = (product.colors || []).find(
-          (c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === (firstColor || "").toLowerCase()
+          (c: any) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === (firstColor || "").toLowerCase()
         );
         if (colorObj?.sizes && colorObj.sizes.length > 0) {
           setSelectedSize(colorObj.sizes[0]);
@@ -250,6 +266,32 @@ export const ProductDetailsPage: React.FC = () => {
       lenis.destroy();
     };
   }, []);
+
+  if (!product || !product.id) {
+    return (
+      <div className="min-h-screen bg-white text-neutral-900 font-sans flex flex-col justify-between">
+        <Navbar />
+        <div className="max-w-xl mx-auto px-4 py-24 text-center space-y-5">
+          <div className="w-16 h-16 bg-amber-50 text-brand-maroon rounded-full flex items-center justify-center mx-auto text-2xl font-bold border border-amber-200">
+            !
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Product Not Found</h2>
+          <p className="text-sm text-zinc-500 max-w-md mx-auto">
+            The requested product is currently unavailable, out of stock, or has been updated by the artisan.
+          </p>
+          <div className="pt-2">
+            <Link
+              to="/shop"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-brand-maroon text-white font-semibold text-sm shadow-md hover:bg-brand-maroon/90 transition-all cursor-pointer"
+            >
+              Explore All Handcrafted Products
+            </Link>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 font-sans selection:bg-black selection:text-white pb-16 md:pb-0 overflow-x-clip">
@@ -292,14 +334,14 @@ export const ProductDetailsPage: React.FC = () => {
                   const targetCol = v.colorName || (v as any).color || "Standard";
                   setSelectedColor(targetCol);
                   const colorObj = (product.colors || []).find(
-                    (c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === targetCol.toLowerCase()
+                    (c: any) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === targetCol.toLowerCase()
                   );
                   const colorSizes = (colorObj?.sizes && colorObj.sizes.length > 0)
                     ? colorObj.sizes
                     : (product.variations || [])
-                      .filter((varItem) => varItem && (varItem.colorName || (varItem as any).color || "").toLowerCase() === targetCol.toLowerCase())
-                      .map((varItem) => varItem.size || varItem.sizeName)
-                      .filter((s): s is string => Boolean(s));
+                      .filter((varItem: any) => varItem && (varItem.colorName || (varItem as any).color || "").toLowerCase() === targetCol.toLowerCase())
+                      .map((varItem: any) => varItem.size || varItem.sizeName)
+                      .filter((s: any): s is string => Boolean(s));
                   if (colorSizes.length > 0 && !colorSizes.includes(selectedSize)) {
                     setSelectedSize(colorSizes[0]);
                   }

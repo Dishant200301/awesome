@@ -20,7 +20,6 @@ import Footer from "@/modules/core/components/Footer";
 import { useWishlist } from "@/modules/product/context/WishlistContext";
 import { useCart } from "@/modules/product/context/CartContext";
 import { useAuth, UserAddress } from "@/modules/core/context/AuthContext";
-import { MOCK_CONTACT_MESSAGES } from "../../../../../admin/src/data/mockAdminData";
 
 export const AccountPage: React.FC = () => {
   const { wishlistCount } = useWishlist();
@@ -29,6 +28,18 @@ export const AccountPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const [supportMessages, setSupportMessages] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const local = localStorage.getItem("awesome_contact_sync");
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed?.message) return [parsed.message];
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
 
   // Redirect and open Auth Modal popup if trying to view /account while logged out
   useEffect(() => {
@@ -224,7 +235,7 @@ export const AccountPage: React.FC = () => {
               }`}
             >
               <FiMessageSquare size={16} />
-              <span>Support Inquiries ({MOCK_CONTACT_MESSAGES.length})</span>
+              <span>Support Inquiries ({supportMessages.length})</span>
             </button>
             <button
               onClick={() => {
@@ -353,12 +364,12 @@ export const AccountPage: React.FC = () => {
           {/* TAB: SUPPORT INQUIRIES & ADMIN REPLIES */}
           {activeTab === "messages" && (
             <div className="space-y-4">
-              {MOCK_CONTACT_MESSAGES.length === 0 ? (
+              {supportMessages.length === 0 ? (
                 <div className="p-8 text-center bg-zinc-50 rounded-2xl border border-zinc-200 text-xs text-zinc-500">
                   No support inquiries submitted yet.
                 </div>
               ) : (
-                MOCK_CONTACT_MESSAGES.map((msg) => (
+                supportMessages.map((msg) => (
                   <div key={msg.id} className="p-6 rounded-2xl bg-white border border-zinc-200 space-y-4 shadow-2xs">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-3">
                       <div>

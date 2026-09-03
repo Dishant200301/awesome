@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getAdminApiBase } from '../utils/authHeaders';
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1')}/auth/admin`;
+const API_BASE_URL = `${getAdminApiBase()}/auth/admin`;
 
 export interface AdminUser {
   id: string;

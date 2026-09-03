@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/modules/core/components/ui/select";
 import ProductCard from "@/modules/home/components/ProductCard";
-import { collections, Category } from "@/data/catalog";
+import { Category } from "@/data/catalog";
 import {
   subscribeToProductStore,
   getLiveProductsList,

@@ -13,10 +13,9 @@ interface WishlistContextType {
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
+import { API_BASE_URL } from "@/modules/core/lib/apiStore";
+
 const LOCAL_STORAGE_KEY = "awesome_wishlist_v1";
-const API_BASE_URL = typeof window !== "undefined" && window.location.hostname === "localhost"
-  ? "http://localhost:5000/api/v1"
-  : "/api/v1";
 
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isLoggedIn, user } = useAuth();

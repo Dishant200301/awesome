@@ -15,8 +15,7 @@ import {
   Bookmark,
   Link as LinkIcon
 } from 'lucide-react';
-import { MOCK_CATEGORIES, MOCK_SUBCATEGORIES, MOCK_PRODUCTS } from '../data/mockAdminData';
-import { SizeGuide, SizeGuideCountry, SizeGuideColumn, SizeGuideRow } from '../types/admin';
+import { SizeGuide, SizeGuideCountry, SizeGuideColumn, SizeGuideRow, Category } from '../types/admin';
 import { AdminApiService } from '../services/adminApi';
 
 interface SizeGuidesPageProps {
@@ -105,6 +104,7 @@ export const SizeGuidesPage: React.FC<SizeGuidesPageProps> = ({ initialSubTab = 
       values: {}
     }
   ]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
 
   // Dynamic Add Inputs
   const [newCountryName, setNewCountryName] = useState('');
@@ -122,6 +122,12 @@ export const SizeGuidesPage: React.FC<SizeGuidesPageProps> = ({ initialSubTab = 
       if (remote && remote.length > 0) {
         setGuides(remote);
       }
+      try {
+        const catRes = await AdminApiService.getCategories();
+        if (catRes?.categories && Array.isArray(catRes.categories)) {
+          setCategoriesList(catRes.categories);
+        }
+      } catch (e) {}
     };
     fetchGuides();
   }, []);
@@ -650,18 +656,22 @@ export const SizeGuidesPage: React.FC<SizeGuidesPageProps> = ({ initialSubTab = 
           <h3 className="text-base font-extrabold text-slate-900">Category &amp; Product Size Guide Mappings</h3>
           <p className="text-xs text-slate-500">Assign a master Size Guide to an entire Category or override for specific individual products.</p>
           <div className="space-y-4">
-            {MOCK_CATEGORIES.map((cat) => (
-              <div key={cat.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-slate-900 text-xs">{cat.name} Category</h4>
-                  <p className="text-[11px] text-slate-500">Applies to all products under {cat.name}</p>
+            {categoriesList.length === 0 ? (
+              <div className="text-xs text-slate-500 py-6 text-center">No categories available.</div>
+            ) : (
+              categoriesList.map((cat) => (
+                <div key={cat.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-xs">{cat.name} Category</h4>
+                    <p className="text-[11px] text-slate-500">Applies to all products under {cat.name}</p>
+                  </div>
+                  <select className="bg-white p-2 text-xs font-bold text-slate-800 rounded-xl border border-slate-200 outline-none cursor-pointer">
+                    <option value={guides[0]?.id}>{guides[0]?.title || 'Size Guide'}</option>
+                    <option value="">-- No Guide Assigned --</option>
+                  </select>
                 </div>
-                <select className="bg-white p-2 text-xs font-bold text-slate-800 rounded-xl border border-slate-200 outline-none cursor-pointer">
-                  <option value={guides[0]?.id}>{guides[0]?.title || 'Women\'s Bra Size Guide'}</option>
-                  <option value="">-- No Guide Assigned --</option>
-                </select>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}

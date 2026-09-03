@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getAdminApiBase, getAdminAuthHeaders } from '../utils/authHeaders';
 import { 
   Plus, 
   FolderTree, 
@@ -23,7 +24,6 @@ import {
   Package,
   RefreshCw
 } from 'lucide-react';
-import { MOCK_CATEGORIES, MOCK_SUBCATEGORIES } from '../data/mockAdminData';
 import { Category } from '../types/admin';
 import { Select } from '../components/ui/select';
 import { Card } from '../components/ui/card';
@@ -58,23 +58,13 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
         const saved = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
         if (saved !== null) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             return parsed;
           }
         }
       } catch (e) {}
     }
-    const initialParents = MOCK_CATEGORIES.map(c => ({
-      ...c,
-      type: 'parent' as const,
-      createdAt: '2026-01-15'
-    }));
-    const initialSubs = MOCK_SUBCATEGORIES.map(s => ({
-      ...s,
-      type: 'sub' as const,
-      createdAt: '2026-01-20'
-    }));
-    return [...initialParents, ...initialSubs];
+    return [];
   });
 
   // Navigation & View Mode: 'all' | 'add' | 'edit'
@@ -129,7 +119,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api/v1" : "http://localhost:5000/api/v1");
+  const API_BASE = getAdminApiBase();
 
   const showToast = (msg: string) => {
     setSuccessToast(msg);
@@ -179,7 +169,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     // Sync to Express Backend
     fetch(`${API_BASE}/taxonomies/categories/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify({ categories }),
     }).catch(() => {});
   }, [categories]);

@@ -1,8 +1,11 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /admin/
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /admin/index.html [L]
+
+  # 1. Do not rewrite real existing files, directories, or assets (JS, CSS, images)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 2. Support React Router SPA fallback (works for both root subdomain and /admin subfolder)
+  RewriteRule ^ index.html [L]
 </IfModule>

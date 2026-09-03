@@ -30,7 +30,6 @@ import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import { useQuickView } from "../context/QuickViewContext";
 import ProductHoverSlider from "../components/ProductHoverSlider";
-import { CLIENT_SHOP_PRODUCTS } from "../data/productData";
 import { ClientShopProduct } from "../types/product";
 import {
   fetchLiveProducts,

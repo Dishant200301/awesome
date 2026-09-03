@@ -40,12 +40,14 @@ export const RelatedProductsSection: React.FC<RelatedProductsSectionProps> = ({ 
       return catalog.filter((p) => ids.includes(String(p.id)) && String(p.id) !== currentId);
     }
 
-    // 2. Strict category / subcategory matching (No other unrelated products allowed)
+    // 2. Matching across category / subcategory / collection / brand
+    const currentBrand = ((currentProduct as any).brand || "").toLowerCase().trim();
     const matchingProducts = catalog.filter((p) => {
       if (String(p.id) === currentId) return false;
       const pCat = (p.category || (p.categories && p.categories[0]) || "").toLowerCase().trim();
       const pSubcat = (p.subcategory || (p as any).subCategory || "").toLowerCase().trim();
       const pCollection = ((p as any).collection || "").toLowerCase().trim();
+      const pBrand = ((p as any).brand || "").toLowerCase().trim();
 
       // Same subcategory match
       if (currentSubcat && pSubcat && pSubcat === currentSubcat) return true;
@@ -53,11 +55,18 @@ export const RelatedProductsSection: React.FC<RelatedProductsSectionProps> = ({ 
       if (currentCat && pCat && pCat === currentCat) return true;
       // Same collection match
       if (currentCollection && pCollection && pCollection === currentCollection) return true;
+      // Same brand match
+      if (currentBrand && pBrand && pBrand === currentBrand) return true;
 
       return false;
     });
 
-    return matchingProducts.slice(0, 10);
+    if (matchingProducts.length > 0) {
+      return matchingProducts.slice(0, 10);
+    }
+
+    // 3. If no matching related products exist, return empty array (do not fabricate fake matches)
+    return [];
   }, [currentProduct, catalog]);
 
   const scrollRef = useRef<HTMLDivElement>(null);

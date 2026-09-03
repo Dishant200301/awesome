@@ -4,8 +4,7 @@ import { FaFacebookF, FaInstagram, FaYoutube, FaWhatsapp } from "react-icons/fa"
 import { FiMail, FiPhone, FiMapPin, FiX, FiCheckCircle } from "react-icons/fi";
 import { AwesomeLogo } from "./Navbar";
 import NewsletterCTA from "./NewsletterCTA";
-import { getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
-import { MOCK_CONTACT_MESSAGES } from "../../../../../admin/src/data/mockAdminData";
+import { API_BASE_URL, getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
 
 export default function Footer() {
   const [liveCategories, setLiveCategories] = useState(() => getLiveCategories());
@@ -40,7 +39,11 @@ export default function Footer() {
       status: 'New' as const
     };
 
-    MOCK_CONTACT_MESSAGES.unshift(newMsg);
+    fetch(`${API_BASE_URL}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newMsg)
+    }).catch(() => {});
 
     setSubmitted(true);
     setTimeout(() => {

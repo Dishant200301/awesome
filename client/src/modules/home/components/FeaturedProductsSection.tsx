@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import { motion } from "framer-motion";
 import { FiChevronLeft, FiChevronRight, FiArrowRight } from "react-icons/fi";
-import { CATEGORY_TABS as FALLBACK_TABS } from "../lib/products";
 import ProductCard from "./ProductCard";
 import { subscribeToProductStore, getLiveProductsList, getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
 
@@ -26,7 +25,7 @@ export default function FeaturedProductsSection({ activeTab, setActiveTab }: Fea
   const [scrollLeft, setScrollLeft] = useState(0);
 
   const dynamicTabs = useMemo(() => {
-    if (!categoriesList || categoriesList.length === 0) return FALLBACK_TABS;
+    if (!categoriesList || categoriesList.length === 0) return [{ key: "all", label: "All Items" }];
     return [
       { key: "all", label: "All Items" },
       ...categoriesList.slice(0, 7).map((c) => ({
@@ -247,14 +246,20 @@ export default function FeaturedProductsSection({ activeTab, setActiveTab }: Fea
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           <div className="flex gap-4 sm:gap-5 md:gap-6 flex-nowrap w-max px-4 sm:px-6">
-            {filteredProducts.map((product) => (
-              <div 
-                key={product.id} 
-                className="prod-card shrink-0 w-[82vw] min-w-[280px] max-w-[330px] sm:w-[280px] lg:w-[310px] xl:w-[335px]"
-              >
-                <ProductCard p={product} />
+            {filteredProducts.length === 0 ? (
+              <div className="py-12 px-6 text-center text-zinc-500 font-medium w-full">
+                No products available in this category.
               </div>
-            ))}
+            ) : (
+              filteredProducts.map((product) => (
+                <div 
+                  key={product.id} 
+                  className="prod-card shrink-0 w-[82vw] min-w-[280px] max-w-[330px] sm:w-[280px] lg:w-[310px] xl:w-[335px]"
+                >
+                  <ProductCard p={product} />
+                </div>
+              ))
+            )}
           </div>
         </div>
 

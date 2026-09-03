@@ -177,7 +177,7 @@ function AdminMainContent() {
 
   // Derive dynamic header title from current location pathname
   const headerTitle = useMemo(() => {
-    const p = location.pathname.toLowerCase();
+    const p = location.pathname.toLowerCase().replace(/^\/admin(?=\/|$)/, '') || '/';
     if (p.includes('/product/edit') || p.includes('/products/edit') || p.includes('/edit-product')) {
       return 'Edit Product';
     }
@@ -268,52 +268,77 @@ function AdminMainContent() {
             {/* Dashboard */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage onNavigate={handleNavigate} />} />
+            <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/admin/dashboard" element={<DashboardPage onNavigate={handleNavigate} />} />
 
             {/* Products & Product Edit / Create */}
             <Route path="/products" element={<ProductsPage onNavigate={handleNavigate} />} />
+            <Route path="/admin/products" element={<ProductsPage onNavigate={handleNavigate} />} />
             <Route path="/product" element={<ProductsPage onNavigate={handleNavigate} />} />
+            <Route path="/admin/product" element={<ProductsPage onNavigate={handleNavigate} />} />
             <Route path="/all-products" element={<ProductsPage onNavigate={handleNavigate} />} />
+            <Route path="/admin/all-products" element={<ProductsPage onNavigate={handleNavigate} />} />
             
             <Route path="/products/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/products/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
             <Route path="/product/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/product/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
             <Route path="/products/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/products/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
             <Route path="/product/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/product/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
             <Route path="/add-product" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/add-product" element={<ProductCreatePage onNavigate={handleNavigate} />} />
 
             <Route path="/products/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/products/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
             <Route path="/product/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/product/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
             <Route path="/edit-product/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+            <Route path="/admin/edit-product/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
 
             {/* Categories & Taxonomy */}
             <Route path="/categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+            <Route path="/admin/categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
             <Route path="/category" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+            <Route path="/admin/category" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
             <Route path="/all-categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+            <Route path="/admin/all-categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
             <Route path="/categories/subcategories" element={<CategoriesPage initialTab="sub-categories" onNavigate={handleNavigate} />} />
+            <Route path="/admin/categories/subcategories" element={<CategoriesPage initialTab="sub-categories" onNavigate={handleNavigate} />} />
 
             {/* Banners & Hero Slider */}
             <Route path="/banners" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
+            <Route path="/admin/banners" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
             <Route path="/banner" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
             <Route path="/hero-slider" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
             <Route path="/homepage-banners" element={<BannersPage initialTab="homepage-banners" onNavigate={handleNavigate} />} />
 
             {/* Attributes, Variants & Filters */}
             <Route path="/attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
+            <Route path="/admin/attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
             <Route path="/all-attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
             <Route path="/variants" element={<ProductVariantsPage onNavigate={handleNavigate} />} />
+            <Route path="/admin/variants" element={<ProductVariantsPage onNavigate={handleNavigate} />} />
             <Route path="/filters" element={<FilterManagementPage />} />
+            <Route path="/admin/filters" element={<FilterManagementPage />} />
 
             {/* Inventory */}
             <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/admin/inventory" element={<InventoryPage />} />
 
             {/* Reviews & Feedback (Real-Time Customer Reviews) */}
             <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/admin/reviews" element={<ReviewsPage />} />
             <Route path="/customer-reviews" element={<ReviewsPage />} />
             <Route path="/customers" element={<ReviewsPage />} />
             <Route path="/all-customers" element={<ReviewsPage />} />
 
             {/* Orders */}
             <Route path="/orders" element={<OrdersPage initialStatusFilter="ALL" />} />
+            <Route path="/admin/orders" element={<OrdersPage initialStatusFilter="ALL" />} />
             <Route path="/all-orders" element={<OrdersPage initialStatusFilter="ALL" />} />
+            <Route path="/admin/all-orders" element={<OrdersPage initialStatusFilter="ALL" />} />
 
             {/* Enquiries & Messages */}
             <Route path="/enquiries" element={<ContactMessagesPage />} />

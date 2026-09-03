@@ -13,7 +13,7 @@ import {
   Sparkles,
   ArrowUpRight
 } from 'lucide-react';
-import { getGlobalVariantsList, MOCK_PRODUCTS } from '../data/mockAdminData';
+import { getGlobalVariantsList, getAdminProducts } from '../data/mockAdminData';
 import { Variant } from '../types/admin';
 import { Select } from '../components/ui/select';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
@@ -74,7 +74,7 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
   });
 
   // Unique lists for filters
-  const uniqueParents = MOCK_PRODUCTS.filter((p) => p.type === 'Variable');
+  const uniqueParents = getAdminProducts().filter((p) => p.type === 'Variable');
   const uniqueColors = Array.from(new Set(variantsList.map((v) => v.color).filter((c): c is string => Boolean(c))));
   const uniqueSizes = Array.from(new Set(variantsList.map((v) => v.size).filter((s): s is string => Boolean(s))));
 
@@ -101,9 +101,9 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
       prev.map((v) => (v.id === editingVariant.id ? updatedVariant : v))
     );
 
-    // Sync with parent product in MOCK_PRODUCTS and broadcast
+    // Sync with parent product in store and broadcast
     if (editingVariant.parentProductId) {
-      const parentProd = MOCK_PRODUCTS.find((p) => p.id === editingVariant.parentProductId);
+      const parentProd = getAdminProducts().find((p) => p.id === editingVariant.parentProductId);
       if (parentProd && parentProd.variants) {
         parentProd.variants = parentProd.variants.map((v) =>
           v.id === editingVariant.id ? updatedVariant : v
