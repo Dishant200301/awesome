@@ -1,17 +1,15 @@
-# Hostinger LiteSpeed / Apache Reverse Proxy for api.awesomehandwork.com
+# Hostinger PHP Proxy Bridge for Node.js (Port 5000)
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Pass Authorization header to Node.js / Express backend
+  # Pass Authorization header to PHP and Node.js
   RewriteCond %{HTTP:Authorization} .
   RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-  # Forward all API traffic internally to Node.js port 5000
-  RewriteRule ^(.*)$ http://127.0.0.1:5000/$1 [P,L]
-</IfModule>
+  # If a real file exists, serve it directly
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
 
-<IfModule mod_proxy.c>
-  ProxyPreserveHost On
-  ProxyRequests Off
-  ProxyPassReverse / http://127.0.0.1:5000/
+  # Route all API traffic to index.php bridge
+  RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>
