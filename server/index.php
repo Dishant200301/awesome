@@ -3,6 +3,32 @@
 $backendHost = '127.0.0.1';
 $backendPort = 5000;
 
+// Handle CORS allowlist and Preflight OPTIONS
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOrigins = [
+    'https://awesomehandwork.com',
+    'https://www.awesomehandwork.com',
+    'https://admin.awesomehandwork.com',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174'
+];
+
+if (!empty($origin) && in_array($origin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: {$origin}");
+    header("Access-Control-Allow-Credentials: true");
+    header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+}
+
+// Immediately satisfy preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 $requestUri = $_SERVER['REQUEST_URI'];
 $targetUrl = "http://{$backendHost}:{$backendPort}{$requestUri}";
 
@@ -87,7 +113,12 @@ foreach ($headerLines as $headerLine) {
     if (stripos($headerLine, 'Transfer-Encoding:') === false &&
         stripos($headerLine, 'HTTP/') !== 0 &&
         !empty($headerLine)) {
-        header($headerLine, false);
+        // Overwrite or skip duplicate Access-Control headers
+        if (stripos($headerLine, 'Access-Control-') === 0) {
+            header($headerLine, true);
+        } else {
+            header($headerLine, false);
+        }
     }
 }
 
