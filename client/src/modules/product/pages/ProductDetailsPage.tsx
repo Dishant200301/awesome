@@ -385,9 +385,14 @@ export const ProductDetailsPage: React.FC = () => {
         <RelatedProductsSection currentProduct={product} />
 
         {/* CUSTOMER REVIEWS */}
-        {/* <div id="customer-reviews">
-          <CustomerReviewsSection />
-        </div> */}
+        <div id="customer-reviews">
+          <CustomerReviewsSection
+            productId={product.id}
+            productName={product.name}
+            productRating={product.rating || 4.9}
+            productReviewCount={product.reviewCount || (product as any).salesCount || 12}
+          />
+        </div>
       </div>
 
       {/* MOBILE STICKY BOTTOM ACTION BAR */}

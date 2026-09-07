@@ -1,5 +1,6 @@
 import { Sequelize } from "sequelize";
 import { config } from "../config/index.js";
+import { initializeMySQLDatabase } from "./init_db.js";
 
 // MySQL Sequelize Instance
 export const sequelize = new Sequelize(
@@ -12,7 +13,7 @@ export const sequelize = new Sequelize(
     dialect: "mysql",
     logging: false,
     pool: {
-      max: 10,
+      max: 20,
       min: 0,
       acquire: 30000,
       idle: 10000,
@@ -20,11 +21,19 @@ export const sequelize = new Sequelize(
   }
 );
 
+export let isMySQLConnected = false;
+
 export const connectDB = async () => {
   try {
+    // 1. Ensure DB & tables exist via auto-initializer
+    await initializeMySQLDatabase();
+
+    // 2. Authenticate Sequelize
     await sequelize.authenticate();
-    console.log("✅ MySQL Database connected successfully.");
+    isMySQLConnected = true;
+    console.log(`✅ MySQL Database '${config.db.name}' connected successfully.`);
   } catch (error) {
-    console.warn("⚠️ MySQL Database connection skipped (using active dynamic store):", (error as Error).message);
+    isMySQLConnected = false;
+    console.error("❌ MySQL Database connection failed:", (error as Error).message);
   }
 };

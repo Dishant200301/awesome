@@ -25,6 +25,7 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 import { findHexByColorName, getClosestColorName } from '../utils/colorMatcher';
 
@@ -448,35 +449,14 @@ export const AttributesPage: React.FC<AttributesPageProps> = ({
                     <label className="text-xs font-semibold text-neutral-700">
                       Attribute Type<span className="text-rose-500">*</span>
                     </label>
-                    <div className="relative">
-                      <select
-                        value={formType}
-                        onChange={(e) => setFormType(e.target.value as AttributeDisplayType)}
-                        className="w-full pl-3.5 pr-10 py-2.5 text-xs text-neutral-800 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-950 focus:border-neutral-950 transition-all appearance-none cursor-pointer"
-                      >
-                        {ATTRIBUTE_TYPES.map((t) => (
-                          <option key={t.value} value={t.value}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-neutral-400">
-                        {formType && (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFormType('TEXTAREA');
-                            }}
-                            className="pointer-events-auto hover:text-neutral-700 cursor-pointer p-0.5"
-                            title="Reset type"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </span>
-                        )}
-                        <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
-                      </div>
-                    </div>
+                    <Select
+                      value={formType}
+                      onValueChange={(val) => setFormType(val as AttributeDisplayType)}
+                      options={ATTRIBUTE_TYPES.map((t) => ({
+                        value: t.value,
+                        label: t.label
+                      }))}
+                    />
                   </div>
                 </div>
               </div>
@@ -751,31 +731,33 @@ export const AttributesPage: React.FC<AttributesPageProps> = ({
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-neutral-500">Type:</span>
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="text-xs bg-white border border-neutral-200 rounded-md px-2.5 py-1 text-neutral-800 outline-none"
-                >
-                  <option value="All">All Types</option>
-                  {ATTRIBUTE_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="w-36">
+                  <Select
+                    value={filterType}
+                    onValueChange={(val) => setFilterType(val)}
+                    className="h-8 text-xs"
+                    options={[
+                      { value: 'All', label: 'All Types' },
+                      ...ATTRIBUTE_TYPES.map((t) => ({ value: t.value, label: t.label }))
+                    ]}
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-neutral-500">Status:</span>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="text-xs bg-white border border-neutral-200 rounded-md px-2.5 py-1 text-neutral-800 outline-none"
-                >
-                  <option value="All">All Status</option>
-                  <option value="Active">Active Only</option>
-                  <option value="Inactive">Inactive Only</option>
-                </select>
+                <div className="w-32">
+                  <Select
+                    value={filterStatus}
+                    onValueChange={(val) => setFilterStatus(val)}
+                    className="h-8 text-xs"
+                    options={[
+                      { value: 'All', label: 'All Status' },
+                      { value: 'Active', label: 'Active Only' },
+                      { value: 'Inactive', label: 'Inactive Only' }
+                    ]}
+                  />
+                </div>
               </div>
             </div>
           </Card>

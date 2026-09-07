@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 import { 
   getAdminProducts,
-  getAdminCategoriesAndSubcategories,
   broadcastAdminProductChange
 } from '../data/mockAdminData';
 import { Product, Category, Subcategory, Brand } from '../types/admin';
@@ -46,17 +45,16 @@ interface ProductsPageProps {
 }
 
 export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
-  // Products & Loading State
+  // Main Products State
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [copiedSku, setCopiedSku] = useState<string | null>(null);
 
-  // Categories & Taxonomy State
-  const [categoriesData, setCategoriesData] = useState(() => getAdminCategoriesAndSubcategories());
-  const [categoriesList, setCategoriesList] = useState<Category[]>(() => categoriesData.mainCategories || []);
-  const [subcategoriesList, setSubcategoriesList] = useState<Subcategory[]>(() => categoriesData.subcategories || []);
+  // Dynamic Categories & Taxonomy State directly from backend/MySQL
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  const [subcategoriesList, setSubcategoriesList] = useState<Subcategory[]>([]);
   const [brandsList, setBrandsList] = useState<Brand[]>([]);
 
   // Search & Filter State
@@ -92,16 +90,31 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
   };
 
   // Sync category updates in real time
+  const loadTaxonomies = async () => {
+    try {
+      const res = await AdminApiService.getCategories();
+      if (res && Array.isArray(res.categories)) {
+        setCategoriesList(res.categories);
+        setSubcategoriesList(res.subcategories || []);
+      }
+    } catch (e) {
+      console.warn("Error fetching categories in ProductsPage:", e);
+    }
+  };
+
   useEffect(() => {
+    loadTaxonomies();
+
+    let catBc: BroadcastChannel | null = null;
+    try {
+      catBc = new BroadcastChannel('awesome_category_sync');
+      catBc.onmessage = () => {
+        loadTaxonomies();
+      };
+    } catch (e) {}
+
     const handleCategorySync = () => {
-      const live = getAdminCategoriesAndSubcategories();
-      setCategoriesData(live);
-      if (live.mainCategories && live.mainCategories.length > 0) {
-        setCategoriesList(live.mainCategories);
-      }
-      if (live.subcategories && live.subcategories.length > 0) {
-        setSubcategoriesList(live.subcategories);
-      }
+      loadTaxonomies();
     };
 
     const handleProductSync = () => {
@@ -1007,19 +1020,22 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
         <div className="p-3 sm:p-4 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
           <div className="flex items-center gap-2">
             <span>Showing</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="bg-neutral-50 border border-neutral-200 rounded px-2 py-1 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+            <div className="w-20">
+              <Select
+                value={String(pageSize)}
+                onValueChange={(val) => {
+                  setPageSize(Number(val));
+                  setCurrentPage(1);
+                }}
+                className="h-8 text-xs bg-neutral-50"
+                options={[
+                  { value: '10', label: '10' },
+                  { value: '25', label: '25' },
+                  { value: '50', label: '50' },
+                  { value: '100', label: '100' }
+                ]}
+              />
+            </div>
             <span>of <strong>{totalCount}</strong> products</span>
           </div>
 

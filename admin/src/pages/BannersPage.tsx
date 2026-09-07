@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { HeroSlide, HomepageBanner } from '../types/admin';
 import { MOCK_HERO_SLIDES, MOCK_PROMO_BANNER } from '../data/mockAdminData';
-import { idbGet, idbSet } from '../data/idbStorage';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -46,37 +45,10 @@ export const BannersPage: React.FC<BannersPageProps> = ({
   const [gridPreviewMode, setGridPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
 
   // 1. HERO SLIDES STATE
-  const [slides, setSlides] = useState<HeroSlide[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('awesome_hero_slides') || localStorage.getItem('aocind_hero_slides');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch (e) {}
-    }
-    return MOCK_HERO_SLIDES;
-  });
+  const [slides, setSlides] = useState<HeroSlide[]>(MOCK_HERO_SLIDES);
 
   // 2. PROMOTIONAL BANNERS STATE (List)
-  const [promoBanners, setPromoBanners] = useState<HomepageBanner[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedList = localStorage.getItem('awesome_promo_banners') || localStorage.getItem('aocind_promo_banners');
-        if (savedList) {
-          const parsed = JSON.parse(savedList);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-        const savedSingle = localStorage.getItem('awesome_promo_banner') || localStorage.getItem('aocind_promo_banner');
-        if (savedSingle) {
-          const parsed = JSON.parse(savedSingle);
-          if (parsed && typeof parsed === 'object') return [parsed];
-        }
-      } catch (e) {}
-    }
-    return [MOCK_PROMO_BANNER];
-  });
+  const [promoBanners, setPromoBanners] = useState<HomepageBanner[]>([MOCK_PROMO_BANNER]);
 
   // Slide Edit / Create Modal State
   const [editingSlide, setEditingSlide] = useState<HeroSlide | null>(null);
@@ -108,34 +80,25 @@ export const BannersPage: React.FC<BannersPageProps> = ({
     }
   }, [initialTab]);
 
-  // Load from IndexedDB / API on mount
+  // Load from Express / MySQL Backend on mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        const idbSlides = await idbGet<HeroSlide[]>('awesome_hero_slides');
-        if (idbSlides && Array.isArray(idbSlides) && idbSlides.length > 0) {
-          setSlides(idbSlides);
-        }
-
-        const idbPromos = await idbGet<HomepageBanner[]>('awesome_promo_banners');
-        if (idbPromos && Array.isArray(idbPromos) && idbPromos.length > 0) {
-          setPromoBanners(idbPromos);
-        } else {
-          const idbPromo = await idbGet<HomepageBanner>('awesome_promo_banner');
-          if (idbPromo && typeof idbPromo === 'object') {
-            setPromoBanners([idbPromo]);
-          }
-        }
-      } catch (e) {}
-
-      // Fetch from Express Backend
-      try {
-        const res = await fetch(`${API_BASE}/content/hero-slides`);
+        const res = await fetch(`${API_BASE}/content/hero-slides`, { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
           if (json?.data && Array.isArray(json.data) && json.data.length > 0) {
             setSlides(json.data);
-            await idbSet('awesome_hero_slides', json.data);
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const res = await fetch(`${API_BASE}/content/promo-banner`, { cache: 'no-store' });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.data) {
+            setPromoBanners([json.data]);
           }
         }
       } catch (e) {}
@@ -147,16 +110,9 @@ export const BannersPage: React.FC<BannersPageProps> = ({
   // Broadcast Slides Changes
   const saveSlides = async (newSlides: HeroSlide[]) => {
     setSlides(newSlides);
-    await idbSet('awesome_hero_slides', newSlides);
-
-    try {
-      localStorage.setItem('awesome_hero_slides', JSON.stringify(newSlides));
-      localStorage.setItem('aocind_hero_slides', JSON.stringify(newSlides));
-    } catch (e) {}
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('awesome_content_sync'));
-      window.dispatchEvent(new Event('aocind_content_sync'));
       if ('BroadcastChannel' in window) {
         const bc = new BroadcastChannel('awesome_content_sync');
         bc.postMessage({ type: 'HERO_SLIDES_UPDATED', slides: newSlides });
@@ -164,8 +120,8 @@ export const BannersPage: React.FC<BannersPageProps> = ({
       }
     }
 
-    // Push to backend
-    fetch(`${API_BASE}/content/hero-slides/sync`, {
+    // Push to backend / database
+    await fetch(`${API_BASE}/content/hero-slides/sync`, {
       method: 'POST',
       headers: getAdminAuthHeaders(),
       body: JSON.stringify({ slides: newSlides }),
@@ -175,21 +131,11 @@ export const BannersPage: React.FC<BannersPageProps> = ({
   // Broadcast Promo Banners Changes
   const savePromoBanners = async (newBanners: HomepageBanner[]) => {
     setPromoBanners(newBanners);
-    await idbSet('awesome_promo_banners', newBanners);
 
     const primaryBanner = newBanners.find((b) => b.status === 'Active') || newBanners[0] || MOCK_PROMO_BANNER;
-    await idbSet('awesome_promo_banner', primaryBanner);
-
-    try {
-      localStorage.setItem('awesome_promo_banners', JSON.stringify(newBanners));
-      localStorage.setItem('aocind_promo_banners', JSON.stringify(newBanners));
-      localStorage.setItem('awesome_promo_banner', JSON.stringify(primaryBanner));
-      localStorage.setItem('aocind_promo_banner', JSON.stringify(primaryBanner));
-    } catch (e) {}
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('awesome_content_sync'));
-      window.dispatchEvent(new Event('aocind_content_sync'));
       if ('BroadcastChannel' in window) {
         const bc = new BroadcastChannel('awesome_content_sync');
         bc.postMessage({ type: 'PROMO_BANNER_UPDATED', banner: primaryBanner, banners: newBanners });
@@ -197,11 +143,11 @@ export const BannersPage: React.FC<BannersPageProps> = ({
       }
     }
 
-    // Push to backend
-    fetch(`${API_BASE}/content/promo-banner/sync`, {
+    // Push to backend / database
+    await fetch(`${API_BASE}/content/promo-banner`, {
       method: 'POST',
       headers: getAdminAuthHeaders(),
-      body: JSON.stringify({ banner: primaryBanner, banners: newBanners }),
+      body: JSON.stringify(primaryBanner),
     }).catch(() => {});
   };
 
@@ -510,7 +456,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                 </div>
 
                 {/* Device View Switcher for Grid */}
-                <div className="flex items-center bg-white border border-neutral-200 rounded-lg p-0.5 shadow-2xs">
+                <div className="flex items-center bg-white border border-neutral-200 rounded-lg p-1 shadow-2xs">
                   <button
                     type="button"
                     onClick={() => setGridPreviewMode('desktop')}
@@ -596,8 +542,8 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                         <div
                           className={`relative overflow-hidden bg-neutral-900 ${
                             gridPreviewMode === 'mobile'
-                              ? 'aspect-[9/14]'
-                              : 'aspect-[16/8]'
+                              ? 'aspect-9/14'
+                              : 'aspect-16/8'
                           }`}
                         >
                           <img
@@ -611,7 +557,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                           />
 
                           {/* Gradient Vignette overlay for text legibility */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent p-4 flex flex-col justify-end text-white">
+                          <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent p-4 flex flex-col justify-end text-white">
                             {slide.tag && (
                               <span className="text-[10px] font-bold tracking-wider uppercase text-amber-300 line-clamp-1">
                                 {slide.tag}
@@ -691,7 +637,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                               disabled={index === 0}
                               onClick={() => handleMoveSlide(index, 'up')}
                               title="Move Slide Up"
-                              className="p-1.5 rounded-md hover:bg-neutral-100 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-neutral-600 transition-colors"
+                              className="p-1.5 rounded-md hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed text-neutral-600 transition-colors"
                             >
                               <MoveUp className="w-3.5 h-3.5" />
                             </button>
@@ -700,7 +646,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                               disabled={index === slides.length - 1}
                               onClick={() => handleMoveSlide(index, 'down')}
                               title="Move Slide Down"
-                              className="p-1.5 rounded-md hover:bg-neutral-100 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-neutral-600 transition-colors"
+                              className="p-1.5 rounded-md hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed text-neutral-600 transition-colors"
                             >
                               <MoveDown className="w-3.5 h-3.5" />
                             </button>
@@ -759,12 +705,12 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                 </div>
 
                 {/* Device View Switcher */}
-                <div className="flex items-center bg-white border border-neutral-200 rounded-lg p-0.5 shadow-2xs">
+                <div className="flex items-center bg-white border border-neutral-200 rounded-lg p-1 shadow-2xs">
                   <button
                     type="button"
                     onClick={() => setGridPreviewMode('desktop')}
                     title="Preview Desktop Banners"
-                    className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    className={`px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
                       gridPreviewMode === 'desktop'
                         ? 'bg-neutral-950 text-white'
                         : 'text-neutral-600 hover:text-neutral-900'
@@ -777,7 +723,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                     type="button"
                     onClick={() => setGridPreviewMode('mobile')}
                     title="Preview Mobile Banners"
-                    className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    className={`px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
                       gridPreviewMode === 'mobile'
                         ? 'bg-neutral-950 text-white'
                         : 'text-neutral-600 hover:text-neutral-900'
@@ -846,8 +792,8 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                         <div
                           className={`relative overflow-hidden bg-neutral-900 ${
                             gridPreviewMode === 'mobile'
-                              ? 'aspect-[9/14]'
-                              : 'aspect-[16/8]'
+                              ? 'aspect-9/14'
+                              : 'aspect-16/8'
                           }`}
                         >
                           <img
@@ -860,7 +806,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                           />
 
                           {/* Gradient Vignette overlay for text legibility */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent p-4 flex flex-col justify-end text-white">
+                          <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent p-4 flex flex-col justify-end text-white">
                             {banner.badge && (
                               <span className="text-[10px] font-bold tracking-wider uppercase text-amber-300 line-clamp-1">
                                 {banner.badge}
@@ -1083,7 +1029,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                 </label>
 
                 {editingSlide.image ? (
-                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-[16/6] bg-neutral-900 shadow-2xs">
+                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-16/6 bg-neutral-900 shadow-2xs">
                     <img
                       src={editingSlide.image}
                       alt="Desktop Hero"
@@ -1189,7 +1135,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                 </label>
 
                 {editingSlide.mobileImage ? (
-                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-[16/9] max-w-[260px] bg-neutral-900 shadow-2xs">
+                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-video max-w-[260px] bg-neutral-900 shadow-2xs">
                     <img
                       src={editingSlide.mobileImage}
                       alt="Mobile Hero"
@@ -1450,7 +1396,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                 </label>
 
                 {editingPromoBanner.image ? (
-                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-[16/6] bg-neutral-900 shadow-2xs">
+                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-16/6 bg-neutral-900 shadow-2xs">
                     <img
                       src={editingPromoBanner.image}
                       alt="Desktop Banner"
@@ -1556,7 +1502,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                 </label>
 
                 {editingPromoBanner.mobileImage ? (
-                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-[16/9] max-w-[260px] bg-neutral-900 shadow-2xs">
+                  <div className="relative group rounded-xl overflow-hidden border border-neutral-200 aspect-video max-w-[260px] bg-neutral-900 shadow-2xs">
                     <img
                       src={editingPromoBanner.mobileImage}
                       alt="Mobile Banner"

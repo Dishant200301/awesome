@@ -70,7 +70,7 @@ export const CartDrawer: React.FC = () => {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] transition-all duration-300 ${
+      className={`fixed inset-0 z-100 transition-all duration-300 ${
         isCartOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
       }`}
     >

@@ -597,12 +597,7 @@ export default function Navbar() {
             </li>
           </ul>
 
-          {/* Drawer Footer with Store Info */}
-          <div className="p-4 mt-6 bg-[#FAF8F4] border-t border-black/5 text-xs text-brand-ink/70 space-y-2">
-            <p className="font-semibold text-brand-ink">Awesome Handmade</p>
-            <p>Shop-5, Soham Arcade, Pal Gam, Surat, Gujarat</p>
-            <p className="font-medium text-brand-maroon">+91 98243 02072</p>
-          </div>
+          
         </aside>
       </div>
     </>

@@ -30,10 +30,12 @@ export default defineConfig({
       '/api/ext': {
         target: 'http://localhost:5000',
         bypass: (_req, res) => {
-          res.statusCode = 200;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ success: true, message: 'Extension endpoint bypass' }));
-          return true;
+          if (res) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, message: 'Extension endpoint bypass' }));
+          }
+          return false;
         }
       }
     }

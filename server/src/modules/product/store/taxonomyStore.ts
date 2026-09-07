@@ -1,6 +1,14 @@
 import fs from "fs";
 import path from "path";
 import { Category, Subcategory, Brand, Attribute } from "../../../types/admin.js";
+import {
+  syncCategoryToMySQL,
+  syncSubcategoryToMySQL,
+  deleteCategoryFromMySQL,
+  deleteSubcategoryFromMySQL,
+  syncAllCategoriesToMySQL,
+  fetchCategoriesFromMySQL
+} from "../../../database/mysqlSync.js";
 
 // Initial Taxonomy Seed Data (12 Master Categories)
 const DEFAULT_CATEGORIES: Category[] = [
@@ -45,24 +53,33 @@ const DB_FILE_PATH = path.join(process.cwd(), "taxonomies_db.json");
 let categories: Category[] = [...DEFAULT_CATEGORIES];
 let subcategories: Subcategory[] = [...DEFAULT_SUBCATEGORIES];
 
-const loadFromDisk = () => {
+export const loadFromDisk = () => {
   try {
     if (fs.existsSync(DB_FILE_PATH)) {
       const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.categories)) {
+      if (parsed && Array.isArray(parsed.categories) && parsed.categories.length > 0) {
         categories = parsed.categories;
+      } else {
+        categories = [...DEFAULT_CATEGORIES];
       }
-      if (parsed && Array.isArray(parsed.subcategories)) {
+      if (parsed && Array.isArray(parsed.subcategories) && parsed.subcategories.length > 0) {
         subcategories = parsed.subcategories;
+      } else {
+        subcategories = [...DEFAULT_SUBCATEGORIES];
       }
+    } else {
+      categories = [...DEFAULT_CATEGORIES];
+      subcategories = [...DEFAULT_SUBCATEGORIES];
     }
   } catch (e) {
     console.warn("[TaxonomyStore] Could not read taxonomies_db.json");
+    categories = [...DEFAULT_CATEGORIES];
+    subcategories = [...DEFAULT_SUBCATEGORIES];
   }
 };
 
-const saveToDisk = () => {
+export const saveToDisk = () => {
   try {
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify({ categories, subcategories }, null, 2), "utf-8");
   } catch (e) {
@@ -71,6 +88,20 @@ const saveToDisk = () => {
 };
 
 loadFromDisk();
+
+export const refreshTaxonomiesFromMySQL = async (): Promise<{ categories: Category[]; subcategories: Subcategory[] }> => {
+  try {
+    const data = await fetchCategoriesFromMySQL();
+    if (data && Array.isArray(data.categories) && data.categories.length > 0) {
+      categories = data.categories;
+      subcategories = data.subcategories || [];
+      saveToDisk();
+    }
+  } catch (err) {
+    console.warn("[TaxonomyStore] MySQL read fallback to cached:", (err as Error).message);
+  }
+  return { categories, subcategories };
+};
 
 let brands: Brand[] = [
   { id: 'b-1', name: 'AOCIND', slug: 'aocind', logo: '/images/common/logo.png' },
@@ -98,83 +129,131 @@ export const getBrandsStore = (): Brand[] => brands;
 export const getCollectionsStore = (): string[] => collections;
 export const getAttributesStore = (): Attribute[] => attributes;
 
-export const syncAllCategoriesStore = (rawList: any[]): { categories: Category[]; subcategories: Subcategory[] } => {
-  if (Array.isArray(rawList)) {
+export const syncAllCategoriesStore = async (rawList: any[]): Promise<{ categories: Category[]; subcategories: Subcategory[] }> => {
+  if (Array.isArray(rawList) && rawList.length > 0) {
     const parents: Category[] = [];
     const subs: Subcategory[] = [];
 
     rawList.forEach((item) => {
       if (item.type === 'sub' || item.parentId) {
         subs.push({
-          id: item.id || `sub-${Date.now()}-${Math.random()}`,
-          categoryId: item.parentId || '',
-          categoryName: item.parentName || '',
+          id: item.id || `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          categoryId: item.parentId || item.categoryId || '',
+          categoryName: item.parentName || item.categoryName || '',
           name: item.name || '',
-          slug: item.slug || (item.name ? item.name.toLowerCase().replace(/\s+/g, '-') : ''),
-          image: item.image,
-        });
+          slug: item.slug || (item.name ? item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : ''),
+          image: item.image || item.imageUrl || '',
+          bannerImage: item.bannerImage || '',
+          description: item.description || '',
+          metaTitle: item.metaTitle || '',
+          metaDescription: item.metaDescription || '',
+          metaKeywords: item.metaKeywords || '',
+          isActive: item.isActive !== false
+        } as any);
       } else {
         parents.push({
-          id: item.id || `cat-${Date.now()}-${Math.random()}`,
+          id: item.id || `cat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           name: item.name || '',
-          slug: item.slug || (item.name ? item.name.toLowerCase().replace(/\s+/g, '-') : ''),
-          image: item.image || '/images/category/Latkan.webp',
+          slug: item.slug || (item.name ? item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : ''),
+          image: item.image || item.imageUrl || '/images/category/Latkan.webp',
+          bannerImage: item.bannerImage || '',
+          description: item.description || '',
+          metaTitle: item.metaTitle || '',
+          metaDescription: item.metaDescription || '',
+          metaKeywords: item.metaKeywords || '',
           productCount: Number(item.productCount) || 0,
-          isActive: item.isActive !== false,
-        });
+          isActive: item.isActive !== false
+        } as any);
       }
     });
 
     categories = parents;
     subcategories = subs;
     saveToDisk();
+
+    // Persist cleanly to MySQL
+    await syncAllCategoriesToMySQL(parents, subs);
   }
   return { categories, subcategories };
 };
 
-export const createCategoryStore = (data: Partial<Category>): Category => {
+export const createCategoryStore = async (data: Partial<Category>): Promise<Category> => {
   const newCat: Category = {
     id: data.id || `cat-${Date.now()}`,
     name: data.name || 'New Category',
-    slug: data.slug || (data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : 'new-category'),
-    image: data.image || '/images/category/Latkan.webp',
+    slug: data.slug || (data.name ? data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'new-category'),
+    image: data.image || (data as any).imageUrl || '/images/category/Latkan.webp',
+    bannerImage: (data as any).bannerImage || '',
+    description: (data as any).description || '',
+    metaTitle: (data as any).metaTitle || '',
+    metaDescription: (data as any).metaDescription || '',
+    metaKeywords: (data as any).metaKeywords || '',
     productCount: 0,
     isActive: data.isActive !== undefined ? data.isActive : true
-  };
+  } as any;
+
   categories.push(newCat);
   saveToDisk();
+  await syncCategoryToMySQL(newCat);
   return newCat;
 };
 
-export const updateCategoryStore = (id: string, data: Partial<Category>): Category | null => {
+export const updateCategoryStore = async (id: string, data: Partial<Category>): Promise<Category | null> => {
   const idx = categories.findIndex((c) => c.id === id);
   if (idx === -1) return null;
   categories[idx] = { ...categories[idx], ...data };
   saveToDisk();
+  await syncCategoryToMySQL(categories[idx]);
   return categories[idx];
 };
 
-export const deleteCategoryStore = (id: string): boolean => {
+export const deleteCategoryStore = async (id: string): Promise<boolean> => {
   const initialLen = categories.length;
   categories = categories.filter((c) => c.id !== id);
   subcategories = subcategories.filter((s) => s.categoryId !== id);
   saveToDisk();
+  await deleteCategoryFromMySQL(id);
   return categories.length < initialLen;
 };
 
-export const createSubcategoryStore = (data: Partial<Subcategory>): Subcategory => {
-  const parentCat = categories.find((c) => c.id === data.categoryId) || categories[0];
+export const createSubcategoryStore = async (data: Partial<Subcategory>): Promise<Subcategory> => {
+  const parentCat = categories.find((c) => c.id === (data.categoryId || (data as any).parentId)) || categories[0];
   const newSub: Subcategory = {
     id: data.id || `sub-${Date.now()}`,
     categoryId: parentCat?.id || '',
     categoryName: parentCat?.name || '',
     name: data.name || 'New Subcategory',
-    slug: data.slug || (data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : 'new-subcategory'),
-    image: data.image
-  };
+    slug: data.slug || (data.name ? data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'new-subcategory'),
+    image: data.image || (data as any).imageUrl || '',
+    bannerImage: (data as any).bannerImage || '',
+    description: (data as any).description || '',
+    metaTitle: (data as any).metaTitle || '',
+    metaDescription: (data as any).metaDescription || '',
+    metaKeywords: (data as any).metaKeywords || '',
+    isActive: (data as any).isActive !== false
+  } as any;
+
   subcategories.push(newSub);
   saveToDisk();
+  await syncSubcategoryToMySQL(newSub);
   return newSub;
+};
+
+export const updateSubcategoryStore = async (id: string, data: Partial<Subcategory>): Promise<Subcategory | null> => {
+  const idx = subcategories.findIndex((s) => s.id === id);
+  if (idx === -1) return null;
+  subcategories[idx] = { ...subcategories[idx], ...data };
+  saveToDisk();
+  await syncSubcategoryToMySQL(subcategories[idx]);
+  return subcategories[idx];
+};
+
+export const deleteSubcategoryStore = async (id: string): Promise<boolean> => {
+  const initialLen = subcategories.length;
+  subcategories = subcategories.filter((s) => s.id !== id);
+  saveToDisk();
+  await deleteSubcategoryFromMySQL(id);
+  return subcategories.length < initialLen;
 };
 
 export const createBrandStore = (data: Partial<Brand>): Brand => {

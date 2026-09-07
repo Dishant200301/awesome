@@ -25,8 +25,8 @@ import {
 import { HeroSlide, HomepageBanner, ContentPageItem, BlogPost, FaqItem } from '../types/admin';
 import { MOCK_HERO_SLIDES, MOCK_PROMO_BANNER } from '../data/mockAdminData';
 import { AdminApiService } from '../services/adminApi';
-import { idbGet, idbSet } from '../data/idbStorage';
 import RichTextEditor, { BRAND_FONTS } from '../components/RichTextEditor';
+import { Select } from '../components/ui/select';
 
 interface ContentPagesProps {
   initialSubTab?: 'hero-slider' | 'homepage-banners' | 'content-pages' | 'content-blog' | 'content-faq';
@@ -82,28 +82,10 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
   const [subTab, setSubTab] = useState(initialSubTab);
 
   // 1. Hero Sliders State
-  const [slides, setSlides] = useState<HeroSlide[]>(() => {
-    try {
-      const saved = localStorage.getItem('awesome_hero_slides') || localStorage.getItem('aocind_hero_slides');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return MOCK_HERO_SLIDES;
-  });
+  const [slides, setSlides] = useState<HeroSlide[]>(MOCK_HERO_SLIDES);
 
   // 2. Banners State (Promo Banner & Side Banners)
-  const [promoBanner, setPromoBanner] = useState<HomepageBanner>(() => {
-    try {
-      const saved = localStorage.getItem('awesome_promo_banner') || localStorage.getItem('aocind_promo_banner');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && (parsed.image || parsed.title)) return parsed;
-      }
-    } catch (e) {}
-    return MOCK_PROMO_BANNER;
-  });
+  const [promoBanner, setPromoBanner] = useState<HomepageBanner>(MOCK_PROMO_BANNER);
 
   // 3. Static Pages State
   const [pages, setPages] = useState<ContentPageItem[]>([
@@ -155,32 +137,12 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
   const [isDraggingPromoDesktop, setIsDraggingPromoDesktop] = useState(false);
   const [isDraggingPromoMobile, setIsDraggingPromoMobile] = useState(false);
 
-  // Fetch initial data from API and sync with state
+  // Fetch initial data from API and sync with state directly from backend/database
   const loadContentData = async () => {
-    // 1. Try loading from IndexedDB first (supports high-res base64 images without 5MB quota limit)
-    try {
-      const idbSlides = await idbGet<HeroSlide[]>('awesome_hero_slides');
-      if (Array.isArray(idbSlides) && idbSlides.length > 0) {
-        setSlides(idbSlides);
-      }
-    } catch (e) {}
-
-    try {
-      const idbBanner = await idbGet<HomepageBanner>('awesome_promo_banner');
-      if (idbBanner && (idbBanner.image || idbBanner.title)) {
-        setPromoBanner(idbBanner);
-      }
-    } catch (e) {}
-
-    // 2. Fetch from backend API
     try {
       const liveSlides = await AdminApiService.getHeroSlides();
       if (Array.isArray(liveSlides) && liveSlides.length > 0) {
         setSlides(liveSlides);
-        await idbSet('awesome_hero_slides', liveSlides);
-        try {
-          localStorage.setItem('awesome_hero_slides', JSON.stringify(liveSlides));
-        } catch (e) {}
       }
     } catch (e) {
       console.error('Error fetching hero slides:', e);
@@ -190,10 +152,6 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
       const liveBanner = await AdminApiService.getPromoBanner();
       if (liveBanner && (liveBanner.image || liveBanner.title)) {
         setPromoBanner(liveBanner);
-        await idbSet('awesome_promo_banner', liveBanner);
-        try {
-          localStorage.setItem('awesome_promo_banner', JSON.stringify(liveBanner));
-        } catch (e) {}
       }
     } catch (e) {
       console.error('Error fetching promo banner:', e);
@@ -206,51 +164,34 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
     return () => window.removeEventListener('focus', loadContentData);
   }, [subTab]);
 
-  // Broadcast & Sync Hero Slides
+  // Broadcast & Sync Hero Slides to MySQL via backend API
   const syncSlidesToBackend = async (newSlides: HeroSlide[]) => {
     setSlides(newSlides);
 
-    // 1. Save to IndexedDB (Unlimited quota)
-    await idbSet('awesome_hero_slides', newSlides);
-
-    // 2. Save to localStorage safely (catch quota exceeded)
-    try {
-      localStorage.setItem('awesome_hero_slides', JSON.stringify(newSlides));
-    } catch (e) {
-      console.warn("localStorage quota exceeded, successfully persisted to IndexedDB & server API.");
-    }
-
-    // 3. Sync to backend API
+    // 1. Sync to backend API / database
     try {
       await AdminApiService.syncHeroSlides(newSlides);
     } catch (e) {
       console.error('Error syncing hero slides to backend:', e);
     }
 
-    // 4. Notify BroadcastChannel
+    // 2. Notify BroadcastChannel
     if ('BroadcastChannel' in window) {
       try {
         const bc = new BroadcastChannel('awesome_content_sync');
         bc.postMessage({ type: 'HERO_UPDATED', slides: newSlides });
+        bc.close();
       } catch (e) {}
     }
 
     showSaveToast();
   };
 
-  // Broadcast & Sync Promo Banner
+  // Broadcast & Sync Promo Banner to MySQL via backend API
   const syncPromoBannerToBackend = async (newBanner: HomepageBanner) => {
     setPromoBanner(newBanner);
 
-    // 1. Save to IndexedDB
-    await idbSet('awesome_promo_banner', newBanner);
-
-    // 2. Save to localStorage safely
-    try {
-      localStorage.setItem('awesome_promo_banner', JSON.stringify(newBanner));
-    } catch (e) {}
-
-    // 3. Sync to backend API
+    // 1. Sync to backend API / database
     try {
       await AdminApiService.updatePromoBanner(newBanner);
     } catch (e) {
@@ -612,7 +553,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                 }`}
               >
                 {/* PREVIEW BANNER */}
-                <div className="relative aspect-[16/9] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 group">
+                <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 group">
                   <img
                     src={s.image}
                     alt={s.title}
@@ -621,7 +562,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                       (e.target as HTMLImageElement).src = '/images/home/hero/hero-1.webp';
                     }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-4 flex flex-col justify-end text-white">
+                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/30 to-transparent p-4 flex flex-col justify-end text-white">
                     {s.tag && (
                       <span className="text-[10px] font-bold tracking-wider uppercase text-amber-300 mb-0.5">
                         {s.tag}
@@ -677,7 +618,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                         onClick={() => moveSlideUp(index)}
                         disabled={index === 0}
                         title="Move Up"
-                        className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer text-slate-700"
+                        className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700"
                       >
                         <MoveUp className="w-3.5 h-3.5" />
                       </button>
@@ -686,7 +627,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                         onClick={() => moveSlideDown(index)}
                         disabled={index === slides.length - 1}
                         title="Move Down"
-                        className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer text-slate-700"
+                        className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700"
                       >
                         <MoveDown className="w-3.5 h-3.5" />
                       </button>
@@ -771,7 +712,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
 
                 {/* Thumbnails (Desktop + Mobile) */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className="relative w-28 sm:w-36 aspect-[16/9] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 group">
+                  <div className="relative w-28 sm:w-36 aspect-video rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 group">
                     <img
                       src={promoBanner.image || '/images/banner/banner.webp'}
                       alt={promoBanner.title || 'Desktop Banner'}
@@ -782,7 +723,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     </span>
                   </div>
 
-                  <div className="relative w-12 sm:w-14 aspect-[9/16] rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0 hidden sm:block">
+                  <div className="relative w-12 sm:w-14 aspect-9/16 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0 hidden sm:block">
                     <img
                       src={promoBanner.mobileImage || '/images/banner/mobile-banner.webp'}
                       alt={promoBanner.title || 'Mobile Banner'}
@@ -987,7 +928,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                       setIsDraggingSlideDesktop(false);
                     }}
                     onDrop={handleSlideDesktopDrop}
-                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                    className={`relative aspect-video rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
                       isDraggingSlideDesktop
                         ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
                         : 'border-slate-300 hover:border-black'
@@ -1013,7 +954,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="or /images/home/hero/hero-1.webp"
                     value={editingSlide.image}
                     onChange={(e) => setEditingSlide({ ...editingSlide, image: e.target.value })}
-                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg outline-none focus:border-black"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1042,7 +983,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                       setIsDraggingSlideMobile(false);
                     }}
                     onDrop={handleSlideMobileDrop}
-                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                    className={`relative aspect-video rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
                       isDraggingSlideMobile
                         ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
                         : 'border-slate-300 hover:border-black'
@@ -1068,7 +1009,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="or /images/home/hero/mobile-1.webp"
                     value={editingSlide.mobileImage || ''}
                     onChange={(e) => setEditingSlide({ ...editingSlide, mobileImage: e.target.value })}
-                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg outline-none focus:border-black"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
               </div>
@@ -1084,7 +1025,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="e.g. Grace in Every or HANDCRAFTED JEWELLERY"
                     value={editingSlide.tag || ''}
                     onChange={(e) => setEditingSlide({ ...editingSlide, tag: e.target.value })}
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1097,7 +1038,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="e.g. Thread or Twirl Into Tradition"
                     value={editingSlide.title}
                     onChange={(e) => setEditingSlide({ ...editingSlide, title: e.target.value })}
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
               </div>
@@ -1125,7 +1066,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="e.g. Shop Collection"
                     value={editingSlide.buttonText}
                     onChange={(e) => setEditingSlide({ ...editingSlide, buttonText: e.target.value })}
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1138,7 +1079,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="e.g. #categories or /shop?category=Latkan"
                     value={editingSlide.link}
                     onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
               </div>
@@ -1149,31 +1090,33 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Text Theme Styling
                   </label>
-                  <select
+                  <Select
                     value={editingSlide.theme || 'gold'}
-                    onChange={(e) => setEditingSlide({ ...editingSlide, theme: e.target.value as any })}
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black bg-white"
-                  >
-                    <option value="gold">Gold Luxury Gradient</option>
-                    <option value="maroon">Deep Maroon Velvet</option>
-                    <option value="purple">Royal Purple Elegance</option>
-                    <option value="dark">Classic Dark Ink</option>
-                  </select>
+                    onValueChange={(val) => setEditingSlide({ ...editingSlide, theme: val as any })}
+                    className="rounded-xl font-medium"
+                    options={[
+                      { value: 'gold', label: 'Gold Luxury Gradient' },
+                      { value: 'maroon', label: 'Deep Maroon Velvet' },
+                      { value: 'purple', label: 'Royal Purple Elegance' },
+                      { value: 'dark', label: 'Classic Dark Ink' }
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Text Alignment
                   </label>
-                  <select
+                  <Select
                     value={editingSlide.align || 'left'}
-                    onChange={(e) => setEditingSlide({ ...editingSlide, align: e.target.value as any })}
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black bg-white"
-                  >
-                    <option value="left">Left Aligned</option>
-                    <option value="center">Centered</option>
-                    <option value="right">Right Aligned</option>
-                  </select>
+                    onValueChange={(val) => setEditingSlide({ ...editingSlide, align: val as any })}
+                    className="rounded-xl font-medium"
+                    options={[
+                      { value: 'left', label: 'Left Aligned' },
+                      { value: 'center', label: 'Centered' },
+                      { value: 'right', label: 'Right Aligned' }
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -1277,7 +1220,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                       setIsDraggingPromoDesktop(false);
                     }}
                     onDrop={handlePromoDesktopDrop}
-                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                    className={`relative aspect-video rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
                       isDraggingPromoDesktop
                         ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
                         : 'border-slate-300 hover:border-black'
@@ -1309,7 +1252,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     onChange={(e) =>
                       setEditingPromoBanner({ ...editingPromoBanner, image: e.target.value })
                     }
-                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg outline-none focus:border-black"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1338,7 +1281,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                       setIsDraggingPromoMobile(false);
                     }}
                     onDrop={handlePromoMobileDrop}
-                    className={`relative aspect-[16/9] rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
+                    className={`relative aspect-video rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer bg-slate-50 flex flex-col items-center justify-center group ${
                       isDraggingPromoMobile
                         ? 'border-amber-600 bg-amber-100 ring-4 ring-amber-400/30 scale-[1.02]'
                         : 'border-slate-300 hover:border-black'
@@ -1370,7 +1313,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     onChange={(e) =>
                       setEditingPromoBanner({ ...editingPromoBanner, mobileImage: e.target.value })
                     }
-                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg outline-none focus:border-black"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
               </div>
@@ -1388,7 +1331,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     onChange={(e) =>
                       setEditingPromoBanner({ ...editingPromoBanner, badge: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1403,7 +1346,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     onChange={(e) =>
                       setEditingPromoBanner({ ...editingPromoBanner, title: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
               </div>
@@ -1435,7 +1378,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     onChange={(e) =>
                       setEditingPromoBanner({ ...editingPromoBanner, buttonText: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1450,7 +1393,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     onChange={(e) =>
                       setEditingPromoBanner({ ...editingPromoBanner, link: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
               </div>
@@ -1542,7 +1485,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="e.g. About Us or Craftsmanship Story"
                     value={editingPage.title}
                     onChange={(e) => setEditingPage({ ...editingPage, title: e.target.value })}
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1586,7 +1529,7 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                     placeholder="e.g. About Us - Awesome Handmade"
                     value={editingPage.metaTitle || ''}
                     onChange={(e) => setEditingPage({ ...editingPage, metaTitle: e.target.value })}
-                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl outline-none focus:border-black"
+                    className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-black"
                   />
                 </div>
 
@@ -1594,14 +1537,15 @@ export const ContentPages: React.FC<ContentPagesProps> = ({ initialSubTab = 'her
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Status
                   </label>
-                  <select
+                  <Select
                     value={editingPage.status}
-                    onChange={(e) => setEditingPage({ ...editingPage, status: e.target.value as any })}
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-200 rounded-xl outline-none focus:border-black bg-white"
-                  >
-                    <option value="Published">Published (Live)</option>
-                    <option value="Draft">Draft (Hidden)</option>
-                  </select>
+                    onValueChange={(val) => setEditingPage({ ...editingPage, status: val as any })}
+                    className="rounded-xl font-bold"
+                    options={[
+                      { value: 'Published', label: 'Published (Live)' },
+                      { value: 'Draft', label: 'Draft (Hidden)' }
+                    ]}
+                  />
                 </div>
               </div>
             </div>

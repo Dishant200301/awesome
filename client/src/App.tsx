@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import ProductDetailsPage from "@/modules/product/pages/ProductDetailsPage";
 import ShopPage from "@/modules/product/pages/ShopPage";
-import CollectionPage from "@/modules/product/pages/CollectionPage";
 import HomePage from "@/modules/home/pages/HomePage";
 import WishlistPage from "@/modules/product/pages/WishlistPage";
 import CartPage from "@/modules/product/pages/CartPage";

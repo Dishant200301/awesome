@@ -11,7 +11,6 @@ import {
   RefreshCw,
   ThumbsUp
 } from 'lucide-react';
-import { idbGet, idbSet } from '../data/idbStorage';
 import { AdminApiService } from '../services/adminApi';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -40,52 +39,19 @@ export const ReviewsPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Load reviews from Server API, LocalStorage & IndexedDB
+  // Load reviews from Server API directly from MySQL
   const loadReviews = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch live reviews directly from backend server API
       const remote = await AdminApiService.getReviews();
-      if (Array.isArray(remote) && remote.length > 0) {
+      if (Array.isArray(remote)) {
         setReviews(remote);
-        localStorage.setItem('awesome_admin_reviews', JSON.stringify(remote));
-        await idbSet('awesome_admin_reviews', remote);
-        setIsLoading(false);
-        return;
       }
     } catch (e) {
-      // API fallback
+      console.warn("Error loading reviews from database:", e);
+    } finally {
+      setIsLoading(false);
     }
-
-    // 2. Fallback to LocalStorage and IndexedDB
-    try {
-      const deletedIds = new Set<string>(JSON.parse(localStorage.getItem('awesome_deleted_reviews') || '[]'));
-      const stored = localStorage.getItem('awesome_admin_reviews') || localStorage.getItem('aaramly_admin_reviews');
-      if (stored !== null) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setReviews(parsed.filter((r) => !deletedIds.has(String(r.id))));
-          setIsLoading(false);
-          return;
-        }
-      }
-    } catch (e) {}
-
-    idbGet<AdminReviewItem[]>('awesome_admin_reviews')
-      .then((stored) => {
-        const deletedIds = new Set<string>(JSON.parse(localStorage.getItem('awesome_deleted_reviews') || '[]'));
-        if (Array.isArray(stored)) {
-          setReviews(stored.filter((r) => !deletedIds.has(String(r.id))));
-        } else {
-          setReviews([]);
-        }
-      })
-      .catch(() => {
-        setReviews([]);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
   };
 
   useEffect(() => {
@@ -96,58 +62,40 @@ export const ReviewsPage: React.FC = () => {
     };
 
     window.addEventListener('awesome_review_sync', handleSync);
-    window.addEventListener('aaramly_review_sync', handleSync);
     window.addEventListener('awesome_product_sync', handleSync);
 
     return () => {
       window.removeEventListener('awesome_review_sync', handleSync);
-      window.removeEventListener('aaramly_review_sync', handleSync);
       window.removeEventListener('awesome_product_sync', handleSync);
     };
   }, []);
 
-  const saveReviews = async (newList: AdminReviewItem[]) => {
-    setReviews(newList);
-    try {
-      localStorage.setItem('awesome_admin_reviews', JSON.stringify(newList));
-      await idbSet('awesome_admin_reviews', newList);
-      window.dispatchEvent(new Event('awesome_review_sync'));
-      window.dispatchEvent(new Event('aaramly_review_sync'));
-    } catch (e) {}
-  };
-
   const handleDeleteReview = async (id: string) => {
-    const updated = reviews.filter((r) => String(r.id) !== String(id));
-    setReviews(updated);
-    try {
-      const deletedIds = JSON.parse(localStorage.getItem('awesome_deleted_reviews') || '[]');
-      if (!deletedIds.includes(String(id))) {
-        deletedIds.push(String(id));
-        localStorage.setItem('awesome_deleted_reviews', JSON.stringify(deletedIds));
-        await idbSet('awesome_deleted_reviews', deletedIds);
-      }
-    } catch (e) {}
-
-    await saveReviews(updated);
     try {
       await AdminApiService.deleteReview(id);
-    } catch (e) {}
+      await loadReviews();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('awesome_review_sync'));
+      }
+    } catch (e) {
+      console.error("Delete review failed:", e);
+    }
     setDeletingId(null);
   };
 
   const handleToggleStatus = async (id: string) => {
-    let nextStatus: 'Approved' | 'Pending' = 'Approved';
-    const updated = reviews.map((r) => {
-      if (r.id === id) {
-        nextStatus = r.status === 'Approved' ? 'Pending' : 'Approved';
-        return { ...r, status: nextStatus as any };
-      }
-      return r;
-    });
-    await saveReviews(updated);
+    const rev = reviews.find((r) => r.id === id);
+    if (!rev) return;
+    const nextStatus = rev.status === 'Approved' ? 'Pending' : 'Approved';
     try {
-      await AdminApiService.updateReviewStatus(id, nextStatus);
-    } catch (e) {}
+      await AdminApiService.updateReviewStatus(id, nextStatus as any);
+      await loadReviews();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('awesome_review_sync'));
+      }
+    } catch (e) {
+      console.error("Update review status failed:", e);
+    }
   };
 
 
@@ -268,7 +216,7 @@ export const ReviewsPage: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by customer name, email, product or review text..."
-            className="w-full bg-neutral-50 text-xs text-black pl-9 pr-4 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-black focus:bg-white transition-colors font-sans"
+            className="w-full bg-white text-xs text-black pl-9 pr-4 py-2 rounded-lg border border-neutral-200 focus:outline-hidden focus:ring-1 focus:ring-black transition-colors font-sans"
           />
         </div>
 

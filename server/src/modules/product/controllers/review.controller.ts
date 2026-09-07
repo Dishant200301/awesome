@@ -6,7 +6,14 @@ import {
   deleteReviewStore,
 } from "../store/reviewStore.js";
 
+const setNoCache = (res: Response) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+};
+
 export const getReviews = async (req: Request, res: Response) => {
+  setNoCache(res);
   try {
     const { productId, status, search } = req.query;
     const reviews = await getReviewsStore(
@@ -15,6 +22,7 @@ export const getReviews = async (req: Request, res: Response) => {
       search as string
     );
     res.json({ success: true, data: reviews });
+
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message || "Failed to fetch reviews" });
   }

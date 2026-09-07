@@ -2,9 +2,16 @@ import { Request, Response } from "express";
 import { productStore } from "../store/productStore.js";
 import { AiProductGeneratorService } from "../services/aiProductGenerator.service.js";
 
+const setNoCache = (res: Response) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+};
+
 export class ProductController {
   // GET /api/v1/products (with comprehensive multi-filter, search, sort & pagination)
   public static getAllProducts(req: Request, res: Response): void {
+    setNoCache(res);
     const hasFilterParams = Boolean(
       req.query.page || 
       req.query.limit || 
@@ -23,6 +30,7 @@ export class ProductController {
     if (hasFilterParams) {
       const result = productStore.queryProducts({
         page: req.query.page ? Number(req.query.page) : 1,
+
         limit: req.query.limit ? Number(req.query.limit) : 10,
         search: req.query.search as string,
         category: req.query.category as string,

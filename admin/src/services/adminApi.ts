@@ -17,16 +17,23 @@ const API_BASE = getAdminApiBase();
 
 export class AdminApiService {
   private static async request<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       const res = await fetch(`${API_BASE}${endpoint}`, {
-        headers: getAdminAuthHeaders(options?.headers as Record<string, string>),
+        cache: "no-store",
         ...options,
+        headers: getAdminAuthHeaders(options?.headers as Record<string, string>),
+        signal: options?.signal || controller.signal,
       });
+      clearTimeout(timeoutId);
       if (!res.ok) return null;
       const data = await res.json();
       return data.data !== undefined ? data.data : data;
     } catch {
-      return null;
+      clearTimeout(timeoutId);
+      return null; 
     }
   }
 
@@ -39,6 +46,13 @@ export class AdminApiService {
     return this.request<any>("/content/hero-slides/sync", {
       method: "POST",
       body: JSON.stringify({ slides })
+    });
+  }
+
+  public static async syncCategories(categories: any[]): Promise<any> {
+    return this.request<any>("/taxonomies/categories/sync", {
+      method: "POST",
+      body: JSON.stringify({ categories })
     });
   }
 
@@ -55,61 +69,26 @@ export class AdminApiService {
 
   // Dashboard Stats
   public static async getDashboardStats() {
-    // 1. Calculate live categories from localStorage
-    let categoryCount = 0;
-    try {
-      const rawCat = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
-      if (rawCat) {
-        const parsed = JSON.parse(rawCat);
-        if (Array.isArray(parsed)) {
-          categoryCount = parsed.filter((c: any) => c.type !== 'sub' && !c.parentId).length;
-        }
-      }
-    } catch (e) {}
+    // Try remote API first directly from database
+    const remote = await this.request<any>("/analytics/dashboard");
+    if (remote) {
+      return remote;
+    }
 
-    // Calculate live attributes from localStorage
-    let attributeCount = 6;
-    try {
-      const rawAttr = localStorage.getItem('awesome_admin_attribute_master_v3') || localStorage.getItem('awesome_attributes');
-      if (rawAttr) {
-        const parsed = JSON.parse(rawAttr);
-        if (Array.isArray(parsed)) {
-          attributeCount = parsed.length;
-        }
-      }
-    } catch (e) {}
-
-    // Calculate live variants from products
+    // Fallback sync with products
     const liveVariants = getGlobalVariantsList();
     const products = getAdminProducts();
     const published = products.filter((p) => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive').length;
     const draft = products.length - published;
     const lowStock = products.filter((p) => (p.stock || 0) <= 20);
 
-    // 2. Try remote API first
-    const remote = await this.request<any>("/analytics/dashboard");
-    if (remote) {
-      // Ensure category count, attribute count and variants count accurately match live admin state
-      return {
-        ...remote,
-        totalProducts: products.length || (remote.totalProducts ?? 0),
-        publishedProducts: published,
-        draftProducts: draft,
-        totalVariants: liveVariants.length > 0 ? liveVariants.length : (remote.totalVariants ?? 0),
-        totalCategories: categoryCount !== undefined && localStorage.getItem('awesome_categories') ? categoryCount : (remote.totalCategories ?? 0),
-        totalAttributes: attributeCount,
-        lowStockCount: lowStock.length
-      };
-    }
-
-    // 3. Fallback sync with live local state
     return {
       totalProducts: products.length,
       publishedProducts: published,
       draftProducts: draft,
       totalVariants: liveVariants.length,
-      totalCategories: categoryCount,
-      totalAttributes: attributeCount,
+      totalCategories: 12,
+      totalAttributes: 6,
       lowStockCount: lowStock.length,
       totalMessages: MOCK_CONTACT_MESSAGES.length,
       unreadMessagesCount: MOCK_CONTACT_MESSAGES.filter((m) => m.status === 'New').length,
@@ -875,6 +854,40 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
 
   public static async deleteCategory(id: string): Promise<boolean> {
     const res = await this.request<any>(`/taxonomies/categories/${id}`, {
+      method: "DELETE"
+    });
+    return !!res;
+  }
+
+  public static async updateCategory(id: string, data: Partial<Category>): Promise<Category | null> {
+    const remote = await this.request<any>(`/taxonomies/categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data)
+    });
+    if (remote?.data) return remote.data;
+    return remote;
+  }
+
+  public static async createSubcategory(data: Partial<Subcategory>): Promise<Subcategory | null> {
+    const remote = await this.request<any>("/taxonomies/subcategories", {
+      method: "POST",
+      body: JSON.stringify(data)
+    });
+    if (remote?.data) return remote.data;
+    return remote;
+  }
+
+  public static async updateSubcategory(id: string, data: Partial<Subcategory>): Promise<Subcategory | null> {
+    const remote = await this.request<any>(`/taxonomies/subcategories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data)
+    });
+    if (remote?.data) return remote.data;
+    return remote;
+  }
+
+  public static async deleteSubcategory(id: string): Promise<boolean> {
+    const res = await this.request<any>(`/taxonomies/subcategories/${id}`, {
       method: "DELETE"
     });
     return !!res;

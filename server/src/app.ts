@@ -22,9 +22,14 @@ const app: Express = express();
 
 connectDB();
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "unsafe-none" },
+  contentSecurityPolicy: false,
+  hsts: config.env === "production" ? { maxAge: 15552000, includeSubDomains: true } : false,
+}));
 
-// Production CORS Configuration with explicit allowlist
+// Production and Development CORS Configuration
 const allowedProductionOrigins = [
   "https://awesomehandwork.com",
   "https://www.awesomehandwork.com",
@@ -34,9 +39,11 @@ const allowedProductionOrigins = [
 const devOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
+  "http://localhost:5175",
   "http://localhost:3000",
   "http://127.0.0.1:5173",
-  "http://127.0.0.1:5174"
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175"
 ];
 
 app.use(cors({
@@ -44,18 +51,22 @@ app.use(cors({
     // Allow non-browser requests (server-to-server, curl, mobile clients)
     if (!origin) return callback(null, true);
 
-    const validOrigins = config.env === "production"
-      ? allowedProductionOrigins
-      : [...allowedProductionOrigins, ...devOrigins];
+    // In development or local testing, allow localhost, 127.0.0.1, or local LAN IPs (e.g. 192.168.x.x, 10.x.x.x) on any port
+    if (config.env !== "production") {
+      if (/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+    }
 
-    if (validOrigins.includes(origin)) {
+    const validOrigins = [...allowedProductionOrigins, ...devOrigins];
+    if (validOrigins.includes(origin) || /^https?:\/\/([a-z0-9-]+\.)*awesomehandwork\.com$/.test(origin)) {
       return callback(null, true);
     }
     return callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
 }));
 
 app.use(compression());
@@ -83,6 +94,7 @@ app.use("/api/v1/attributes", attributeRoutes);
 app.use("/api/v1/filters", filterRoutes);
 app.use("/api/v1/size-guides", sizeGuideRoutes);
 app.use("/api/v1/taxonomies", taxonomyRoutes);
+app.use("/api/v1/categories", taxonomyRoutes);
 app.use("/api/v1/content", contentRoutes);
 app.use("/api/v1/contacts", contactRoutes);
 app.use("/api/v1/reviews", reviewRoutes);

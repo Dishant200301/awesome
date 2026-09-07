@@ -1,6 +1,6 @@
 import React from "react";
 import { FiHeart, FiShoppingBag, FiEye } from "react-icons/fi";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, Star } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWishlist } from "@/modules/product/context/WishlistContext";
 import { useCart } from "@/modules/product/context/CartContext";
@@ -186,6 +186,17 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
               {p.subtitle || p.shortDescription || p.tagline}
             </p>
           )}
+
+          {/* Star Rating & Review Count */}
+          <div className="mt-1 flex items-center gap-1.5 text-amber-500 text-xs font-bold">
+            <div className="flex items-center gap-1">
+              <Star className="w-3.5 h-3.5 fill-current" />
+              <span className="text-zinc-800 font-semibold">{p.rating !== undefined && p.rating !== null ? p.rating : 4.9}</span>
+            </div>
+            <span className="text-zinc-400 font-normal text-[10px]">
+              ({(p as any).reviewCount || p.salesCount || 12})
+            </span>
+          </div>
         </Link>
 
         {/* Price & Add To Bag Button / Quantity Stepper */}

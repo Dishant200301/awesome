@@ -107,28 +107,17 @@ export const INITIAL_DEFAULT_ATTRIBUTES: AttributeMaster[] = [
 ];
 
 export class AttributeService {
+  private static memoryAttributes: AttributeMaster[] = [...INITIAL_DEFAULT_ATTRIBUTES];
+
   private static getLocalAttributes(): AttributeMaster[] {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {}
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_DEFAULT_ATTRIBUTES));
-    return [...INITIAL_DEFAULT_ATTRIBUTES];
+    return this.memoryAttributes;
   }
 
   private static saveLocalAttributes(attributes: AttributeMaster[], dispatchSync: boolean = true): void {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(attributes));
-      if (dispatchSync && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('awesome_attribute_sync'));
-        window.dispatchEvent(new CustomEvent('aaramly_attribute_sync'));
-      }
-    } catch (e) {}
+    this.memoryAttributes = attributes;
+    if (dispatchSync && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('awesome_attribute_sync'));
+    }
   }
 
   public static async getAttributes(params?: { usage?: string; status?: string; search?: string }): Promise<AttributeMaster[]> {
@@ -138,7 +127,7 @@ export class AttributeService {
       if (params?.status) query.append('status', params.status);
       if (params?.search) query.append('search', params.search);
 
-      const res = await fetch(`${API_BASE_URL}?${query.toString()}`);
+      const res = await fetch(`${API_BASE_URL}?${query.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
@@ -147,7 +136,7 @@ export class AttributeService {
         }
       }
     } catch (error) {
-      console.warn('[AttributeService] Backend API not reachable, loading from LocalStorage.');
+      console.warn('[AttributeService] Backend API not reachable, loading default attributes.');
     }
 
     let list = this.getLocalAttributes();

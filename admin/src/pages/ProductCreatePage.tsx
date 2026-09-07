@@ -19,11 +19,12 @@ import {
   Sparkles
 } from 'lucide-react';
 import {
-  getAdminCategoriesAndSubcategories,
   broadcastAdminProductChange
 } from '../data/mockAdminData';
 import {
   Product,
+  Category,
+  Subcategory,
   ProductOptionItem,
   ProductVariantDetail
 } from '../types/admin';
@@ -31,6 +32,7 @@ import { AttributeMaster } from '../types/attribute.types';
 import { AttributeService } from '../services/attributeService';
 import { AdminApiService } from '../services/adminApi';
 import { RichTextEditor } from '../components/RichTextEditor';
+import { Select } from '../components/ui/select';
 import { findHexByColorName } from '../utils/colorMatcher';
 import { generateSmartProductContent } from '../utils/productContentGenerator';
 
@@ -82,10 +84,10 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [isDirty, setIsDirty] = useState<boolean>(false);
 
-  // Dynamic Categories from Store & Backend
-  const [categoriesData, setCategoriesData] = useState(() => getAdminCategoriesAndSubcategories());
-  const mainCategories = categoriesData.mainCategories || [];
-  const allSubcategories = categoriesData.subcategories || [];
+  // Dynamic Categories from Backend API & MySQL
+  const [mainCategories, setMainCategories] = useState<Category[]>([]);
+  const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState<boolean>(true);
 
   // Dynamic Master Attributes
   const [masterAttributes, setMasterAttributes] = useState<AttributeMaster[]>([]);
@@ -108,13 +110,42 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     };
   }, []);
 
+  // Fetch dynamic categories directly from backend MySQL API
+  const loadDynamicCategories = async () => {
+    try {
+      const data = await AdminApiService.getCategories();
+      if (data && Array.isArray(data.categories)) {
+        setMainCategories(data.categories.filter((c) => c.isActive !== false));
+        setAllSubcategories(data.subcategories ? data.subcategories.filter((s: any) => s.isActive !== false) : []);
+      }
+    } catch (err) {
+      console.warn('Failed to load dynamic categories:', err);
+    } finally {
+      setIsCategoriesLoading(false);
+    }
+  };
+
   useEffect(() => {
+    loadDynamicCategories();
+
+    let catBc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        catBc = new BroadcastChannel('awesome_category_sync');
+        catBc.onmessage = () => {
+          loadDynamicCategories();
+        };
+      } catch {}
+    }
+
     const handleTaxonomySync = () => {
-      setCategoriesData(getAdminCategoriesAndSubcategories());
+      loadDynamicCategories();
     };
     window.addEventListener('awesome_category_sync', handleTaxonomySync);
     window.addEventListener('aocind_category_sync', handleTaxonomySync);
+
     return () => {
+      if (catBc) catBc.close();
       window.removeEventListener('awesome_category_sync', handleTaxonomySync);
       window.removeEventListener('aocind_category_sync', handleTaxonomySync);
     };
@@ -143,20 +174,32 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     return allSubcategories.filter(
       (s) =>
         s.categoryId === parentCat.id ||
-        s.parentId === parentCat.id ||
+        (s as any).parentId === parentCat.id ||
         (s.categoryName && s.categoryName.toLowerCase() === parentCat.name.toLowerCase()) ||
-        (s.parentName && s.parentName.toLowerCase() === parentCat.name.toLowerCase())
+        ((s as any).parentName && (s as any).parentName.toLowerCase() === parentCat.name.toLowerCase())
     );
   }, [category, mainCategories, allSubcategories]);
 
   // Set initial category if none chosen
   useEffect(() => {
     if (!category && mainCategories.length > 0 && !isEditMode) {
-      setCategory(mainCategories[0].name);
+      const defaultCat = mainCategories[0].name;
+      setCategory(defaultCat);
+      const parentCat = mainCategories[0];
+      const subs = allSubcategories.filter(
+        (s) =>
+          s.categoryId === parentCat.id ||
+          (s as any).parentId === parentCat.id ||
+          (s.categoryName && s.categoryName.toLowerCase() === parentCat.name.toLowerCase()) ||
+          ((s as any).parentName && (s as any).parentName.toLowerCase() === parentCat.name.toLowerCase())
+      );
+      if (subs.length > 0) {
+        setSubcategory(subs[0].name);
+      }
     }
-  }, [mainCategories, category, isEditMode]);
+  }, [mainCategories, category, isEditMode, allSubcategories]);
 
-  // Handle Category Change & update Subcategory
+  // Handle Category Change & update Subcategory dynamically
   const handleCategoryChange = (newCat: string) => {
     setCategory(newCat);
     setIsDirty(true);
@@ -167,9 +210,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       ? allSubcategories.filter(
           (s) =>
             s.categoryId === parentCat.id ||
-            s.parentId === parentCat.id ||
+            (s as any).parentId === parentCat.id ||
             (s.categoryName && s.categoryName.toLowerCase() === parentCat.name.toLowerCase()) ||
-            (s.parentName && s.parentName.toLowerCase() === parentCat.name.toLowerCase())
+            ((s as any).parentName && (s as any).parentName.toLowerCase() === parentCat.name.toLowerCase())
         )
       : [];
 
@@ -179,6 +222,44 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       setSubcategory('');
     }
   };
+
+  // Synchronize category & subcategory values when categories list or selection updates
+  useEffect(() => {
+    if (!category || mainCategories.length === 0) return;
+    const parentCat = mainCategories.find(
+      (c) => c.name.toLowerCase() === category.toLowerCase() || c.id === category
+    );
+    if (parentCat) {
+      if (category !== parentCat.name) {
+        setCategory(parentCat.name);
+      }
+    } else if (!isEditMode && mainCategories.length > 0) {
+      setCategory(mainCategories[0].name);
+    }
+  }, [category, mainCategories, isEditMode]);
+
+  useEffect(() => {
+    if (!category) {
+      if (subcategory) setSubcategory('');
+      return;
+    }
+    if (filteredSubcategories.length === 0) {
+      if (subcategory) setSubcategory('');
+    } else if (subcategory) {
+      const match = filteredSubcategories.find(
+        (s) => s.name.toLowerCase() === subcategory.toLowerCase() || s.id === subcategory
+      );
+      if (match) {
+        if (subcategory !== match.name) {
+          setSubcategory(match.name);
+        }
+      } else if (!isEditMode) {
+        setSubcategory(filteredSubcategories[0].name);
+      } else {
+        setSubcategory('');
+      }
+    }
+  }, [category, filteredSubcategories, subcategory, isEditMode]);
 
   // 3. PRICING & INVENTORY (For Simple Product)
   const [sellingPrice, setSellingPrice] = useState<string>('799');
@@ -1100,18 +1181,16 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               <label className="text-xs font-semibold text-neutral-700">
                 Category <span className="text-rose-500">*</span>
               </label>
-              <select
+              <Select
                 value={category}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium cursor-pointer"
-              >
-                <option value="" disabled>Select category</option>
-                {mainCategories.map((c) => (
-                  <option key={c.id || c.name} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(val) => handleCategoryChange(val)}
+                disabled={isCategoriesLoading || mainCategories.length === 0}
+                placeholder={isCategoriesLoading ? 'Loading categories...' : mainCategories.length === 0 ? 'No categories found' : 'Select category'}
+                options={mainCategories.map((c) => ({
+                  value: c.name,
+                  label: c.name
+                }))}
+              />
             </div>
 
             {/* Subcategory */}
@@ -1119,24 +1198,25 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               <label className="text-xs font-semibold text-neutral-700">
                 Subcategory <span className="text-rose-500">*</span>
               </label>
-              <select
+              <Select
                 value={subcategory}
-                onChange={(e) => {
-                  setSubcategory(e.target.value);
+                onValueChange={(val) => {
+                  setSubcategory(val);
                   setIsDirty(true);
                 }}
                 disabled={!category || filteredSubcategories.length === 0}
-                className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium cursor-pointer disabled:bg-neutral-50 disabled:text-neutral-400"
-              >
-                <option value="">
-                  {!category ? 'Select category first' : filteredSubcategories.length === 0 ? 'None / General' : 'Select subcategory'}
-                </option>
-                {filteredSubcategories.map((s) => (
-                  <option key={s.id || s.name} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                placeholder={
+                  !category
+                    ? 'Select category first'
+                    : filteredSubcategories.length === 0
+                    ? 'No subcategories available'
+                    : 'Select subcategory'
+                }
+                options={filteredSubcategories.map((s) => ({
+                  value: s.name,
+                  label: s.name
+                }))}
+              />
             </div>
           </div>
 
@@ -1269,24 +1349,17 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                   {/* Attribute Name Select */}
                   <div className="sm:col-span-4 space-y-1">
                     <label className="text-[11px] font-semibold text-neutral-600">Attribute</label>
-                    <select
+                    <Select
                       value={attr.name}
-                      onChange={(e) => handleAttributeNameChange(attrIdx, e.target.value)}
-                      className="w-full px-3 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium cursor-pointer"
-                    >
-                      {STANDARD_ATTRIBUTES.map((sa) => (
-                        <option key={sa.name} value={sa.name}>
-                          {sa.name}
-                        </option>
-                      ))}
-                      {masterAttributes
-                        .filter((ma) => !STANDARD_ATTRIBUTES.some((sa) => sa.name.toLowerCase() === ma.name.toLowerCase()))
-                        .map((ma) => (
-                          <option key={ma.id} value={ma.name}>
-                            {ma.name}
-                          </option>
-                        ))}
-                    </select>
+                      onValueChange={(val) => handleAttributeNameChange(attrIdx, val)}
+                      placeholder="Select attribute"
+                      options={[
+                        ...STANDARD_ATTRIBUTES.map((sa) => ({ value: sa.name, label: sa.name })),
+                        ...masterAttributes
+                          .filter((ma) => !STANDARD_ATTRIBUTES.some((sa) => sa.name.toLowerCase() === ma.name.toLowerCase()))
+                          .map((ma) => ({ value: ma.name, label: ma.name }))
+                      ]}
+                    />
                   </div>
 
                   {/* Attribute Values Multi-Select Box */}
@@ -1552,14 +1625,17 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
                             {/* Status */}
                             <td className="py-2.5 px-3">
-                              <select
-                                value={(v as any).status || 'Active'}
-                                onChange={(e) => handleUpdateVariantField(vIdx, 'status', e.target.value)}
-                                className="px-2 py-1 text-xs bg-white border border-neutral-200 rounded-md focus:outline-none focus:border-black cursor-pointer font-medium"
-                              >
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                              </select>
+                              <div className="w-24">
+                                <Select
+                                  value={(v as any).status || 'Active'}
+                                  onValueChange={(val) => handleUpdateVariantField(vIdx, 'status', val)}
+                                  className="h-8 text-xs"
+                                  options={[
+                                    { value: 'Active', label: 'Active' },
+                                    { value: 'Inactive', label: 'Inactive' }
+                                  ]}
+                                />
+                              </div>
                             </td>
 
                             {/* Action Delete */}
@@ -1965,22 +2041,22 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       )}
 
       {/* STICKY BOTTOM ACTION FOOTER */}
-      <div className="sticky bottom-0 z-30 bg-white backdrop-blur-md border-t border-neutral-200 px-6 sm:px-10 py-4 flex items-center justify-between">
+      <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-neutral-200 px-3 sm:px-10 py-3 flex items-center justify-between gap-2 font-sans">
         <button
           type="button"
           onClick={navigateBack}
-          className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 flex items-center gap-1.5 px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer"
+          className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer shrink-0"
         >
           <ChevronLeft className="w-4 h-4" />
           <span>Back</span>
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={() => handleSaveProduct('Draft')}
             disabled={isSaving}
-            className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer disabled:opacity-50"
+            className="text-xs font-semibold text-neutral-700 hover:text-neutral-950 px-3 sm:px-4 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer disabled:opacity-50"
           >
             Save Draft
           </button>
@@ -1989,7 +2065,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
             type="button"
             onClick={() => handleSaveProduct('Active')}
             disabled={isSaving}
-            className="text-xs font-bold text-white bg-neutral-950 hover:bg-black px-5 py-2 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+            className="text-xs font-bold text-white bg-neutral-950 hover:bg-black px-3.5 sm:px-5 py-2 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 disabled:opacity-50"
           >
             {isSaving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
             <span>Publish Product</span>

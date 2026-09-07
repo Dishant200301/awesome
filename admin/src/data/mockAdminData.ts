@@ -1,5 +1,4 @@
 import { Product, Order, Category, Subcategory, Attribute, Customer, ContactMessage, Brand, Variant, HeroSlide, HomepageBanner } from '../types/admin';
-import { idbGet, idbSet } from './idbStorage';
 import { getAdminApiBase, getAdminAuthHeaders } from '../utils/authHeaders';
 
 export const MOCK_BRANDS: Brand[] = [];
@@ -23,45 +22,7 @@ export const sanitizeProducts = (list: any[]): Product[] => {
 
 export const MOCK_PRODUCTS: Product[] = [];
 
-// Load products from IndexedDB & LocalStorage on startup
-if (typeof window !== 'undefined') {
-  try {
-    const stored = localStorage.getItem('awesome_admin_sync') || localStorage.getItem('aaramly_admin_sync');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed.products)) {
-        const clean = sanitizeProducts(parsed.products);
-        MOCK_PRODUCTS.push(...clean);
-      }
-    }
-  } catch (e) {}
-
-  // Async load from IndexedDB (handles large Base64 images without quota limits)
-  idbGet<any>('awesome_admin_sync').then((stored) => {
-    if (stored && Array.isArray(stored.products) && stored.products.length > 0) {
-      const clean = sanitizeProducts(stored.products);
-      MOCK_PRODUCTS.length = 0;
-      MOCK_PRODUCTS.push(...clean);
-      window.dispatchEvent(new Event('awesome_product_sync'));
-      window.dispatchEvent(new Event('aaramly_product_sync'));
-    }
-  }).catch(() => {});
-}
-
 export const getAdminProducts = (): Product[] => {
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('awesome_admin_sync') || localStorage.getItem('aaramly_admin_sync');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed.products) && parsed.products.length > 0) {
-          const clean = sanitizeProducts(parsed.products);
-          MOCK_PRODUCTS.length = 0;
-          MOCK_PRODUCTS.push(...clean);
-        }
-      }
-    } catch (e) {}
-  }
   return MOCK_PRODUCTS;
 };
 
@@ -100,59 +61,23 @@ export const getGlobalVariantsList = (): Variant[] => {
 const BACKEND_API_URL = `${getAdminApiBase()}/products`;
 
 export const fetchProductsFromBackend = async (): Promise<Product[]> => {
-  // 1. Sync from IndexedDB first (contains all newly added and edited admin products)
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = await idbGet<any>('awesome_admin_sync');
-      if (stored && Array.isArray(stored.products) && stored.products.length > 0) {
-        const clean = sanitizeProducts(stored.products);
-        clean.forEach((p) => {
-          if (!deletedProductIds.has(String(p.id))) {
-            const idx = MOCK_PRODUCTS.findIndex((m) => String(m.id) === String(p.id));
-            if (idx !== -1) {
-              MOCK_PRODUCTS[idx] = p;
-            } else {
-              MOCK_PRODUCTS.unshift(p);
-            }
-          }
-        });
-      }
-    } catch (e) {}
-  }
-
-  // 2. Fetch from backend API
   try {
-    const res = await fetch(`${BACKEND_API_URL}?admin=true`);
+    const res = await fetch(`${BACKEND_API_URL}?admin=true`, {
+      cache: 'no-store',
+      headers: getAdminAuthHeaders()
+    });
     if (res.ok) {
       const json = await res.json();
-      const list = json.data || json.items || json.products;
-      if (json.success && Array.isArray(list)) {
+      const list = json.data?.items || json.data || json.items || json.products;
+      if (Array.isArray(list)) {
         const cleanList = sanitizeProducts(list);
-        cleanList.forEach((backendProd) => {
-          if (!deletedProductIds.has(String(backendProd.id))) {
-            const idx = MOCK_PRODUCTS.findIndex((m) => String(m.id) === String(backendProd.id));
-            if (idx === -1) {
-              MOCK_PRODUCTS.push(backendProd);
-            }
-          }
-        });
+        MOCK_PRODUCTS.length = 0;
+        MOCK_PRODUCTS.push(...cleanList);
+        return MOCK_PRODUCTS;
       }
     }
   } catch (e) {
     console.warn('[Backend Network API] Unable to fetch live backend products on load:', e);
-  }
-
-  // Filter out any deleted products
-  const finalProducts = MOCK_PRODUCTS.filter((p) => !deletedProductIds.has(String(p.id)));
-  MOCK_PRODUCTS.length = 0;
-  MOCK_PRODUCTS.push(...finalProducts);
-
-  if (typeof window !== 'undefined') {
-    idbSet('awesome_admin_sync', {
-      timestamp: Date.now(),
-      products: MOCK_PRODUCTS,
-      deletedIds: Array.from(deletedProductIds)
-    });
   }
 
   return MOCK_PRODUCTS;
@@ -180,22 +105,6 @@ export const syncProductToBackend = async (product: Product, isEdit: boolean = f
 
 const deletedProductIds = new Set<string>();
 
-if (typeof window !== 'undefined') {
-  try {
-    const savedDeleted = localStorage.getItem('awesome_deleted_products') || localStorage.getItem('aaramly_deleted_products');
-    if (savedDeleted) {
-      const parsed = JSON.parse(savedDeleted);
-      if (Array.isArray(parsed)) parsed.forEach((id) => deletedProductIds.add(String(id)));
-    }
-  } catch (e) {}
-
-  idbGet<string[]>('awesome_deleted_products').then((ids) => {
-    if (Array.isArray(ids)) {
-      ids.forEach((id) => deletedProductIds.add(String(id)));
-    }
-  }).catch(() => {});
-}
-
 export const getDeletedProductIds = (): Set<string> => deletedProductIds;
 
 export const deleteAdminProduct = async (productId: string) => {
@@ -206,11 +115,6 @@ export const deleteAdminProduct = async (productId: string) => {
   if (idx !== -1) {
     MOCK_PRODUCTS.splice(idx, 1);
   }
-
-  idbSet('awesome_deleted_products', Array.from(deletedProductIds));
-  try {
-    localStorage.setItem('awesome_deleted_products', JSON.stringify(Array.from(deletedProductIds)));
-  } catch (e) {}
 
   try {
     await fetch(`${BACKEND_API_URL}/${productId}`, {
@@ -237,73 +141,23 @@ export const broadcastAdminProductChange = (updatedProduct?: Product) => {
     }
   }
 
-  // 1. Save to IndexedDB (unlimited storage for base64 images)
-  idbSet('awesome_admin_sync', {
-    timestamp: Date.now(),
-    products: MOCK_PRODUCTS,
-    deletedIds: Array.from(deletedProductIds)
-  });
-
-  // 2. BroadcastChannel
+  // 1. BroadcastChannel
   try {
     const channel = new BroadcastChannel('awesome_product_sync');
     channel.postMessage({
       type: 'PRODUCT_UPDATED',
       timestamp: Date.now(),
-      product: updatedProduct,
-      products: MOCK_PRODUCTS,
-      deletedIds: Array.from(deletedProductIds)
+      product: updatedProduct
     });
     channel.close();
   } catch (e) {}
 
-  try {
-    const legacyChannel = new BroadcastChannel('aaramly_product_sync');
-    legacyChannel.postMessage({
-      type: 'PRODUCT_UPDATED',
-      timestamp: Date.now(),
-      product: updatedProduct,
-      products: MOCK_PRODUCTS,
-      deletedIds: Array.from(deletedProductIds)
-    });
-    legacyChannel.close();
-  } catch (e) {}
-
-  // 3. LocalStorage & Window Events
-  try {
-    localStorage.setItem('awesome_admin_sync', JSON.stringify({
-      timestamp: Date.now(),
-      products: MOCK_PRODUCTS,
-      deletedIds: Array.from(deletedProductIds)
-    }));
-  } catch (e) {
-    console.warn('LocalStorage write failed (quota exceeded, using IndexedDB fallback).');
-  }
-
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('awesome_product_sync'));
-    window.dispatchEvent(new Event('aaramly_product_sync'));
   }
 };
 
 export const MOCK_CONTACT_MESSAGES: ContactMessage[] = [];
-
-if (typeof window !== 'undefined') {
-  try {
-    const stored = localStorage.getItem('awesome_contact_sync') || localStorage.getItem('aaramly_contact_sync');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-        const existingIds = new Set(MOCK_CONTACT_MESSAGES.map((m) => m.id));
-        parsed.messages.forEach((msg: ContactMessage) => {
-          if (!existingIds.has(msg.id)) {
-            MOCK_CONTACT_MESSAGES.unshift(msg);
-          }
-        });
-      }
-    }
-  } catch (e) {}
-}
 
 export const MOCK_ORDERS: Order[] = [
   {
@@ -357,36 +211,16 @@ export const MOCK_CUSTOMERS: Customer[] = [
 ];
 
 export const getAdminCategoriesAndSubcategories = () => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories') || localStorage.getItem('aaramly_categories');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Validate if saved categories are the old Aaramly intimates categories, and if so discard them
-        const hasOldCategories = Array.isArray(parsed) && parsed.some((c: any) => 
-          ['Bralettes', 'Everyday Bras', 'Seamless Panties', 'Shapewear', 'bralettes'].includes(c.name || c.slug)
-        );
-        if (!hasOldCategories && Array.isArray(parsed) && parsed.length > 0) {
-          const mainCats = parsed.filter((c: any) => c.type !== 'sub' && (c.isActive ?? true));
-          const subCats = parsed.filter((c: any) => c.type === 'sub' && (c.isActive ?? true));
-          return { mainCategories: mainCats, subcategories: subCats };
-        } else if (hasOldCategories) {
-          // Clear legacy intimates data
-          localStorage.removeItem('aaramly_categories');
-          localStorage.removeItem('aocind_categories');
-          localStorage.removeItem('awesome_categories');
-        }
-      }
-    } catch (e) {}
-  }
-  const mainCats = MOCK_CATEGORIES.map((c) => ({ ...c, type: 'parent' }));
+  const mainCats = MOCK_CATEGORIES.map((c) => ({ ...c, type: 'parent' as const }));
   const subCats = MOCK_SUBCATEGORIES.map((s) => ({
     id: s.id,
     name: s.name,
     slug: s.slug,
-    type: 'sub',
+    type: 'sub' as const,
     parentId: s.categoryId,
-    parentName: s.categoryName
+    parentName: s.categoryName,
+    categoryId: s.categoryId,
+    categoryName: s.categoryName
   }));
   return { mainCategories: mainCats, subcategories: subCats };
 };

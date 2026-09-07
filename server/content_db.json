@@ -83,7 +83,14 @@
       "link": "/shop?category=Necklace",
       "gridPosition": "Main Promo Banner",
       "showTextOverlay": true,
-      "status": "Active"
+      "status": "Active",
+      "tagline": "",
+      "badgeText": "",
+      "buttonLink": "#collection",
+      "imageUrl": "",
+      "mobileImageUrl": "",
+      "bgColor": "",
+      "isActive": true
     }
   ],
   "contentPages": [

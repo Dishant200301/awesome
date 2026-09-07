@@ -71,12 +71,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     const res = await AdminApiService.getDashboardStats();
     setStats(res);
     try {
-      const stored = localStorage.getItem('awesome_admin_reviews') || localStorage.getItem('aaramly_admin_reviews');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setReviewsCount(parsed.length);
-        }
+      const revs = await AdminApiService.getReviews();
+      if (Array.isArray(revs)) {
+        setReviewsCount(revs.length);
       }
     } catch (e) {}
     setLoading(false);

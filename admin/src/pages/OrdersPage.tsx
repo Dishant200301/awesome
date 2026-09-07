@@ -162,18 +162,21 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialStatusFilter = 'A
                   <TableCell className="font-medium text-neutral-700">{ord.paymentGateway}</TableCell>
                   <TableCell className="font-bold text-black">₹{ord.totalAmount}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={ord.status}
-                      onChange={(e) => updateOrderStatus(ord.id, e.target.value)}
-                      className="bg-neutral-50 border border-neutral-200 text-black text-[11px] font-semibold rounded-md px-2 py-1 focus:outline-none focus:border-black cursor-pointer"
-                    >
-                      <option value="PENDING">PENDING</option>
-                      <option value="PAID">PAID</option>
-                      <option value="PROCESSING">PROCESSING</option>
-                      <option value="SHIPPED">SHIPPED</option>
-                      <option value="DELIVERED">DELIVERED</option>
-                      <option value="CANCELLED">CANCELLED</option>
-                    </select>
+                    <div className="w-32">
+                      <Select
+                        value={ord.status}
+                        onValueChange={(val) => updateOrderStatus(ord.id, val)}
+                        className="h-7 text-[11px] font-semibold bg-neutral-50"
+                        options={[
+                          { value: 'PENDING', label: 'PENDING' },
+                          { value: 'PAID', label: 'PAID' },
+                          { value: 'PROCESSING', label: 'PROCESSING' },
+                          { value: 'SHIPPED', label: 'SHIPPED' },
+                          { value: 'DELIVERED', label: 'DELIVERED' },
+                          { value: 'CANCELLED', label: 'CANCELLED' }
+                        ]}
+                      />
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

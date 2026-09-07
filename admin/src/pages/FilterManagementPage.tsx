@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getAdminApiBase, getAdminAuthHeaders } from '../utils/authHeaders';
 import { Plus, Trash2, Save, RefreshCw, CheckCircle2, SlidersHorizontal, Palette, Ruler, Tag } from 'lucide-react';
 
@@ -12,82 +12,28 @@ interface ColorItem {
   hex: string;
 }
 
-const DEFAULT_CATEGORIES: CategoryItem[] = [
-  { name: 'Latkan', key: 'Latkan' },
-  { name: 'Choli', key: 'Choli' },
-  { name: 'Gift Hamper', key: 'Gift Hamper' },
-  { name: 'Necklace', key: 'Necklace' },
-  { name: 'Earrings', key: 'Earrings' },
-  { name: 'Tassel', key: 'Tassel' },
-  { name: 'Hair Accessories', key: 'Hair Accessories' },
-  { name: 'Macrame Hanging', key: 'Macrame Hanging' }
-];
+const DEFAULT_CATEGORIES: CategoryItem[] = [];
 
 const DEFAULT_COLORS: ColorItem[] = [
-  { name: 'Maroon', hex: '#800000' },
+  { name: 'Maroon', hex: '#520618' },
   { name: 'Gold', hex: '#D4AF37' },
   { name: 'Royal Blue', hex: '#4169E1' },
-  { name: 'Emerald Green', hex: '#50C878' },
-  { name: 'Blush Pink', hex: '#FF69B4' },
+  { name: 'Emerald Green', hex: '#1A5235' },
+  { name: 'Blush Pink', hex: '#E1306C' },
   { name: 'Mustard Yellow', hex: '#FFDB58' },
   { name: 'Classic White', hex: '#FFFFFF' },
-  { name: 'Black', hex: '#000000' }
+  { name: 'Jet Black', hex: '#000000' }
 ];
 
-const DEFAULT_SIZES: string[] = ['Free Size', 'Kids (2-4 Yrs)', 'Kids (5-8 Yrs)', 'Adult S', 'Adult M', 'Adult L', 'Adult XL'];
+const DEFAULT_SIZES: string[] = ['Free Size', 'Standard Pair', 'Kids (2-4 Yrs)', 'Kids (5-8 Yrs)', 'Adult S', 'Adult M', 'Adult L', 'Adult XL'];
 
 const STORAGE_KEY = 'awesome_dynamic_filters';
 
 export const FilterManagementPage: React.FC = () => {
-  const [categories, setCategories] = useState<CategoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('aaramly_dynamic_filters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed.categories) && parsed.categories.length > 0) {
-          return parsed.categories;
-        }
-      }
-    } catch {}
-    return DEFAULT_CATEGORIES;
-  });
-
-  const [colors, setColors] = useState<ColorItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('aaramly_dynamic_filters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed.colors) && parsed.colors.length > 0) {
-          return parsed.colors;
-        }
-      }
-    } catch {}
-    return DEFAULT_COLORS;
-  });
-
-  const [sizes, setSizes] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('aaramly_dynamic_filters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed.sizes) && parsed.sizes.length > 0) {
-          return parsed.sizes;
-        }
-      }
-    } catch {}
-    return DEFAULT_SIZES;
-  });
-
-  const [maxPrice, setMaxPrice] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('aaramly_dynamic_filters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.maxPrice) return Number(parsed.maxPrice);
-      }
-    } catch {}
-    return 3000;
-  });
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [colors, setColors] = useState<ColorItem[]>(DEFAULT_COLORS);
+  const [sizes, setSizes] = useState<string[]>(DEFAULT_SIZES);
+  const [maxPrice, setMaxPrice] = useState<number>(3000);
 
   // New Inputs State
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -96,33 +42,42 @@ export const FilterManagementPage: React.FC = () => {
   const [newSize, setNewSize] = useState('');
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const apiBase = getAdminApiBase();
+
+  useEffect(() => {
+    fetch(`${apiBase}/filters`, { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.data) {
+          if (Array.isArray(json.data.categories)) setCategories(json.data.categories);
+          if (Array.isArray(json.data.colors)) setColors(json.data.colors);
+          if (Array.isArray(json.data.sizes)) setSizes(json.data.sizes);
+          if (json.data.maxPrice) setMaxPrice(Number(json.data.maxPrice));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSave = () => {
     const payload = { categories, colors, sizes, maxPrice };
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      
       // Broadcast live update across all tabs
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         const channel = new BroadcastChannel('awesome_filter_sync');
         channel.postMessage({ filters: payload });
-        const legacyChannel = new BroadcastChannel('aaramly_filter_sync');
-        legacyChannel.postMessage({ filters: payload });
+        channel.close();
       }
 
-      // Also try posting to backend API if live
-      const apiBase = getAdminApiBase();
+      // Post directly to backend API / database
       fetch(`${apiBase}/filters`, {
         method: 'POST',
         headers: getAdminAuthHeaders(),
         body: JSON.stringify(payload),
       }).catch(() => {});
+    } catch {}
 
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
-    } catch (e) {
-      console.error('Failed to save filters', e);
-    }
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
   };
 
   const handleResetDefaults = () => {
@@ -191,7 +146,7 @@ export const FilterManagementPage: React.FC = () => {
               placeholder="e.g. Latkan, Choli, Gift Hamper..."
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-[#bf5c30]"
+              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-hidden focus:ring-1 focus:ring-[#bf5c30]"
             />
             <button
               type="button"
@@ -250,7 +205,7 @@ export const FilterManagementPage: React.FC = () => {
               placeholder="e.g. Blush Pink"
               value={newColorName}
               onChange={(e) => setNewColorName(e.target.value)}
-              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-[#bf5c30]"
+              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-hidden focus:ring-1 focus:ring-[#bf5c30]"
             />
             <input
               type="color"
@@ -321,7 +276,7 @@ export const FilterManagementPage: React.FC = () => {
               placeholder="e.g. S, XL, 34B, 38D..."
               value={newSize}
               onChange={(e) => setNewSize(e.target.value)}
-              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-[#bf5c30]"
+              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-hidden focus:ring-1 focus:ring-[#bf5c30]"
             />
             <button
               type="button"

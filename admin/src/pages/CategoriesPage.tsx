@@ -51,21 +51,9 @@ interface CategoriesPageProps {
 }
 
 export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'all-categories', onNavigate }) => {
-  // Main Categories State with LocalStorage & Express Backend Persistence
-  const [categories, setCategories] = useState<EnhancedCategory[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
-        if (saved !== null) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            return parsed;
-          }
-        }
-      } catch (e) {}
-    }
-    return [];
-  });
+  // Main Categories State strictly from Express & MySQL backend
+  const [categories, setCategories] = useState<EnhancedCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Navigation & View Mode: 'all' | 'add' | 'edit'
   const [subView, setSubView] = useState<'all' | 'add' | 'edit'>(() => {
@@ -128,51 +116,48 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     }, 3500);
   };
 
-  // Fetch live categories from Express Server on mount
+  // Fetch live categories from Express Server directly from MySQL
+  const loadCategoriesFromServer = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/taxonomies/categories`, {
+        cache: 'no-store',
+        headers: getAdminAuthHeaders()
+      });
+      const json = await res.json();
+      if (json?.data && Array.isArray(json.data.categories)) {
+        const parents = json.data.categories.map((c: any) => ({
+          ...c,
+          type: 'parent' as const,
+          createdAt: c.createdAt || '2026-01-15'
+        }));
+        const subs = (json.data.subcategories || []).map((s: any) => ({
+          ...s,
+          type: 'sub' as const,
+          createdAt: s.createdAt || '2026-01-20'
+        }));
+        setCategories([...parents, ...subs]);
+      }
+    } catch (e) {
+      console.warn("Express server taxonomy API fetch error:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch(`${API_BASE}/taxonomies/categories`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (json?.data && Array.isArray(json.data.categories)) {
-          const parents = json.data.categories.map((c: any) => ({
-            ...c,
-            type: 'parent' as const,
-            createdAt: c.createdAt || '2026-01-15'
-          }));
-          const subs = (json.data.subcategories || []).map((s: any) => ({
-            ...s,
-            type: 'sub' as const,
-            createdAt: s.createdAt || '2026-01-20'
-          }));
-          setCategories([...parents, ...subs]);
-        }
-      })
-      .catch(() => {});
+    loadCategoriesFromServer();
   }, []);
 
-  // Sync to LocalStorage & Express Backend
-  useEffect(() => {
-    try {
-      localStorage.setItem('awesome_categories', JSON.stringify(categories));
-      localStorage.setItem('aocind_categories', JSON.stringify(categories));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('awesome_category_sync'));
-        window.dispatchEvent(new Event('aocind_category_sync'));
-        if ('BroadcastChannel' in window) {
-          const bc = new BroadcastChannel('awesome_category_sync');
-          bc.postMessage({ type: 'CATEGORIES_UPDATED', categories });
-          bc.close();
-        }
-      }
-    } catch (e) {}
-
-    // Sync to Express Backend
-    fetch(`${API_BASE}/taxonomies/categories/sync`, {
-      method: 'POST',
-      headers: getAdminAuthHeaders(),
-      body: JSON.stringify({ categories }),
-    }).catch(() => {});
-  }, [categories]);
+  const broadcastChange = () => {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('awesome_category_sync');
+        bc.postMessage({ type: 'CATEGORIES_UPDATED' });
+        bc.close();
+      } catch {}
+    }
+  };
 
   // Main Categories list for parent selection
   const mainCategoriesList = categories.filter((c) => c.type !== 'sub');
@@ -274,58 +259,100 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   };
 
   // Save Category or Subcategory
-  const handleSaveCategory = (e: React.FormEvent) => {
+  const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!categoryName.trim()) return;
 
     const slugToSave = categorySlug.trim() || categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const parentObj = categoryType === 'sub' ? mainCategoriesList.find((c) => c.id === selectedParentId) : undefined;
 
-    if (editingCategory) {
-      // UPDATE EXISTING
-      setCategories((prev) =>
-        prev.map((c) =>
-          c.id === editingCategory.id
-            ? {
-                ...c,
-                name: categoryName.trim(),
-                slug: slugToSave,
-                image: categoryImage,
-                bannerImage: categoryBanner,
-                description: categoryDescription,
-                type: categoryType,
-                parentId: categoryType === 'sub' ? selectedParentId : undefined,
-                parentName: parentObj ? parentObj.name : undefined,
-                metaTitle: metaTitle.trim(),
-                metaDescription: metaDescription.trim(),
-                metaKeywords: metaKeywords.trim(),
-                isActive
-              }
-            : c
-        )
-      );
-      showToast(`Updated "${categoryName}" successfully.`);
-    } else {
-      // CREATE NEW
-      const newCat: EnhancedCategory = {
-        id: categoryType === 'sub' ? `sub-${Date.now()}` : `cat-${Date.now()}`,
-        name: categoryName.trim(),
-        slug: slugToSave,
-        image: categoryImage,
-        bannerImage: categoryBanner,
-        description: categoryDescription,
-        type: categoryType,
-        parentId: categoryType === 'sub' ? selectedParentId : undefined,
-        parentName: parentObj ? parentObj.name : undefined,
-        metaTitle: metaTitle.trim() || `${categoryName} | Awesome Handmade`,
-        metaDescription: metaDescription.trim() || categoryDescription,
-        metaKeywords: metaKeywords.trim(),
-        productCount: 0,
-        isActive,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      setCategories((prev) => [newCat, ...prev]);
-      showToast(`Created new ${categoryType === 'sub' ? 'subcategory' : 'category'} "${categoryName}".`);
+    try {
+      if (editingCategory) {
+        // UPDATE EXISTING IN MYSQL VIA API
+        if (editingCategory.type === 'sub' || categoryType === 'sub') {
+          await fetch(`${API_BASE}/taxonomies/subcategories/${editingCategory.id}`, {
+            method: 'PUT',
+            headers: getAdminAuthHeaders(),
+            body: JSON.stringify({
+              name: categoryName.trim(),
+              slug: slugToSave,
+              categoryId: selectedParentId || editingCategory.parentId,
+              parentId: selectedParentId || editingCategory.parentId,
+              image: categoryImage,
+              bannerImage: categoryBanner,
+              description: categoryDescription,
+              metaTitle: metaTitle.trim(),
+              metaDescription: metaDescription.trim(),
+              metaKeywords: metaKeywords.trim(),
+              isActive
+            })
+          });
+        } else {
+          await fetch(`${API_BASE}/taxonomies/categories/${editingCategory.id}`, {
+            method: 'PUT',
+            headers: getAdminAuthHeaders(),
+            body: JSON.stringify({
+              name: categoryName.trim(),
+              slug: slugToSave,
+              image: categoryImage,
+              bannerImage: categoryBanner,
+              description: categoryDescription,
+              metaTitle: metaTitle.trim(),
+              metaDescription: metaDescription.trim(),
+              metaKeywords: metaKeywords.trim(),
+              isActive
+            })
+          });
+        }
+        showToast(`Updated "${categoryName}" successfully in database.`);
+      } else {
+        // CREATE NEW IN MYSQL VIA API
+        if (categoryType === 'sub') {
+          await fetch(`${API_BASE}/taxonomies/subcategories`, {
+            method: 'POST',
+            headers: getAdminAuthHeaders(),
+            body: JSON.stringify({
+              id: `sub-${Date.now()}`,
+              name: categoryName.trim(),
+              slug: slugToSave,
+              categoryId: selectedParentId,
+              parentId: selectedParentId,
+              parentName: parentObj ? parentObj.name : undefined,
+              image: categoryImage,
+              bannerImage: categoryBanner,
+              description: categoryDescription,
+              metaTitle: metaTitle.trim() || `${categoryName} | Awesome Handmade`,
+              metaDescription: metaDescription.trim() || categoryDescription,
+              metaKeywords: metaKeywords.trim(),
+              isActive
+            })
+          });
+        } else {
+          await fetch(`${API_BASE}/taxonomies/categories`, {
+            method: 'POST',
+            headers: getAdminAuthHeaders(),
+            body: JSON.stringify({
+              id: `cat-${Date.now()}`,
+              name: categoryName.trim(),
+              slug: slugToSave,
+              image: categoryImage,
+              bannerImage: categoryBanner,
+              description: categoryDescription,
+              metaTitle: metaTitle.trim() || `${categoryName} | Awesome Handmade`,
+              metaDescription: metaDescription.trim() || categoryDescription,
+              metaKeywords: metaKeywords.trim(),
+              isActive
+            })
+          });
+        }
+        showToast(`Created new ${categoryType === 'sub' ? 'subcategory' : 'category'} "${categoryName}" in database.`);
+      }
+
+      await loadCategoriesFromServer();
+      broadcastChange();
+    } catch (err) {
+      console.error("Save category error:", err);
+      showToast("Error saving to database. Please check connection.");
     }
 
     setSubView('all');
@@ -333,27 +360,64 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   };
 
   // Confirm Delete Handler
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteConfirmId) return;
     const itemToDelete = categories.find((c) => c.id === deleteConfirmId);
-    setCategories((prev) => prev.filter((c) => c.id !== deleteConfirmId));
+    
+    try {
+      if (itemToDelete?.type === 'sub') {
+        await fetch(`${API_BASE}/taxonomies/subcategories/${deleteConfirmId}`, {
+          method: 'DELETE',
+          headers: getAdminAuthHeaders()
+        });
+      } else {
+        await fetch(`${API_BASE}/taxonomies/categories/${deleteConfirmId}`, {
+          method: 'DELETE',
+          headers: getAdminAuthHeaders()
+        });
+      }
+      if (itemToDelete) {
+        showToast(`Deleted "${itemToDelete.name}" from database.`);
+      }
+      await loadCategoriesFromServer();
+      broadcastChange();
+    } catch (err) {
+      console.error("Delete category error:", err);
+    }
+
     if (editingCategory?.id === deleteConfirmId) {
       setSubView('all');
       setEditingCategory(null);
     }
     setDeleteConfirmId(null);
-    if (itemToDelete) {
-      showToast(`Deleted "${itemToDelete.name}" successfully.`);
-    }
   };
 
   // Confirm Status Toggle
-  const handleConfirmStatusToggle = () => {
+  const handleConfirmStatusToggle = async () => {
     if (!statusConfirmItem) return;
-    setCategories((prev) =>
-      prev.map((c) => (c.id === statusConfirmItem.id ? { ...c, isActive: !c.isActive } : c))
-    );
-    showToast(`Status changed for "${statusConfirmItem.name}".`);
+    const newActiveState = !statusConfirmItem.isActive;
+
+    try {
+      if (statusConfirmItem.type === 'sub') {
+        await fetch(`${API_BASE}/taxonomies/subcategories/${statusConfirmItem.id}`, {
+          method: 'PUT',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify({ isActive: newActiveState })
+        });
+      } else {
+        await fetch(`${API_BASE}/taxonomies/categories/${statusConfirmItem.id}`, {
+          method: 'PUT',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify({ isActive: newActiveState })
+        });
+      }
+      showToast(`Status changed for "${statusConfirmItem.name}".`);
+      await loadCategoriesFromServer();
+      broadcastChange();
+    } catch (err) {
+      console.error("Status toggle error:", err);
+    }
+
     setStatusConfirmItem(null);
   };
 
@@ -459,7 +523,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                 placeholder="Search categories by name, slug or parent..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 text-xs bg-neutral-50 border-neutral-200 focus:bg-white"
+                className="pl-9 text-xs bg-white border-neutral-200"
               />
               {searchTerm && (
                 <button
@@ -530,16 +594,16 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
             <div className="bg-white rounded-xl border border-neutral-200 shadow-2xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-neutral-50 border-b border-neutral-200 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
+                  <thead className="bg-neutral-50 border-b border-neutral-200 text-[11px] font-bold text-neutral-600 tracking-wider">
                     <tr>
                       <th className="py-3 px-4">Image</th>
                       <th className="py-3 px-4">Category Name &amp; Slug</th>
                       <th className="py-3 px-4">Classification</th>
                       {filterType !== 'MAIN' && <th className="py-3 px-4">Parent Category</th>}
-                      <th className="py-3 px-4 text-center">Products</th>
+                      {/* <th className="py-3 px-4 text-center">Products</th> */}
                       {filterType !== 'SUB' && <th className="py-3 px-4 text-center">Subcategories</th>}
                       <th className="py-3 px-4 text-center">Status</th>
-                      <th className="py-3 px-4">Created Date</th>
+                      <th className="py-3 px-4">Date</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -579,7 +643,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                               }`}
                             >
                               <Tag className="w-2.5 h-2.5" />
-                              <span>{isSub ? 'Subcategory' : 'Main Category'}</span>
+                              <span>{isSub ? 'Subcategory' : 'Category'}</span>
                             </span>
                           </td>
 
@@ -597,11 +661,11 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                           )}
 
                           {/* Product Count */}
-                          <td className="py-3 px-4 text-center">
+                          {/* <td className="py-3 px-4 text-center">
                             <span className="font-semibold text-neutral-900">
                               {cat.productCount !== undefined ? cat.productCount : 12}
                             </span>
-                          </td>
+                          </td> */}
 
                           {/* Subcategory Count (Main only) */}
                           {filterType !== 'SUB' && (

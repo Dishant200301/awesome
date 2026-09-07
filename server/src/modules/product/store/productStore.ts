@@ -133,6 +133,7 @@ export interface ProductItem {
 
 import fs from "fs";
 import path from "path";
+import { syncProductToMySQL, deleteProductFromMySQL } from "../../../database/mysqlSync.js";
 
 const DB_FILE_PATH = path.join(process.cwd(), "products_db.json");
 
@@ -315,6 +316,7 @@ class ProductStore {
       this.products.unshift(normalized);
     }
     this.saveToDisk();
+    syncProductToMySQL(normalized).catch((e) => console.warn("[MySQL Sync] add product error:", e));
     return normalized;
   }
 
@@ -333,6 +335,7 @@ class ProductStore {
     const normalized = this.normalizeProduct(merged);
     this.products[index] = normalized;
     this.saveToDisk();
+    syncProductToMySQL(normalized).catch((e) => console.warn("[MySQL Sync] update product error:", e));
     return normalized;
   }
 
@@ -341,7 +344,10 @@ class ProductStore {
     const len = this.products.length;
     this.products = this.products.filter((p) => String(p.id) !== target && String(p.slug) !== target);
     const deleted = this.products.length < len;
-    if (deleted) this.saveToDisk();
+    if (deleted) {
+      this.saveToDisk();
+      deleteProductFromMySQL(target).catch((e) => console.warn("[MySQL Sync] delete product error:", e));
+    }
     return deleted;
   }
 
@@ -352,7 +358,12 @@ class ProductStore {
       (p) => !stringIds.includes(String(p.id)) && !stringIds.includes(String(p.slug))
     );
     const count = initialLen - this.products.length;
-    if (count > 0) this.saveToDisk();
+    if (count > 0) {
+      this.saveToDisk();
+      stringIds.forEach((sid) => {
+        deleteProductFromMySQL(sid).catch((e) => console.warn("[MySQL Sync] bulkDelete product error:", e));
+      });
+    }
     return count;
   }
 

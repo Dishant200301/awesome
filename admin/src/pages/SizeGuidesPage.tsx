@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { SizeGuide, SizeGuideCountry, SizeGuideColumn, SizeGuideRow, Category } from '../types/admin';
 import { AdminApiService } from '../services/adminApi';
+import { Select } from '../components/ui/select';
 
 interface SizeGuidesPageProps {
   initialSubTab?: 'all-guides' | 'add-guide' | 'templates' | 'assignment';
@@ -665,10 +666,16 @@ export const SizeGuidesPage: React.FC<SizeGuidesPageProps> = ({ initialSubTab = 
                     <h4 className="font-bold text-slate-900 text-xs">{cat.name} Category</h4>
                     <p className="text-[11px] text-slate-500">Applies to all products under {cat.name}</p>
                   </div>
-                  <select className="bg-white p-2 text-xs font-bold text-slate-800 rounded-xl border border-slate-200 outline-none cursor-pointer">
-                    <option value={guides[0]?.id}>{guides[0]?.title || 'Size Guide'}</option>
-                    <option value="">-- No Guide Assigned --</option>
-                  </select>
+                  <div className="w-56">
+                    <Select
+                      defaultValue={guides[0]?.id || ''}
+                      className="rounded-xl font-bold text-slate-800"
+                      options={[
+                        { value: guides[0]?.id || 'default', label: guides[0]?.title || 'Size Guide' },
+                        { value: 'none', label: '-- No Guide Assigned --' }
+                      ]}
+                    />
+                  </div>
                 </div>
               ))
             )}

@@ -1,5 +1,4 @@
 import { ProductDetails, ProductColorVariation } from "@/modules/product/types/product";
-import { idbGet, idbSet } from "./idbStorage";
 
 const rawApiUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandwork.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
 export const API_BASE_URL = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
@@ -35,24 +34,7 @@ export const sanitizeClientProducts = (list: any[]): any[] => {
   return list.filter((p) => !isLegacyAaramlyProduct(p));
 };
 
-const DEFAULT_CATALOG_PRODUCTS: any[] = [];
-
 let liveProducts: any[] = [];
-
-if (typeof window !== "undefined") {
-  try {
-    const local = localStorage.getItem("awesome_admin_sync") || localStorage.getItem("aaramly_admin_sync");
-    if (local) {
-      const parsed = JSON.parse(local);
-      if (Array.isArray(parsed.products)) {
-        liveProducts = sanitizeClientProducts(parsed.products).filter(
-          (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
-        );
-      }
-    }
-  } catch (e) {}
-}
-
 let isLoaded = false;
 
 export const subscribeToProductStore = (listener: Listener) => {
@@ -66,51 +48,16 @@ const notifyListeners = () => {
   listeners.forEach((fn) => fn());
 };
 
-// Fetch live products from MySQL Express backend or local IndexedDB dynamic store
+// Fetch live products dynamically from MySQL Express backend
 export const fetchLiveProducts = async (): Promise<any[]> => {
-  syncDeletedIds();
-
-  // 1. Sync from IndexedDB (contains full admin-managed dynamic products & base64 images)
-  if (typeof window !== "undefined") {
-    try {
-      const stored = await idbGet<any>("awesome_admin_sync");
-      if (stored && Array.isArray(stored.products)) {
-        const clean = sanitizeClientProducts(stored.products);
-        liveProducts = clean.filter(
-          (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
-        );
-        isLoaded = true;
-        notifyListeners();
-        return liveProducts;
-      }
-    } catch (e) {}
-
-    try {
-      const local = localStorage.getItem("awesome_admin_sync");
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed.products)) {
-          const clean = sanitizeClientProducts(parsed.products);
-          liveProducts = clean.filter(
-            (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
-          );
-          isLoaded = true;
-          notifyListeners();
-          return liveProducts;
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 2. Fetch from backend API if available
   try {
-    const res = await fetch(`${API_BASE_URL}/products`);
+    const res = await fetch(`${API_BASE_URL}/products`, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       const list = json.data?.items || json.data || json.items || json.products;
       if (Array.isArray(list)) {
         liveProducts = sanitizeClientProducts(list).filter(
-          (p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== "Draft"
+          (p: any) => p.isPublished !== false && p.status !== "Draft" && p.status !== "Inactive"
         );
         isLoaded = true;
         notifyListeners();
@@ -118,10 +65,9 @@ export const fetchLiveProducts = async (): Promise<any[]> => {
       }
     }
   } catch (e) {
-    console.warn("Express MySQL backend offline; serving local dynamic state.");
+    console.warn("Express MySQL backend offline or unreachable.");
   }
 
-  liveProducts = sanitizeClientProducts(liveProducts).filter((p: any) => !deletedProductIds.has(String(p.id)));
   return liveProducts;
 };
 
@@ -153,133 +99,20 @@ export const addLiveProduct = async (productData: any) => {
 
 let deletedProductIds = new Set<string>();
 
-const syncDeletedIds = () => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('awesome_deleted_products') || localStorage.getItem('aaramly_deleted_products');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) parsed.forEach((id) => deletedProductIds.add(String(id)));
-      }
-    } catch (e) {}
-
-    idbGet<string[]>('awesome_deleted_products').then((ids) => {
-      if (Array.isArray(ids)) {
-        ids.forEach((id) => deletedProductIds.add(String(id)));
-      }
-    }).catch(() => {});
-  }
-};
-syncDeletedIds();
-
-// BroadcastChannel and Storage Listener for Real-Time Sync with Admin Panel
+// Real-Time Sync with Admin Panel via BroadcastChannel
 if (typeof window !== "undefined") {
-  const handleProductMessage = (event: MessageEvent) => {
-    if (event.data) {
-      if (Array.isArray(event.data.deletedIds)) {
-        event.data.deletedIds.forEach((id: string) => deletedProductIds.add(String(id)));
-        try {
-          localStorage.setItem('awesome_deleted_products', JSON.stringify(Array.from(deletedProductIds)));
-        } catch (e) {}
-      }
-      if (Array.isArray(event.data.products)) {
-        const clean = sanitizeClientProducts(event.data.products);
-        liveProducts = clean.filter((p: any) => !deletedProductIds.has(String(p.id)));
-        notifyListeners();
-      } else if (event.data.product) {
-        const updated = event.data.product;
-        if (!deletedProductIds.has(String(updated.id))) {
-          const idx = liveProducts.findIndex((p) => String(p.id) === String(updated.id));
-          if (idx !== -1) {
-            liveProducts[idx] = updated;
-          } else {
-            liveProducts.unshift(updated);
-          }
-          notifyListeners();
-        }
-      }
-    }
+  const handleProductMessage = () => {
+    fetchLiveProducts();
   };
 
   try {
     const channel = new BroadcastChannel("awesome_product_sync");
     channel.onmessage = handleProductMessage;
-    const legacyChannel = new BroadcastChannel("aaramly_product_sync");
-    legacyChannel.onmessage = handleProductMessage;
   } catch (e) {}
 
-  window.addEventListener("storage", (e) => {
-    if ((e.key === "awesome_deleted_products" || e.key === "aaramly_deleted_products") && e.newValue) {
-      try {
-        const parsed = JSON.parse(e.newValue);
-        if (Array.isArray(parsed)) parsed.forEach((id) => deletedProductIds.add(String(id)));
-        notifyListeners();
-      } catch (err) {}
-    }
-    if ((e.key === "awesome_admin_sync" || e.key === "aaramly_admin_sync") && e.newValue) {
-      try {
-        syncDeletedIds();
-        const parsed = JSON.parse(e.newValue);
-        if (Array.isArray(parsed.deletedIds)) {
-          parsed.deletedIds.forEach((id: string) => deletedProductIds.add(String(id)));
-        }
-        if (Array.isArray(parsed.products)) {
-          const clean = sanitizeClientProducts(parsed.products);
-          liveProducts = clean.filter((p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== 'Draft');
-          notifyListeners();
-        }
-      } catch (err) {}
-    }
+  window.addEventListener("awesome_product_sync", () => {
+    fetchLiveProducts();
   });
-
-  const handleProductSyncEvent = () => {
-    try {
-      syncDeletedIds();
-      const stored = localStorage.getItem("awesome_admin_sync") || localStorage.getItem("aaramly_admin_sync");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed.deletedIds)) {
-          parsed.deletedIds.forEach((id: string) => deletedProductIds.add(String(id)));
-        }
-        if (Array.isArray(parsed.products)) {
-          const clean = sanitizeClientProducts(parsed.products);
-          liveProducts = clean.filter((p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== 'Draft');
-          notifyListeners();
-        }
-      }
-    } catch (e) {}
-
-    // Also sync from IndexedDB
-    idbGet<any>("awesome_admin_sync").then((stored) => {
-      if (stored) {
-        if (Array.isArray(stored.deletedIds)) {
-          stored.deletedIds.forEach((id: string) => deletedProductIds.add(String(id)));
-        }
-        if (Array.isArray(stored.products) && stored.products.length > 0) {
-          const clean = sanitizeClientProducts(stored.products);
-          liveProducts = clean.filter((p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== 'Draft');
-          notifyListeners();
-        }
-      }
-    }).catch(() => {});
-  };
-
-  window.addEventListener("awesome_product_sync", handleProductSyncEvent);
-  window.addEventListener("aaramly_product_sync", handleProductSyncEvent);
-
-  // Load from IndexedDB on startup (supports full base64 images of any size)
-  idbGet<any>("awesome_admin_sync").then((stored) => {
-    if (stored) {
-      if (Array.isArray(stored.deletedIds)) {
-        stored.deletedIds.forEach((id: string) => deletedProductIds.add(String(id)));
-      }
-      if (Array.isArray(stored.products) && stored.products.length > 0) {
-        const clean = sanitizeClientProducts(stored.products);
-        liveProducts = clean.filter((p: any) => !deletedProductIds.has(String(p.id)) && p.isPublished !== false && p.status !== 'Draft');
-        notifyListeners();
-      }
-    }
-  }).catch(() => {});
 }
 
 export const updateLiveStoreDirectly = (productsList: any[]) => {
@@ -438,24 +271,9 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails | null => 
 
   const query = String(idOrSlug).trim().toLowerCase();
 
-  let found = liveProducts.find(
+  const found = liveProducts.find(
     (p) => String(p.id).toLowerCase() === query || String(p.slug || "").toLowerCase() === query
   );
-
-  if (!found && typeof window !== "undefined") {
-    try {
-      const stored = localStorage.getItem("awesome_admin_sync") || localStorage.getItem("aaramly_admin_sync");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed.products) && parsed.products.length > 0) {
-          liveProducts = parsed.products;
-          found = liveProducts.find(
-            (p) => String(p.id).toLowerCase() === query || String(p.slug || "").toLowerCase() === query
-          );
-        }
-      }
-    } catch (e) {}
-  }
 
   if (!found) {
     return null;
@@ -751,19 +569,6 @@ export const deductLiveStock = async (
 
   if (updated) {
     if (typeof window !== "undefined") {
-      idbSet('awesome_admin_sync', {
-        timestamp: Date.now(),
-        products: liveProducts,
-        deletedIds: Array.from(deletedProductIds)
-      });
-      try {
-        localStorage.setItem('awesome_admin_sync', JSON.stringify({
-          timestamp: Date.now(),
-          products: liveProducts,
-          deletedIds: Array.from(deletedProductIds)
-        }));
-      } catch (e) {}
-
       window.dispatchEvent(new Event('awesome_product_sync'));
       try {
         const channel = new BroadcastChannel('awesome_product_sync');
@@ -816,7 +621,7 @@ const notifyReviewListeners = () => {
 export const fetchLiveReviews = async (productId?: string): Promise<CustomerReviewItem[]> => {
   try {
     const url = productId ? `${API_BASE_URL}/reviews?productId=${productId}` : `${API_BASE_URL}/reviews`;
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       const list = json.data || json;
@@ -826,12 +631,6 @@ export const fetchLiveReviews = async (productId?: string): Promise<CustomerRevi
           liveReviews = [...list, ...otherReviews];
         } else {
           liveReviews = list;
-        }
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem('awesome_admin_reviews', JSON.stringify(liveReviews));
-            await idbSet('awesome_admin_reviews', liveReviews);
-          } catch (e) {}
         }
         notifyReviewListeners();
         return getLiveReviews(productId);
@@ -844,47 +643,21 @@ export const fetchLiveReviews = async (productId?: string): Promise<CustomerRevi
 };
 
 export const getLiveReviews = (productId?: string): CustomerReviewItem[] => {
-  if (typeof window !== 'undefined') {
-    try {
-      const deleted = localStorage.getItem('awesome_deleted_reviews') || localStorage.getItem('aaramly_deleted_reviews');
-      if (deleted) {
-        const parsedDel = JSON.parse(deleted);
-        if (Array.isArray(parsedDel)) {
-          parsedDel.forEach((id: string) => deletedReviewIds.add(String(id)));
-        }
-      }
-
-      const stored = localStorage.getItem('awesome_admin_reviews') || localStorage.getItem('aaramly_admin_reviews');
-      if (stored !== null) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          liveReviews = parsed.filter((r) => !deletedReviewIds.has(String(r.id)));
-        }
-      } else {
-        liveReviews = [];
-      }
-    } catch (e) {
-      liveReviews = [];
-    }
-  } else {
-    liveReviews = [];
-  }
-
   if (productId) {
-    const prodRev = liveReviews.filter((r) => String(r.productId) === String(productId) && !deletedReviewIds.has(String(r.id)));
-    return prodRev;
+    return liveReviews.filter((r) => String(r.productId) === String(productId));
   }
-  return liveReviews.filter((r) => !deletedReviewIds.has(String(r.id)));
+  return liveReviews;
 };
 
 if (typeof window !== 'undefined') {
   const handleLiveReviewSync = () => {
-    getLiveReviews();
-    notifyReviewListeners();
-    notifyListeners();
+    fetchLiveReviews();
   };
+  try {
+    const revBc = new BroadcastChannel('awesome_review_sync');
+    revBc.onmessage = handleLiveReviewSync;
+  } catch (e) {}
   window.addEventListener("awesome_review_sync", handleLiveReviewSync);
-  window.addEventListener("aaramly_review_sync", handleLiveReviewSync);
 }
 
 export const addCustomerReview = async (review: Omit<CustomerReviewItem, 'id' | 'date'> & { id?: string; date?: string }) => {
@@ -904,17 +677,7 @@ export const addCustomerReview = async (review: Omit<CustomerReviewItem, 'id' | 
   };
 
   const existing = getLiveReviews();
-  const updated = [newRev, ...existing.filter((r) => r.id !== newRev.id)];
-  liveReviews = updated;
-
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem('awesome_admin_reviews', JSON.stringify(updated));
-      await idbSet('awesome_admin_reviews', updated);
-      window.dispatchEvent(new Event('awesome_review_sync'));
-      window.dispatchEvent(new Event('aaramly_review_sync'));
-    } catch (e) {}
-  }
+  liveReviews = [newRev, ...existing.filter((r) => r.id !== newRev.id)];
 
   // Also attach to the live product
   const prod = liveProducts.find((p) => String(p.id) === String(review.productId));
@@ -929,7 +692,7 @@ export const addCustomerReview = async (review: Omit<CustomerReviewItem, 'id' | 
 
   notifyReviewListeners();
 
-  // Call Server API to persist review in MySQL / Server Store
+  // Call Server API to persist review directly in MySQL
   try {
     const res = await fetch(`${API_BASE_URL}/reviews`, {
       method: 'POST',
@@ -938,30 +701,23 @@ export const addCustomerReview = async (review: Omit<CustomerReviewItem, 'id' | 
     });
     if (res.ok) {
       const json = await res.json();
+      try {
+        const revBc = new BroadcastChannel('awesome_review_sync');
+        revBc.postMessage({ type: 'SYNC' });
+      } catch (e) {}
       if (json.data) {
         return json.data;
       }
     }
   } catch (err) {
-    console.warn('Backend reviews API offline; review preserved in local live store.');
+    console.warn('Backend reviews API offline.');
   }
 
   return newRev;
 };
 
 export const deleteCustomerReview = async (reviewId: string) => {
-  const existing = getLiveReviews();
-  const updated = existing.filter((r) => r.id !== reviewId);
-  liveReviews = updated;
-
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem('awesome_admin_reviews', JSON.stringify(updated));
-      await idbSet('awesome_admin_reviews', updated);
-      window.dispatchEvent(new Event('awesome_review_sync'));
-      window.dispatchEvent(new Event('aaramly_review_sync'));
-    } catch (e) {}
-  }
+  liveReviews = liveReviews.filter((r) => r.id !== reviewId);
 
   // Also remove from live product reviews
   liveProducts.forEach((prod) => {
@@ -983,37 +739,29 @@ export const deleteCustomerReview = async (reviewId: string) => {
     await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
       method: 'DELETE',
     });
+    try {
+      const revBc = new BroadcastChannel('awesome_review_sync');
+      revBc.postMessage({ type: 'SYNC' });
+    } catch (e) {}
   } catch (err) {}
 };
 
-
 export const getLiveProductsList = () => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('awesome_deleted_products') || localStorage.getItem('aaramly_deleted_products');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) parsed.forEach((id) => deletedProductIds.add(String(id)));
-      }
-    } catch (e) {}
-  }
-
   const map = new Map<string, any>();
   if (Array.isArray(liveProducts)) {
     liveProducts.forEach((p) => {
       if (p && p.id !== undefined && p.id !== null) {
-        if (!deletedProductIds.has(String(p.id))) {
-          map.set(String(p.id), p);
-        }
+        map.set(String(p.id), p);
       }
     });
   }
-  return Array.from(map.values()).filter((p) => !deletedProductIds.has(String(p.id)));
+  return Array.from(map.values());
 };
 
 // DYNAMIC FILTER STORE
 const DEFAULT_FILTER_CONFIG = {
-  categories: [] as Array<{ name: string; key: string; count: number }>,
+  categories: [] as any[],
+  subcategories: [] as any[],
   colors: [
     { name: 'Maroon', hex: '#520618' },
     { name: 'Royal Gold', hex: '#C89B3C' },
@@ -1021,23 +769,23 @@ const DEFAULT_FILTER_CONFIG = {
     { name: 'Peacock Blue', hex: '#004F7A' },
     { name: 'Blush Pink', hex: '#E1306C' },
     { name: 'Pure White', hex: '#FFFFFF' },
+    { name: 'Jet Black', hex: '#000000' },
   ],
-  sizes: ['Free Size', 'Standard', '2-3 Y', '4-5 Y', '6-7 Y', '8-9 Y', '10-12 Y', 'XS', 'S', 'M', 'L', 'XL'],
+  sizes: ['Free Size', 'Standard Pair', 'S', 'M', 'L', 'XL', 'Kids (2-4 Yrs)', 'Kids (5-8 Yrs)'],
+  minPrice: 0,
   maxPrice: 3000,
+  ratings: [5, 4, 3, 2, 1],
 };
 
-let liveFilterData = { ...DEFAULT_FILTER_CONFIG };
+let liveFilterData: any = { ...DEFAULT_FILTER_CONFIG };
 
 export const fetchLiveFilters = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/filters`);
+    const res = await fetch(`${API_BASE_URL}/filters`, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       if (json.data) {
         liveFilterData = json.data;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('awesome_dynamic_filters', JSON.stringify(json.data));
-        }
         filterListeners.forEach((fn) => fn());
         return liveFilterData;
       }
@@ -1273,12 +1021,22 @@ export const getLiveFilters = () => {
     values: Array.from(valSet),
   }));
 
+  const mergedSizes = Array.from(
+    new Set([
+      ...dynamicSizes,
+      ...(Array.isArray(liveFilterData?.sizes) ? liveFilterData.sizes : DEFAULT_FILTER_CONFIG.sizes),
+    ])
+  );
+
   return {
-    categories: liveCats,
-    colors: dynamicColors.length > 0 ? dynamicColors : DEFAULT_FILTER_CONFIG.colors,
-    sizes: dynamicSizes.length > 0 ? dynamicSizes : DEFAULT_FILTER_CONFIG.sizes,
+    categories: liveCats.length > 0 ? liveCats : (liveFilterData?.categories || []),
+    subcategories: Array.isArray(liveFilterData?.subcategories) ? liveFilterData.subcategories : [],
+    colors: dynamicColors.length > 0 ? dynamicColors : (liveFilterData?.colors || DEFAULT_FILTER_CONFIG.colors),
+    sizes: mergedSizes.length > 0 ? mergedSizes : DEFAULT_FILTER_CONFIG.sizes,
     attributes: dynamicAttributes,
+    minPrice: liveFilterData?.minPrice !== undefined ? liveFilterData.minPrice : 0,
     maxPrice: dynamicMaxPrice,
+    ratings: [5, 4, 3, 2, 1],
   };
 };
 
@@ -1288,60 +1046,45 @@ export const subscribeToFilterStore = (listener: () => void) => {
   filterListeners.add(listener);
 
   let broadcastChannel: BroadcastChannel | null = null;
-  let legacyChannel: BroadcastChannel | null = null;
   if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-    broadcastChannel = new BroadcastChannel('awesome_filter_sync');
-    broadcastChannel.onmessage = () => {
-      filterListeners.forEach((fn) => fn());
-    };
-    legacyChannel = new BroadcastChannel('aaramly_filter_sync');
-    legacyChannel.onmessage = () => {
-      filterListeners.forEach((fn) => fn());
-    };
-  }
-
-  const handleStorageChange = (e: StorageEvent) => {
-    if (e.key === 'awesome_dynamic_filters' || e.key === 'aaramly_dynamic_filters') {
-      filterListeners.forEach((fn) => fn());
-    }
-  };
-
-  if (typeof window !== 'undefined') {
-    window.addEventListener('storage', handleStorageChange);
+    try {
+      broadcastChannel = new BroadcastChannel('awesome_filter_sync');
+      broadcastChannel.onmessage = () => {
+        fetchLiveFilters();
+        filterListeners.forEach((fn) => fn());
+      };
+    } catch (e) {}
   }
 
   return () => {
     filterListeners.delete(listener);
     if (broadcastChannel) broadcastChannel.close();
-    if (legacyChannel) legacyChannel.close();
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('storage', handleStorageChange);
-    }
   };
 };
 
 // CATEGORIES STORE & ADMIN SYNC
 const categoryListeners = new Set<() => void>();
 let liveCategoryData: any[] = [];
+let isCategoryFetchInitiated = false;
 
 export const subscribeToCategoriesStore = (listener: () => void) => {
   categoryListeners.add(listener);
 
-  let broadcastChannel: BroadcastChannel | null = null;
-  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-    broadcastChannel = new BroadcastChannel('awesome_category_sync');
-    broadcastChannel.onmessage = () => {
-      fetchLiveCategories();
-      categoryListeners.forEach((fn) => fn());
-    };
+  if (!isCategoryFetchInitiated) {
+    isCategoryFetchInitiated = true;
+    fetchLiveCategories();
   }
 
-  const handleStorageChange = (e: StorageEvent) => {
-    if (e.key === 'awesome_categories' || e.key === 'aocind_categories') {
-      fetchLiveCategories();
-      categoryListeners.forEach((fn) => fn());
-    }
-  };
+  let broadcastChannel: BroadcastChannel | null = null;
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      broadcastChannel = new BroadcastChannel('awesome_category_sync');
+      broadcastChannel.onmessage = () => {
+        fetchLiveCategories();
+        categoryListeners.forEach((fn) => fn());
+      };
+    } catch (e) {}
+  }
 
   const handleCustomEvent = () => {
     fetchLiveCategories();
@@ -1349,25 +1092,21 @@ export const subscribeToCategoriesStore = (listener: () => void) => {
   };
 
   if (typeof window !== 'undefined') {
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('awesome_category_sync', handleCustomEvent);
-    window.addEventListener('aocind_category_sync', handleCustomEvent);
   }
 
   return () => {
     categoryListeners.delete(listener);
     if (broadcastChannel) broadcastChannel.close();
     if (typeof window !== 'undefined') {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('awesome_category_sync', handleCustomEvent);
-      window.removeEventListener('aocind_category_sync', handleCustomEvent);
     }
   };
 };
 
 export const fetchLiveCategories = async (): Promise<any[]> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/taxonomies/categories`);
+    const res = await fetch(`${API_BASE_URL}/taxonomies/categories`, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       if (json?.data && Array.isArray(json.data.categories)) {
@@ -1387,15 +1126,12 @@ export const fetchLiveCategories = async (): Promise<any[]> => {
             })) : (cat.subs || [])
           };
         });
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('awesome_categories', JSON.stringify(liveCategoryData));
-        }
         categoryListeners.forEach((fn) => fn());
         return getLiveCategories();
       }
     }
   } catch (e) {
-    // console.warn("Express server taxonomy API offline, serving local categories.");
+    // Express server taxonomy API offline
   }
   return getLiveCategories();
 };
@@ -1404,7 +1140,7 @@ export const getLiveCategories = () => {
   const liveProds = getLiveProductsList();
   let baseCategories: any[] = [];
 
-  // 1. Strictly prefer memory store from Express API
+  // Strictly dynamic from Express API liveCategoryData
   if (Array.isArray(liveCategoryData) && liveCategoryData.length > 0) {
     const activeParents = liveCategoryData.filter((c: any) => c.type !== 'sub' && c.isActive !== false);
     baseCategories = activeParents.map((ac: any) => ({
@@ -1414,35 +1150,9 @@ export const getLiveCategories = () => {
       image: ac.image || '/images/category/Latkan.webp',
       subs: ac.subs || [],
     }));
-  } else if (typeof window !== 'undefined') {
-    // 2. Check if Admin has custom/updated categories in storage
-    try {
-      const saved = localStorage.getItem('awesome_categories') || localStorage.getItem('aocind_categories');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const adminParents = parsed.filter((c: any) => c.type !== 'sub' && c.isActive !== false);
-          const adminSubs = parsed.filter((c: any) => c.type === 'sub' && c.isActive !== false);
-          baseCategories = adminParents.map((ac: any) => {
-            const mySubs = adminSubs.filter((s: any) => s.parentId === ac.id || s.parentName === ac.name || s.categoryName === ac.name);
-            return {
-              id: ac.id,
-              name: ac.name,
-              slug: ac.slug || ac.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-              image: ac.image || '/images/category/Latkan.webp',
-              subs: mySubs.length > 0 ? mySubs.map((s: any) => ({
-                name: s.name,
-                slug: s.slug || s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-              })) : (ac.subs || []),
-            };
-          });
-        }
-      }
-    } catch (e) {}
   }
 
-
-  // 4. Dynamic product count per category
+  // Dynamic product count per category
   const countMap = new Map<string, number>();
   liveProds.forEach((p) => {
     if (p && p.category) {
@@ -1607,30 +1317,12 @@ export const subscribeToPromoBanner = (listener: () => void) => {
 };
 
 export const fetchLiveHeroSlides = async (): Promise<LiveHeroSlide[]> => {
-  // 1. Try IndexedDB first
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = await idbGet<LiveHeroSlide[]>('awesome_hero_slides');
-      if (Array.isArray(stored) && stored.length > 0) {
-        liveHeroSlides = stored.filter((s: any) => s.status !== 'Inactive');
-        heroListeners.forEach((fn) => fn());
-      }
-    } catch (e) {}
-  }
-
-  // 2. Fetch from Express backend API
   try {
-    const res = await fetch(`${API_BASE_URL}/content/hero-slides`);
+    const res = await fetch(`${API_BASE_URL}/content/hero-slides`, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       if (Array.isArray(json.data) && json.data.length > 0) {
         liveHeroSlides = json.data.filter((s: any) => s.status !== 'Inactive');
-        if (typeof window !== 'undefined') {
-          await idbSet('awesome_hero_slides', json.data);
-          try {
-            localStorage.setItem('awesome_hero_slides', JSON.stringify(liveHeroSlides));
-          } catch (e) {}
-        }
         heroListeners.forEach(fn => fn());
         return liveHeroSlides;
       }
@@ -1640,45 +1332,16 @@ export const fetchLiveHeroSlides = async (): Promise<LiveHeroSlide[]> => {
 };
 
 export const getLiveHeroSlides = (): LiveHeroSlide[] => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('awesome_hero_slides') || localStorage.getItem('aocind_hero_slides');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((s: any) => s.status !== 'Inactive');
-        }
-      }
-    } catch (e) {}
-  }
   return liveHeroSlides.filter((s) => s.status !== 'Inactive');
 };
 
 export const fetchLivePromoBanner = async (): Promise<LivePromoBanner> => {
-  // 1. Try IndexedDB first
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = await idbGet<LivePromoBanner>('awesome_promo_banner');
-      if (stored && (stored.image || stored.title)) {
-        livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...stored };
-        bannerListeners.forEach((fn) => fn());
-      }
-    } catch (e) {}
-  }
-
-  // 2. Fetch from Express backend API
   try {
-    const res = await fetch(`${API_BASE_URL}/content/promo-banner`);
+    const res = await fetch(`${API_BASE_URL}/content/promo-banner`, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       if (json.data && (json.data.image || json.data.title)) {
         livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...json.data };
-        if (typeof window !== 'undefined') {
-          await idbSet('awesome_promo_banner', json.data);
-          try {
-            localStorage.setItem('awesome_promo_banner', JSON.stringify(livePromoBanner));
-          } catch (e) {}
-        }
         bannerListeners.forEach(fn => fn());
         return livePromoBanner;
       }
@@ -1688,75 +1351,34 @@ export const fetchLivePromoBanner = async (): Promise<LivePromoBanner> => {
 };
 
 export const getLivePromoBanner = (): LivePromoBanner => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('awesome_promo_banner') || localStorage.getItem('aocind_promo_banner');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed) {
-          return { ...DEFAULT_LIVE_PROMO_BANNER, ...parsed };
-        }
-      }
-    } catch (e) {}
-  }
   return livePromoBanner;
 };
 
 // Global real-time content sync listener
 if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'awesome_hero_slides' || e.key === 'aocind_hero_slides') {
-      try {
-        if (e.newValue) {
-          liveHeroSlides = JSON.parse(e.newValue);
-          heroListeners.forEach(fn => fn());
-        }
-      } catch (err) {}
-    }
-    if (e.key === 'awesome_promo_banner' || e.key === 'aocind_promo_banner') {
-      try {
-        if (e.newValue) {
-          livePromoBanner = JSON.parse(e.newValue);
-          bannerListeners.forEach(fn => fn());
-        }
-      } catch (err) {}
-    }
-  });
-
   if ('BroadcastChannel' in window) {
     try {
       const contentBc = new BroadcastChannel('awesome_content_sync');
       contentBc.onmessage = (msg) => {
-        if (msg.data?.type === 'HERO_UPDATED' && Array.isArray(msg.data.slides)) {
-          liveHeroSlides = msg.data.slides.filter((s: any) => s.status !== 'Inactive');
-          idbSet('awesome_hero_slides', msg.data.slides);
-          try { localStorage.setItem('awesome_hero_slides', JSON.stringify(liveHeroSlides)); } catch (e) {}
-          heroListeners.forEach(fn => fn());
+        if (msg.data?.type === 'HERO_UPDATED') {
+          if (Array.isArray(msg.data.slides)) {
+            liveHeroSlides = msg.data.slides.filter((s: any) => s.status !== 'Inactive');
+            heroListeners.forEach(fn => fn());
+          } else {
+            fetchLiveHeroSlides();
+          }
         }
-        if (msg.data?.type === 'BANNER_UPDATED' && msg.data.banner) {
-          livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...msg.data.banner };
-          idbSet('awesome_promo_banner', msg.data.banner);
-          try { localStorage.setItem('awesome_promo_banner', JSON.stringify(livePromoBanner)); } catch (e) {}
-          bannerListeners.forEach(fn => fn());
+        if (msg.data?.type === 'BANNER_UPDATED') {
+          if (msg.data.banner) {
+            livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...msg.data.banner };
+            bannerListeners.forEach(fn => fn());
+          } else {
+            fetchLivePromoBanner();
+          }
         }
       };
     } catch (e) {}
   }
-
-  // Load from IndexedDB on startup (supports full base64 images of any size)
-  idbGet<LiveHeroSlide[]>('awesome_hero_slides').then((stored) => {
-    if (Array.isArray(stored) && stored.length > 0) {
-      liveHeroSlides = stored.filter((s: any) => s.status !== 'Inactive');
-      heroListeners.forEach(fn => fn());
-    }
-  }).catch(() => {});
-
-  idbGet<LivePromoBanner>('awesome_promo_banner').then((stored) => {
-    if (stored && (stored.image || stored.title)) {
-      livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...stored };
-      bannerListeners.forEach(fn => fn());
-    }
-  }).catch(() => {});
 }
 
 // Trigger initial fetch once
@@ -1765,6 +1387,7 @@ fetchLiveFilters();
 fetchLiveCategories();
 fetchLiveHeroSlides();
 fetchLivePromoBanner();
+fetchLiveReviews();
 
 // Event-driven real-time refresh on window focus
 if (typeof window !== 'undefined') {
@@ -1773,6 +1396,7 @@ if (typeof window !== 'undefined') {
     fetchLiveCategories();
     fetchLiveHeroSlides();
     fetchLivePromoBanner();
+    fetchLiveReviews();
   });
 }
 

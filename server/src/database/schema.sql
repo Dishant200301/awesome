@@ -3,13 +3,20 @@
 -- Engine: InnoDB | Character Set: utf8mb4_unicode_ci
 -- =========================================================
 
+CREATE DATABASE IF NOT EXISTS awesome CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE awesome;
+
 -- 1. CATEGORIES
 CREATE TABLE IF NOT EXISTS categories (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
-    image_url VARCHAR(512),
+    image_url LONGTEXT,
+    banner_image LONGTEXT,
+    meta_title VARCHAR(500),
+    meta_description TEXT,
+    meta_keywords TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -17,12 +24,16 @@ CREATE TABLE IF NOT EXISTS categories (
 
 -- 2. SUB CATEGORIES
 CREATE TABLE IF NOT EXISTS sub_categories (
-    id VARCHAR(36) PRIMARY KEY,
-    category_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    category_id VARCHAR(64) NOT NULL,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
-    image_url VARCHAR(512),
+    image_url LONGTEXT,
+    banner_image LONGTEXT,
+    meta_title VARCHAR(500),
+    meta_description TEXT,
+    meta_keywords TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -31,17 +42,17 @@ CREATE TABLE IF NOT EXISTS sub_categories (
 
 -- 3. BRANDS
 CREATE TABLE IF NOT EXISTS brands (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
-    logo_url VARCHAR(512),
+    logo_url LONGTEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- 4. COLLECTIONS
 CREATE TABLE IF NOT EXISTS collections (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -50,22 +61,23 @@ CREATE TABLE IF NOT EXISTS collections (
 
 -- 5. TAGS
 CREATE TABLE IF NOT EXISTS tags (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     slug VARCHAR(100) NOT NULL UNIQUE
 ) ENGINE=InnoDB;
 
 -- 6. PRODUCTS
 CREATE TABLE IF NOT EXISTS products (
-    id VARCHAR(36) PRIMARY KEY,
-    brand_id VARCHAR(36),
-    category_id VARCHAR(36),
+    id VARCHAR(64) PRIMARY KEY,
+    brand_id VARCHAR(64),
+    category_id VARCHAR(64),
+    subcategory_id VARCHAR(64),
     name VARCHAR(255) NOT NULL,
-    subtitle VARCHAR(255),
+    subtitle TEXT,
     slug VARCHAR(255) NOT NULL UNIQUE,
-    product_type VARCHAR(50) NOT NULL DEFAULT 'variable', -- simple, variable
+    product_type VARCHAR(50) NOT NULL DEFAULT 'variable',
     short_description TEXT,
-    full_description TEXT,
+    full_description LONGTEXT,
     price DECIMAL(10, 2) NOT NULL,
     original_price DECIMAL(10, 2) NOT NULL,
     cost_price DECIMAL(10, 2),
@@ -75,23 +87,24 @@ CREATE TABLE IF NOT EXISTS products (
     stock INT DEFAULT 50,
     default_sku VARCHAR(100) NOT NULL UNIQUE,
     barcode VARCHAR(100),
-    image_url VARCHAR(512) NOT NULL,
+    image_url LONGTEXT NOT NULL,
     is_featured BOOLEAN DEFAULT FALSE,
     is_trending BOOLEAN DEFAULT FALSE,
     is_new_arrival BOOLEAN DEFAULT FALSE,
     is_best_seller BOOLEAN DEFAULT FALSE,
     is_on_sale BOOLEAN DEFAULT FALSE,
-    is_published BOOLEAN DEFAULT TRUE, -- CHECKBOX RULE: Visible on client website when TRUE, Admin only when FALSE
-    status VARCHAR(50) DEFAULT 'Published', -- Draft, Published, Hidden
+    is_published BOOLEAN DEFAULT TRUE,
+    status VARCHAR(50) DEFAULT 'Published',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE SET NULL,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (subcategory_id) REFERENCES sub_categories(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- 7. ATTRIBUTES MASTER (Product & Variant Attribute Templates)
 CREATE TABLE IF NOT EXISTS attributes (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     slug VARCHAR(100) NOT NULL UNIQUE,
     type VARCHAR(50) NOT NULL DEFAULT 'text',
@@ -106,8 +119,8 @@ CREATE TABLE IF NOT EXISTS attributes (
 
 -- 8. ATTRIBUTE OPTIONS (Values for Select / Multi Select / Swatch)
 CREATE TABLE IF NOT EXISTS attribute_options (
-    id VARCHAR(36) PRIMARY KEY,
-    attribute_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    attribute_id VARCHAR(64) NOT NULL,
     label VARCHAR(255) NOT NULL,
     value VARCHAR(255) NOT NULL,
     hex_code VARCHAR(10),
@@ -120,9 +133,9 @@ CREATE TABLE IF NOT EXISTS attribute_options (
 
 -- 8b. PRODUCT ATTRIBUTE VALUES (Product Specific Assigned Attributes)
 CREATE TABLE IF NOT EXISTS product_attribute_values (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
-    attribute_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
+    attribute_id VARCHAR(64) NOT NULL,
     value TEXT NOT NULL,
     display_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -133,8 +146,8 @@ CREATE TABLE IF NOT EXISTS product_attribute_values (
 
 -- 9. PRODUCT VARIANTS
 CREATE TABLE IF NOT EXISTS product_variants (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
     sku VARCHAR(100) NOT NULL UNIQUE,
     barcode VARCHAR(100),
     color_name VARCHAR(100),
@@ -145,7 +158,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
     cost_price DECIMAL(10, 2),
     stock INT NOT NULL DEFAULT 0,
     weight DECIMAL(8, 2),
-    thumbnail_url VARCHAR(512),
+    thumbnail_url LONGTEXT,
     status VARCHAR(50) DEFAULT 'Active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -153,10 +166,10 @@ CREATE TABLE IF NOT EXISTS product_variants (
 
 -- 10. PRODUCT IMAGES
 CREATE TABLE IF NOT EXISTS product_images (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
-    variant_id VARCHAR(36),
-    image_url VARCHAR(512) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
+    variant_id VARCHAR(64),
+    image_url LONGTEXT NOT NULL,
     alt_text VARCHAR(255),
     display_order INT DEFAULT 0,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
@@ -165,8 +178,8 @@ CREATE TABLE IF NOT EXISTS product_images (
 
 -- 11. INVENTORY WAREHOUSE LOGS
 CREATE TABLE IF NOT EXISTS inventory (
-    id VARCHAR(36) PRIMARY KEY,
-    variant_id VARCHAR(36) NOT NULL UNIQUE,
+    id VARCHAR(64) PRIMARY KEY,
+    variant_id VARCHAR(64) NOT NULL UNIQUE,
     warehouse_code VARCHAR(50) DEFAULT 'MAIN-WH-01',
     quantity INT NOT NULL DEFAULT 0,
     reserved_quantity INT NOT NULL DEFAULT 0,
@@ -178,38 +191,37 @@ CREATE TABLE IF NOT EXISTS inventory (
 
 -- 12. CONTACT MESSAGES
 CREATE TABLE IF NOT EXISTS contact_messages (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
     subject VARCHAR(255),
     message TEXT NOT NULL,
-    status VARCHAR(50) DEFAULT 'New', -- New, Read, Replied
+    status VARCHAR(50) DEFAULT 'New',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- 12b. PRODUCT REVIEWS
 CREATE TABLE IF NOT EXISTS reviews (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
     product_name VARCHAR(255),
-    product_image VARCHAR(512),
+    product_image LONGTEXT,
     author VARCHAR(255) NOT NULL,
     email VARCHAR(255),
     rating INT NOT NULL DEFAULT 5,
     comment TEXT NOT NULL,
     date VARCHAR(50),
     verified BOOLEAN DEFAULT TRUE,
-    status VARCHAR(50) DEFAULT 'Approved', -- Approved, Pending, Rejected
+    status VARCHAR(50) DEFAULT 'Approved',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-
 -- 13. CUSTOMERS
 CREATE TABLE IF NOT EXISTS customers (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100),
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -221,9 +233,9 @@ CREATE TABLE IF NOT EXISTS customers (
 
 -- 14. ORDERS
 CREATE TABLE IF NOT EXISTS orders (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL UNIQUE,
-    customer_id VARCHAR(36),
+    customer_id VARCHAR(64),
     status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     total_amount DECIMAL(10, 2) NOT NULL,
     payment_gateway VARCHAR(50) DEFAULT 'Razorpay',
@@ -234,7 +246,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- 15. ADMINS
 CREATE TABLE IF NOT EXISTS admins (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
@@ -245,40 +257,40 @@ CREATE TABLE IF NOT EXISTS admins (
 
 -- 16. PRODUCT COLORS
 CREATE TABLE IF NOT EXISTS product_colors (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
     color_name VARCHAR(100) NOT NULL,
     color_hex VARCHAR(10) NOT NULL,
-    display_image VARCHAR(512),
-    main_image VARCHAR(512),
+    display_image LONGTEXT,
+    main_image LONGTEXT,
     display_order INT DEFAULT 0,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- 17. PRODUCT COLOR GALLERY IMAGES
 CREATE TABLE IF NOT EXISTS product_color_images (
-    id VARCHAR(36) PRIMARY KEY,
-    color_id VARCHAR(36) NOT NULL,
-    image_url VARCHAR(512) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    color_id VARCHAR(64) NOT NULL,
+    image_url LONGTEXT NOT NULL,
     display_order INT DEFAULT 0,
     FOREIGN KEY (color_id) REFERENCES product_colors(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- 18. PRODUCT DESCRIPTION CARDS
 CREATE TABLE IF NOT EXISTS product_description_cards (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    image_url VARCHAR(512),
+    image_url LONGTEXT,
     sort_order INT DEFAULT 0,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- 19. PRODUCT HIGHLIGHTS
 CREATE TABLE IF NOT EXISTS product_highlights (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
     title VARCHAR(255) NOT NULL,
     value VARCHAR(255) NOT NULL,
     icon_name VARCHAR(100) DEFAULT 'Sparkles',
@@ -288,8 +300,8 @@ CREATE TABLE IF NOT EXISTS product_highlights (
 
 -- 20. PRODUCT WASHING INSTRUCTIONS
 CREATE TABLE IF NOT EXISTS product_washing_instructions (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
     title VARCHAR(255) NOT NULL,
     description VARCHAR(255),
     icon_name VARCHAR(100) DEFAULT 'Droplets',
@@ -299,8 +311,8 @@ CREATE TABLE IF NOT EXISTS product_washing_instructions (
 
 -- 21. PRODUCT MANUFACTURING DETAILS
 CREATE TABLE IF NOT EXISTS product_manufacturing_details (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL UNIQUE,
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL UNIQUE,
     manufacturer VARCHAR(255),
     address VARCHAR(512),
     packed_by VARCHAR(255),
@@ -314,7 +326,7 @@ CREATE TABLE IF NOT EXISTS product_manufacturing_details (
 
 -- 22. SIZE GUIDES
 CREATE TABLE IF NOT EXISTS size_guides (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(64) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -323,18 +335,18 @@ CREATE TABLE IF NOT EXISTS size_guides (
 
 -- 23. SIZE GUIDE CATEGORY MAPPINGS
 CREATE TABLE IF NOT EXISTS size_guide_mappings (
-    id VARCHAR(36) PRIMARY KEY,
-    size_guide_id VARCHAR(36) NOT NULL,
-    category_id VARCHAR(36),
-    sub_category_id VARCHAR(36),
+    id VARCHAR(64) PRIMARY KEY,
+    size_guide_id VARCHAR(64) NOT NULL,
+    category_id VARCHAR(64),
+    sub_category_id VARCHAR(64),
     FOREIGN KEY (size_guide_id) REFERENCES size_guides(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- 24. CART ITEMS
 CREATE TABLE IF NOT EXISTS cart_items (
-    id VARCHAR(36) PRIMARY KEY,
-    customer_id VARCHAR(36) NOT NULL,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    customer_id VARCHAR(64) NOT NULL,
+    product_id VARCHAR(64) NOT NULL,
     color_name VARCHAR(100),
     size VARCHAR(50),
     quantity INT NOT NULL DEFAULT 1,
@@ -346,24 +358,84 @@ CREATE TABLE IF NOT EXISTS cart_items (
 
 -- 25. WISHLIST ITEMS
 CREATE TABLE IF NOT EXISTS wishlist_items (
-    id VARCHAR(36) PRIMARY KEY,
-    customer_id VARCHAR(36) NOT NULL,
-    product_id VARCHAR(36) NOT NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    customer_id VARCHAR(64) NOT NULL,
+    product_id VARCHAR(64) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- 26. HERO SLIDES
+CREATE TABLE IF NOT EXISTS hero_slides (
+    id VARCHAR(64) PRIMARY KEY,
+    tag VARCHAR(255),
+    title VARCHAR(255) NOT NULL,
+    subtitle TEXT,
+    image LONGTEXT NOT NULL,
+    mobile_image LONGTEXT,
+    button_text VARCHAR(100),
+    link VARCHAR(500),
+    theme VARCHAR(50) DEFAULT 'gold',
+    align VARCHAR(50) DEFAULT 'left',
+    status VARCHAR(50) DEFAULT 'Active',
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 27. PROMO BANNERS
+CREATE TABLE IF NOT EXISTS promo_banners (
+    id VARCHAR(64) PRIMARY KEY,
+    tagline VARCHAR(255),
+    title VARCHAR(255) NOT NULL,
+    subtitle TEXT,
+    badge_text VARCHAR(100),
+    button_text VARCHAR(100),
+    button_link VARCHAR(500),
+    image_url LONGTEXT,
+    mobile_image_url LONGTEXT,
+    bg_color VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
 -- =========================================================
--- INITIAL SEED DATA
+-- INITIAL SEED DATA (Awesome Handmade Categories)
 -- =========================================================
 
-INSERT IGNORE INTO categories (id, name, slug, description) VALUES
-('cat-1', 'Bralettes', 'bralettes', 'Seamless wirefree padded bralettes'),
-('cat-2', 'Everyday Bras', 'everyday-bras', 'Contour everyday wirefree bras'),
-('cat-3', 'Accessories', 'accessories', 'Silicone nipple covers & bra extenders');
+INSERT IGNORE INTO categories (id, name, slug, image_url, description, is_active) VALUES
+('cat-1', 'Gift Hamper', 'gift-hamper', '/images/category/Gift Hamper.webp', 'Handmade customized gift hampers for every occasion', TRUE),
+('cat-2', 'Choli', 'choli', '/images/category/Choli.webp', 'Traditional handcrafted cholis and festive attire', TRUE),
+('cat-3', 'Krishna Outfit', 'krishna-outfit', '/images/category/Krishna outfit.webp', 'Divine poshak and accessories for Bal Gopal / Krishna', TRUE),
+('cat-4', 'Necklace', 'necklace', '/images/category/Necklace.webp', 'Artisan mirror and thread work necklace sets', TRUE),
+('cat-5', 'Latkan', 'latkan', '/images/category/Latkan.webp', 'Bridal, blouse, mirror & fabric latkans', TRUE),
+('cat-6', 'Tassel', 'tassel', '/images/category/Tassel.webp', 'Handcrafted tassels for dresses and dupattas', TRUE),
+('cat-7', 'Hair Accessories', 'hair-accessories', '/images/category/Hair_Accessories.webp', 'Handmade hair bows, clips, and bands', TRUE),
+('cat-8', 'Watch', 'watch', '/images/category/Watch.webp', 'Artistic traditional and kids watches', TRUE),
+('cat-9', 'Bracelet', 'bracelet', '/images/category/Bracelet.webp', 'Handwoven threads and charming beaded bracelets', TRUE),
+('cat-10', 'Waist Belt', 'waist-belt', '/images/category/Waist Belt.webp', 'Embroidered & mirror work waist belts (kamarbandh)', TRUE),
+('cat-11', 'Earrings', 'earrings', '/images/category/Earrings.webp', 'Mirror work, hoop and traditional festive earrings', TRUE),
+('cat-12', 'Anklet', 'anklet', '/images/category/Anklet.webp', 'Handmade thread, bead and ghungroo payals', TRUE);
 
-INSERT IGNORE INTO products (id, name, subtitle, slug, product_type, price, original_price, discount_percentage, default_sku, image_url, category_id, is_published, status) VALUES
-('prod-1', "Women's Seamless Padded Bralette", 'Ultra-soft 4-way stretch wire-free contour bra', 'womens-seamless-padded-bralette', 'variable', 799.00, 1299.00, 38, 'AAR-BR-BLK-S', 'https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=600', 'cat-1', TRUE, 'Published'),
-('prod-2', "Women's Seamless Bra", 'Zero-wire contour support with breathable side wings', 'womens-seamless-bra', 'variable', 899.00, 1499.00, 40, 'AAR-BRA-DNM-34B', 'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?q=80&w=600', 'cat-2', TRUE, 'Published'),
-('prod-3', 'Silicone Nipple Covers', 'Hypoallergenic reusable medical-grade silicone covers', 'silicone-nipple-covers', 'simple', 299.00, 499.00, 40, 'AAR-NC-SIL-FREE', 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=600', 'cat-3', TRUE, 'Published');
+INSERT IGNORE INTO sub_categories (id, category_id, name, slug, description, is_active) VALUES
+('sub-1', 'cat-1', 'Keychain', 'keychain', 'Handcrafted resin, macrame and mirror keychains', TRUE),
+('sub-2', 'cat-2', 'Kids Choli', 'kids-choli', 'Festive Chaniya Choli for kids', TRUE),
+('sub-3', 'cat-2', 'Adult Choli', 'adult-choli', 'Designer Chaniya Choli for adults', TRUE),
+('sub-4', 'cat-4', 'Mirror Necklace', 'mirror-necklace', 'Folk mirror work necklace sets', TRUE),
+('sub-5', 'cat-5', 'Mirror Latkan', 'mirror-latkan', 'Handmade mirror latkans for lehengas and blouses', TRUE),
+('sub-6', 'cat-5', 'Blouse Latkan', 'blouse-latkan', 'Intricate handcrafted latkans for designer blouses', TRUE),
+('sub-7', 'cat-5', 'Mirror Wall Decor', 'mirror-wall-decor', 'Festive wall hangings and door torans', TRUE),
+('sub-8', 'cat-5', 'Fabric Latkan', 'fabric-latkan', 'Cotton & silk fabric tassels and latkans', TRUE),
+('sub-9', 'cat-5', 'Golden Latkan', 'golden-latkan', 'Gota patti and golden zari latkans', TRUE),
+('sub-10', 'cat-5', 'Crochet Latkan', 'crochet-latkan', 'Hand-knitted crochet latkans', TRUE),
+('sub-11', 'cat-6', 'Long Tassels', 'long-tassels', 'Long decorative handcrafted tassels', TRUE),
+('sub-12', 'cat-7', 'Hair Bow', 'hair-bow', 'Satin and fabric hair bows', TRUE),
+('sub-13', 'cat-7', 'Hair Clip', 'hair-clip', 'Beaded and floral hair clips', TRUE),
+('sub-14', 'cat-7', 'Hair Band', 'hair-band', 'Embroidered festive hair bands', TRUE),
+('sub-15', 'cat-8', 'Kids Watch', 'kids-watch', 'Colorful printed kids watches', TRUE),
+('sub-16', 'cat-8', 'Traditional Watch', 'traditional-watch', 'Ethnic bracelet style watches', TRUE),
+('sub-17', 'cat-10', 'Mirror Waist Belt', 'mirror-waist-belt', 'Traditional Kutchi mirror kamarbandh', TRUE),
+('sub-18', 'cat-11', 'Mirror Earrings', 'mirror-earrings', 'Lightweight mirror work earrings', TRUE),
+('sub-19', 'cat-11', 'Hoop Earrings', 'hoop-earrings', 'Thread wrapped hoop earrings', TRUE);

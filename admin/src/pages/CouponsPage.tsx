@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Ticket, Plus, Trash2, Tag, Percent } from 'lucide-react';
+import { Select } from '../components/ui/select';
 
 interface Coupon {
   id: string;
@@ -57,14 +58,17 @@ export const CouponsPage: React.FC = () => {
             className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 focus:outline-none focus:border-rose-500 font-mono font-bold uppercase"
           />
 
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as any)}
-            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-rose-500 font-semibold"
-          >
-            <option value="Percentage">Percentage Discount (%)</option>
-            <option value="Fixed">Fixed Amount (₹)</option>
-          </select>
+          <div className="w-52">
+            <Select
+              value={type}
+              onValueChange={(val) => setType(val as any)}
+              className="rounded-xl font-semibold text-slate-800"
+              options={[
+                { value: 'Percentage', label: 'Percentage Discount (%)' },
+                { value: 'Fixed', label: 'Fixed Amount (₹)' }
+              ]}
+            />
+          </div>
 
           <input
             type="number"

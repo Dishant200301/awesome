@@ -39,20 +39,35 @@ import {
   subscribeToFilterStore,
   getLiveCategories,
   subscribeToCategoriesStore,
+  fetchLiveFilters,
+  fetchLiveCategories,
 } from "@/modules/core/lib/apiStore";
 
-// Comprehensive category & subcategory matching helper
+// Helper to extract clean pure color name without size suffixes (e.g. "Green / S" -> "Green", "Black / XL" -> "Black")
+const extractPureColor = (raw?: string): string => {
+  if (!raw) return "";
+  let clean = raw.trim();
+  if (clean.includes("/")) {
+    clean = clean.split("/")[0].trim();
+  }
+  clean = clean.replace(/\s*\([^)]*\)\s*/g, "").trim();
+  clean = clean.replace(/\s*-\s*(Free\s*Size|[SML]|XL|XXL|2XL|3XL)\b/gi, "").trim();
+  return clean;
+};
+
+// Comprehensive category matching helper
 const matchProductCategory = (prod: any, targetCategory: string): boolean => {
   if (!targetCategory || targetCategory.toLowerCase() === "all") return true;
+  if (!prod) return false;
 
   const clean = (s?: string) => (s || "").toLowerCase().replace(/[-_\s]+/g, "");
   const target = clean(targetCategory);
+  if (!target) return true;
   const targetStem = target.endsWith("s") && target.length > 3 ? target.slice(0, -1) : target;
 
   const cat = clean(prod.category);
   const subcat = clean(prod.subcategory || prod.subCategory);
   const name = clean(prod.name);
-  const desc = clean(prod.shortDescription || prod.subtitle || "");
   const categoriesList = Array.isArray(prod.categories) ? prod.categories.map(clean) : [];
 
   // 1. Direct or stem equality
@@ -61,42 +76,47 @@ const matchProductCategory = (prod: any, targetCategory: string): boolean => {
 
   // 2. Substring matching
   if (cat.includes(targetStem) || subcat.includes(targetStem) || target.includes(cat) || targetStem.includes(cat)) return true;
-  if (name.includes(targetStem) || desc.includes(targetStem)) return true;
 
-  // 3. Domain-specific semantic mappings
+  // 3. Match in product categories array
+  if (categoriesList.some((c: string) => c && (c.includes(targetStem) || targetStem.includes(c)))) return true;
+
+  // 4. Domain-specific semantic mappings
   if (targetStem.includes("latkan") || targetStem.includes("tassel")) {
-    return cat.includes("latkan") || cat.includes("tassel") || subcat.includes("latkan") || subcat.includes("tassel") || name.includes("latkan") || name.includes("tassel");
+    return cat.includes("latkan") || cat.includes("tassel") || subcat.includes("latkan") || subcat.includes("tassel");
   }
   if (targetStem.includes("choli") || targetStem.includes("navratri")) {
-    return cat.includes("choli") || subcat.includes("choli") || name.includes("choli");
+    return cat.includes("choli") || subcat.includes("choli");
   }
   if (targetStem.includes("earring") || targetStem.includes("jhumka")) {
-    return cat.includes("earring") || cat.includes("jhumka") || subcat.includes("earring") || name.includes("earring") || name.includes("jhumka");
+    return cat.includes("earring") || cat.includes("jhumka") || subcat.includes("earring");
   }
   if (targetStem.includes("necklace") || targetStem.includes("haar") || targetStem.includes("mala")) {
-    return cat.includes("necklace") || subcat.includes("necklace") || name.includes("necklace");
+    return cat.includes("necklace") || subcat.includes("necklace");
   }
   if (targetStem.includes("gift") || targetStem.includes("hamper") || targetStem.includes("keychain")) {
-    return cat.includes("gift") || cat.includes("hamper") || cat.includes("keychain") || subcat.includes("gift") || subcat.includes("hamper") || subcat.includes("keychain") || name.includes("gift") || name.includes("hamper") || name.includes("keychain");
+    return cat.includes("gift") || cat.includes("hamper") || cat.includes("keychain") || subcat.includes("gift") || subcat.includes("hamper") || subcat.includes("keychain");
   }
   if (targetStem.includes("hair") || targetStem.includes("bow") || targetStem.includes("clip") || targetStem.includes("band")) {
-    return cat.includes("hair") || subcat.includes("hair") || cat.includes("bow") || cat.includes("clip") || name.includes("hair") || name.includes("bow") || name.includes("clip");
+    return cat.includes("hair") || subcat.includes("hair") || cat.includes("bow") || cat.includes("clip");
   }
   if (targetStem.includes("krishna") || targetStem.includes("poshak") || targetStem.includes("outfit")) {
-    return cat.includes("krishna") || subcat.includes("krishna") || name.includes("krishna") || name.includes("poshak");
+    return cat.includes("krishna") || subcat.includes("krishna");
   }
   if (targetStem.includes("belt") || targetStem.includes("kandora") || targetStem.includes("kamarbandh")) {
-    return cat.includes("belt") || subcat.includes("belt") || name.includes("belt") || name.includes("kamarbandh") || name.includes("kandora");
+    return cat.includes("belt") || cat.includes("kandora") || cat.includes("kamarbandh");
+  }
+  if (targetStem.includes("anklet") || targetStem.includes("payal")) {
+    return cat.includes("anklet") || subcat.includes("anklet") || cat.includes("payal") || subcat.includes("payal");
   }
   if (targetStem.includes("watch")) {
-    return cat.includes("watch") || subcat.includes("watch") || name.includes("watch");
+    return cat.includes("watch") || subcat.includes("watch");
   }
-  if (targetStem.includes("bracelet") || targetStem.includes("anklet") || targetStem.includes("payal")) {
-    return cat.includes("bracelet") || cat.includes("anklet") || cat.includes("payal") || subcat.includes("bracelet") || subcat.includes("anklet") || name.includes("bracelet") || name.includes("anklet");
+  if (targetStem.includes("bracelet")) {
+    return cat.includes("bracelet") || subcat.includes("bracelet");
   }
-  if (targetStem.includes("jewel") || targetStem.includes("ornament")) {
-    return cat.includes("necklace") || cat.includes("earring") || cat.includes("bracelet") || cat.includes("anklet") || cat.includes("ring") || name.includes("jewel");
-  }
+
+  // 5. Fallback check product name if cat is missing or generic
+  if (!cat && (name.includes(targetStem) || targetStem.includes(name))) return true;
 
   return false;
 };
@@ -185,7 +205,8 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
   const pCategory = p.category || "Latkan";
   const pSubcategory = prodAny.subcategory || prodAny.subCategory || "";
   const pRating = Number(p.rating !== undefined && p.rating !== null ? p.rating : 4.8);
-  const pSales = p.salesCount ?? prodAny.reviewCount ?? 0;
+  const pReviewCount = Number(prodAny.reviewCount || p.reviewCount || (p.salesCount && p.salesCount > 0 ? p.salesCount : 12));
+  const pSales = Number(p.salesCount !== undefined && p.salesCount !== null ? p.salesCount : pReviewCount);
 
   const extractUrl = (val: any): string => {
     if (!val) return "";
@@ -262,6 +283,7 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
             hoverImage: vdGallery[1] || vdMain,
             stock: vdStock,
             rating: pRating,
+            reviewCount: pReviewCount,
             salesCount: pSales,
             sku: vd.sku || `${p.sku || "AOC"}-${pureColor}`,
             slug: pSlug,
@@ -321,6 +343,7 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
             hoverImage: vGallery[1] || vMain,
             stock: vStock,
             rating: pRating,
+            reviewCount: pReviewCount,
             salesCount: pSales,
             sku: v.sku || `${p.sku || "AOC"}-${pureColor}`,
             slug: pSlug,
@@ -372,6 +395,7 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
             hoverImage: cGallery[1] || cMain,
             stock: Number(p.stock) || 25,
             rating: pRating,
+            reviewCount: pReviewCount,
             salesCount: pSales,
             sku: `${p.sku || "AOC"}-${pureColor}`,
             slug: pSlug,
@@ -422,6 +446,7 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
       hoverImage: defaultGals[1] || defaultImg,
       stock: (p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock))) ? Number(p.stock) : 25,
       rating: pRating,
+      reviewCount: pReviewCount,
       salesCount: pSales,
       sku: p.sku || `AOC-${pId}`,
       slug: pSlug,
@@ -455,6 +480,8 @@ export default function ShopPage() {
   const [liveCategoriesList, setLiveCategoriesList] = useState(() => getLiveCategories());
 
   useEffect(() => {
+    fetchLiveFilters();
+    fetchLiveCategories();
     const unsubscribeFilters = subscribeToFilterStore(() => {
       const cfg = getLiveFilters();
       setFilterConfig(cfg);
@@ -769,7 +796,7 @@ export default function ShopPage() {
       );
     }
 
-    // Size Filter (Strict card-level matching)
+    // Size Filter (Card-level matching + product level available sizes)
     if (selectedSizes.length > 0) {
       list = list.filter((item: any) =>
         selectedSizes.some((s) => {
@@ -780,25 +807,24 @@ export default function ShopPage() {
             return true;
           }
 
-          if (!item.isVariantCard) {
-            const p = item.parentProduct || {};
-            const hasAvailSize = (p.availableSizes || []).some(
-              (sz: string) => sz.toLowerCase().trim() === cleanS
-            );
-            const hasVarSize = (p.variations || []).some((v: any) => {
-              const sVal = (v.size || v.sizeName || "").toLowerCase().trim();
-              const parts = (v.colorName || "").toLowerCase().split("/").map((x: string) => x.trim());
-              return sVal === cleanS || (parts.length > 1 && parts[1] === cleanS);
-            });
-            const hasAttrSize = (p.attributes || p.productOptions || []).some(
-              (a: any) =>
-                (a.name || "").toLowerCase().includes("size") &&
-                (a.values || []).some((v: string) => v.toLowerCase().trim() === cleanS)
-            );
-            return hasAvailSize || hasVarSize || hasAttrSize;
-          }
-
-          return false;
+          const p = item.parentProduct || {};
+          const hasAvailSize = (p.availableSizes || p.sizes || []).some(
+            (sz: string) => {
+              const cleanSz = (sz || "").toLowerCase().trim();
+              return cleanSz === cleanS || cleanSz.includes(cleanS) || cleanS.includes(cleanSz);
+            }
+          );
+          const hasVarSize = (p.variations || p.variants || []).some((v: any) => {
+            const sVal = (v.size || v.sizeName || "").toLowerCase().trim();
+            const parts = (v.colorName || "").toLowerCase().split("/").map((x: string) => x.trim());
+            return sVal === cleanS || (parts.length > 1 && parts[1] === cleanS);
+          });
+          const hasAttrSize = (p.attributes || p.productOptions || []).some(
+            (a: any) =>
+              (a.name || "").toLowerCase().includes("size") &&
+              (a.values || []).some((v: string) => v.toLowerCase().trim() === cleanS)
+          );
+          return hasAvailSize || hasVarSize || hasAttrSize;
         })
       );
     }
@@ -843,8 +869,9 @@ export default function ShopPage() {
     // Rating Filter
     if (selectedRatings.length > 0) {
       list = list.filter((item) => {
-        const prodRating = Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8);
-        return selectedRatings.some((r) => prodRating >= r);
+        const r = Number(item.rating !== undefined && item.rating !== null ? item.rating : 4.8);
+        const starLevel = r >= 4.5 ? 5 : r >= 3.5 ? 4 : r >= 2.5 ? 3 : r >= 1.5 ? 2 : 1;
+        return selectedRatings.includes(starLevel);
       });
     }
 
@@ -907,9 +934,13 @@ export default function ShopPage() {
 
   // Live Rating Real Counts
   const ratingCounts = useMemo(() => {
-    const c5 = allShopItems.filter((item) => Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8) >= 5).length;
-    const c4 = allShopItems.filter((item) => Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8) === 4).length;
-    const c3 = allShopItems.filter((item) => Math.floor(item.rating !== undefined && item.rating !== null ? item.rating : 4.8) === 3).length;
+    const getStarLevel = (r: any) => {
+      const val = Number(r !== undefined && r !== null ? r : 4.8);
+      return val >= 4.5 ? 5 : val >= 3.5 ? 4 : val >= 2.5 ? 3 : val >= 1.5 ? 2 : 1;
+    };
+    const c5 = allShopItems.filter((item) => getStarLevel(item.rating) === 5).length;
+    const c4 = allShopItems.filter((item) => getStarLevel(item.rating) === 4).length;
+    const c3 = allShopItems.filter((item) => getStarLevel(item.rating) === 3).length;
     return [
       { stars: 5, count: c5 },
       { stars: 4, count: c4 },
@@ -917,13 +948,13 @@ export default function ShopPage() {
     ];
   }, [allShopItems]);
 
-  // Live Dynamic Colors extracted from current shop products & variants with accurate counts
+  // Live Dynamic Colors extracted from current shop products & variants with accurate counts (only pure color names)
   const availableDynamicColors = useMemo(() => {
     const colorMap = new Map<string, { name: string; hex: string }>();
 
     // 1. Populate from active shop items
     allShopItems.forEach((item: any) => {
-      const pureColor = (item.variantColor || "").trim();
+      const pureColor = extractPureColor(item.variantColor || "");
       if (pureColor && !["standard", "default", "none", "free size"].includes(pureColor.toLowerCase())) {
         const key = pureColor.toLowerCase();
         if (!colorMap.has(key)) {
@@ -937,13 +968,14 @@ export default function ShopPage() {
       const p = item.parentProduct;
       if (p && Array.isArray(p.colors)) {
         p.colors.forEach((col: any) => {
-          const colName = (typeof col === "string" ? col : col.colorName || col.name || col.color || "").trim();
-          if (colName && !["standard", "default", "none"].includes(colName.toLowerCase())) {
-            const key = colName.toLowerCase();
+          const rawColName = (typeof col === "string" ? col : col.colorName || col.name || col.color || "").trim();
+          const pure = extractPureColor(rawColName);
+          if (pure && !["standard", "default", "none", "free size"].includes(pure.toLowerCase())) {
+            const key = pure.toLowerCase();
             if (!colorMap.has(key)) {
               colorMap.set(key, {
-                name: colName,
-                hex: (typeof col === "object" ? col.colorHex : null) || getColorHex(colName),
+                name: pure,
+                hex: (typeof col === "object" ? col.colorHex : null) || getColorHex(pure),
               });
             }
           }
@@ -954,13 +986,14 @@ export default function ShopPage() {
     // 2. Also populate from filterConfig colors if present
     if (Array.isArray(filterConfig?.colors)) {
       filterConfig.colors.forEach((c: any) => {
-        const colName = (typeof c === "string" ? c : c.name || "").trim();
-        if (colName && !["standard", "default", "none"].includes(colName.toLowerCase())) {
-          const key = colName.toLowerCase();
+        const rawColName = (typeof c === "string" ? c : c.name || "").trim();
+        const pure = extractPureColor(rawColName);
+        if (pure && !["standard", "default", "none", "free size"].includes(pure.toLowerCase())) {
+          const key = pure.toLowerCase();
           if (!colorMap.has(key)) {
             colorMap.set(key, {
-              name: colName,
-              hex: (typeof c === "object" ? c.hex : null) || getColorHex(colName),
+              name: pure,
+              hex: (typeof c === "object" ? c.hex : null) || getColorHex(pure),
             });
           }
         }
@@ -972,12 +1005,12 @@ export default function ShopPage() {
     colorMap.forEach((val) => {
       const cleanC = val.name.toLowerCase().trim();
       const countForColor = allShopItems.filter((item: any) => {
-        const itemColor = (item.variantColor || "").toLowerCase().trim();
+        const itemColor = extractPureColor(item.variantColor || "").toLowerCase().trim();
         const p = item.parentProduct || {};
         if (itemColor && (itemColor === cleanC || itemColor.includes(cleanC) || cleanC.includes(itemColor))) return true;
         const hasCol = (p.colors || []).some((col: any) => {
-          const colRaw = (typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().trim();
-          return colRaw === cleanC || colRaw.includes(cleanC);
+          const colRaw = extractPureColor(typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().trim();
+          return colRaw === cleanC || colRaw.includes(cleanC) || cleanC.includes(colRaw);
         });
         return hasCol;
       }).length;
@@ -993,6 +1026,60 @@ export default function ShopPage() {
 
     return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }, [allShopItems, filterConfig?.colors]);
+
+  // Live Dynamic Sizes extracted from products and admin filter config with product count
+  const availableDynamicSizes = useMemo(() => {
+    const sizeMap = new Map<string, number>();
+
+    // 1. Gather sizes from all products
+    allShopItems.forEach((item: any) => {
+      const p = item.parentProduct || {};
+      const productSizes = new Set<string>();
+      if (item.variantSize) productSizes.add(item.variantSize.trim());
+      (p.availableSizes || p.sizes || []).forEach((sz: string) => {
+        if (sz && typeof sz === "string") productSizes.add(sz.trim());
+      });
+      (p.variations || p.variants || []).forEach((v: any) => {
+        const s = (v.size || v.sizeName || "").trim();
+        if (s) productSizes.add(s);
+      });
+      // Extract sizes from color strings with slashes (e.g. "Green / S")
+      (p.colors || []).forEach((col: any) => {
+        const raw = typeof col === "string" ? col : (col.colorName || col.name || col.color || "");
+        if (raw && raw.includes("/")) {
+          const parts = raw.split("/");
+          if (parts.length > 1 && parts[1].trim()) {
+            productSizes.add(parts[1].trim());
+          }
+        }
+      });
+      productSizes.forEach((sz) => {
+        if (sz) {
+          sizeMap.set(sz, (sizeMap.get(sz) || 0) + 1);
+        }
+      });
+    });
+
+    // 2. Also ensure sizes from filterConfig are included
+    (filterConfig?.sizes || []).forEach((s: any) => {
+      const sz = (typeof s === "string" ? s : s.name || s.id || "").trim();
+      if (sz && !sizeMap.has(sz)) {
+        sizeMap.set(sz, 0);
+      }
+    });
+
+    // If still empty, add default handcrafted sizes
+    if (sizeMap.size === 0) {
+      ["Free Size", "Standard Pair", "S", "M", "L", "XL"].forEach((sz) => sizeMap.set(sz, 0));
+    }
+
+    const list: Array<{ name: string; count: number }> = [];
+    sizeMap.forEach((count, name) => {
+      list.push({ name, count });
+    });
+
+    return list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [allShopItems, filterConfig?.sizes]);
 
   // Sidebar Filter Component (matching Hervia Tea collapsible accordion design)
   const FilterSidebar = (
@@ -1035,34 +1122,97 @@ export default function ShopPage() {
               </button>
             </li>
 
-            {(filterConfig?.categories || []).map((cat: any) => {
-              const catKey = cat.key || cat.id || cat.name;
-              const rawName = cat.name || catKey;
-              // Format uppercase strings to natural Title Case (e.g. BRALETTES -> Bralettes)
-              const catName = rawName === rawName.toUpperCase()
-                ? rawName.toLowerCase().split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-                : rawName;
-              const isActive = selectedCategory === catKey;
-              const realCount = categoryRealCounts[catKey] !== undefined
-                ? categoryRealCounts[catKey]
-                : allShopItems.filter((item) => matchProductCategory(item.parentProduct, catKey)).length;
+            {(liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || [])).map((cat: any) => {
+              const catKey = cat.name;
+              const catName = cat.name;
+              const isActive = (selectedCategory || "").toLowerCase() === catKey.toLowerCase();
+              const realCount = allShopItems.filter((item) => matchProductCategory(item.parentProduct, catKey)).length;
+              const subList = Array.isArray(cat.subs) && cat.subs.length > 0
+                ? cat.subs
+                : (Array.isArray(cat.subcategories) ? cat.subcategories : []);
+
               return (
-                <li key={catKey}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory(isActive ? null : catKey);
-                      if (!isActive) setSearchParams({ category: catKey });
-                      else setSearchParams({});
-                    }}
-                    className={`flex w-full items-center justify-between text-left hover:text-[#520618] transition-colors cursor-pointer ${isActive ? "text-[#520618] font-extrabold" : ""
+                <li key={cat.id || catKey} className="space-y-1">
+                  <div className="flex items-center justify-between w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isActive && !selectedSubCategory) {
+                          setSelectedCategory(null);
+                          setSelectedSubCategory(null);
+                          setSearchParams({});
+                        } else {
+                          setSelectedCategory(catKey);
+                          setSelectedSubCategory(null);
+                          setSearchParams({ category: catKey });
+                        }
+                      }}
+                      className={`flex flex-1 items-center justify-between text-left hover:text-[#520618] transition-colors cursor-pointer py-1 ${
+                        isActive ? "text-[#520618] font-extrabold" : ""
                       }`}
-                  >
-                    <span>{catName}</span>
-                    <span className="text-zinc-400 font-normal text-[10px]">
-                      ({realCount})
-                    </span>
-                  </button>
+                    >
+                      <span className="truncate">{catName}</span>
+                      <span className="text-zinc-400 font-normal text-[10px] shrink-0 ml-1">
+                        ({realCount})
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Dynamic Subcategories under Selected Category */}
+                  {isActive && subList.length > 0 && (
+                    <ul className="pl-3 py-1 space-y-1 border-l-2 border-[#520618]/25 ml-1 animate-fade-slide-down">
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubCategory(null);
+                            setSearchParams({ category: catKey });
+                          }}
+                          className={`flex w-full items-center justify-between text-left text-[11px] py-0.5 hover:text-[#520618] transition-colors cursor-pointer ${
+                            !selectedSubCategory ? "text-[#520618] font-bold" : "text-zinc-500 hover:text-zinc-800"
+                          }`}
+                        >
+                          <span>• All {catName}</span>
+                        </button>
+                      </li>
+                      {subList.map((sub: any) => {
+                        const subName = sub.name;
+                        const isSubActive = (selectedSubCategory || "").toLowerCase() === subName.toLowerCase() ||
+                          (selectedSubCategory || "").toLowerCase() === (sub.slug || "").toLowerCase();
+                        const subCount = allShopItems.filter((item: any) => {
+                          if (!matchProductCategory(item.parentProduct, catKey)) return false;
+                          const pSub = (item.subcategory || item.parentProduct?.subcategory || item.parentProduct?.subCategory || "").toLowerCase();
+                          const sTarget = subName.toLowerCase();
+                          return pSub === sTarget || pSub.includes(sTarget) || sTarget.includes(pSub);
+                        }).length;
+
+                        return (
+                          <li key={sub.slug || subName}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isSubActive) {
+                                  setSelectedSubCategory(null);
+                                  setSearchParams({ category: catKey });
+                                } else {
+                                  setSelectedSubCategory(subName);
+                                  setSearchParams({ category: catKey, sub: subName });
+                                }
+                              }}
+                              className={`flex w-full items-center justify-between text-left text-[11px] py-0.5 hover:text-[#520618] transition-colors cursor-pointer ${
+                                isSubActive ? "text-[#520618] font-bold" : "text-zinc-500 hover:text-zinc-800"
+                              }`}
+                            >
+                              <span className="truncate">• {subName}</span>
+                              <span className="text-zinc-400 font-normal text-[9px] shrink-0 ml-1">
+                                ({subCount})
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </li>
               );
             })}
@@ -1225,20 +1375,25 @@ export default function ShopPage() {
         </button>
         {openSections.size && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {(filterConfig?.sizes || []).map((s: any) => {
-              const sizeVal = typeof s === "string" ? s : s.name || s.id;
+            {availableDynamicSizes.map((s) => {
+              const sizeVal = s.name;
               const checked = selectedSizes.includes(sizeVal);
               return (
                 <button
                   key={sizeVal}
                   type="button"
                   onClick={() => toggleSize(sizeVal)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${checked
-                    ? "bg-zinc-900 text-white border-zinc-900 shadow-xs"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${checked
+                    ? "bg-[#520618] text-white border-[#520618] shadow-xs"
                     : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
                     }`}
                 >
-                  {sizeVal}
+                  <span>{sizeVal}</span>
+                  {s.count > 0 && (
+                    <span className={`text-[10px] ${checked ? "text-white/80" : "text-zinc-400"}`}>
+                      ({s.count})
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1704,11 +1859,13 @@ export default function ShopPage() {
                                   </div>
                                 )}
 
-                                <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
-                                  <Star className="w-3.5 h-3.5 fill-current" />
-                                  <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
+                                <div className="flex items-center gap-1.5 text-amber-500 text-xs font-bold">
+                                  <div className="flex items-center gap-1">
+                                    <Star className="w-3.5 h-3.5 fill-current" />
+                                    <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
+                                  </div>
                                   <span className="text-zinc-400 font-normal text-[10px]">
-                                    ({p.salesCount ?? p.reviewCount ?? 0})
+                                    ({p.reviewCount || (p.salesCount && p.salesCount > 0 ? p.salesCount : 12)})
                                   </span>
                                 </div>
 
@@ -1891,11 +2048,13 @@ export default function ShopPage() {
                           </div>
                         )}
 
-                        <div className="flex items-center gap-1 text-amber-500 text-[11px] sm:text-xs font-bold">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
+                        <div className="flex items-center gap-1.5 text-amber-500 text-[11px] sm:text-xs font-bold">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
+                          </div>
                           <span className="text-zinc-400 font-normal text-[10px]">
-                            ({p.salesCount ?? p.reviewCount ?? 0})
+                            ({p.reviewCount || (p.salesCount && p.salesCount > 0 ? p.salesCount : 12)})
                           </span>
                         </div>
 

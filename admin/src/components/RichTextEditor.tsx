@@ -20,6 +20,7 @@ import {
   Outdent,
   RemoveFormatting
 } from 'lucide-react';
+import { Select } from './ui/select';
 
 export const BRAND_FONTS = [
   { label: 'Default (Inter / Sans)', value: 'Inter, sans-serif' },
@@ -128,18 +129,20 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       {/* COMPACT CLEAN TOOLBAR MATCHING DESIGN */}
       <div className="flex flex-wrap items-center gap-1 p-1.5 bg-white border-b border-neutral-200 text-neutral-600 text-xs">
         {/* PARAGRAPH / HEADING SELECTOR */}
-        <select
-          value={currentBlock}
-          onChange={(e) => handleBlockChange(e.target.value)}
-          className="h-7 px-2 text-xs font-medium bg-neutral-50 border border-neutral-200 rounded text-neutral-700 outline-none cursor-pointer hover:bg-neutral-100"
-          title="Format Paragraph / Heading"
-        >
-          <option value="p">Normal</option>
-          <option value="h1">Heading 1</option>
-          <option value="h2">Heading 2</option>
-          <option value="h3">Heading 3</option>
-          <option value="h4">Heading 4</option>
-        </select>
+        <div className="w-28">
+          <Select
+            value={currentBlock}
+            onValueChange={(val) => handleBlockChange(val)}
+            className="h-7 text-xs font-medium bg-neutral-50 px-2"
+            options={[
+              { value: 'p', label: 'Normal' },
+              { value: 'h1', label: 'Heading 1' },
+              { value: 'h2', label: 'Heading 2' },
+              { value: 'h3', label: 'Heading 3' },
+              { value: 'h4', label: 'Heading 4' }
+            ]}
+          />
+        </div>
 
         <div className="w-[1px] h-4 bg-neutral-200 mx-0.5" />
 
