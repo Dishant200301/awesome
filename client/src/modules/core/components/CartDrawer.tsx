@@ -42,6 +42,16 @@ export const CartDrawer: React.FC = () => {
     };
   }, [isCartOpen]);
 
+  // Auto-close drawer when items become 0
+  useEffect(() => {
+    if (isCartOpen && cartItems.length === 0) {
+      const timer = setTimeout(() => {
+        setIsCartOpen(false);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [isCartOpen, cartItems.length, setIsCartOpen]);
+
   // Generate recommended products list dynamically from live products
   const recommendedProducts = React.useMemo(() => {
     if (liveProducts && liveProducts.length > 0) {

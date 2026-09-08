@@ -1,22 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "@/modules/product/context/CartContext";
 
 export const StickyCartWidget: React.FC = () => {
   const { totalItemsCount, totalPrice, setIsCartOpen, isCartOpen } = useCart();
-  const [hasBounced, setHasBounced] = useState(false);
 
-  // Trigger bounce micro-animation whenever items count updates
-  useEffect(() => {
-    if (totalItemsCount > 0) {
-      setHasBounced(true);
-      const timer = setTimeout(() => setHasBounced(false), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [totalItemsCount]);
-
-  // Hide widget while the drawer is open to prevent overlapping
-  if (isCartOpen) return null;
+  // Hide widget completely when cart is empty (0 items) or when drawer is open
+  if (totalItemsCount <= 0 || isCartOpen) return null;
 
   const itemText = totalItemsCount === 1 ? "Item" : "Items";
   const formattedPrice = `₹${totalPrice.toLocaleString("en-IN")}.00`;
@@ -27,9 +17,7 @@ export const StickyCartWidget: React.FC = () => {
         type="button"
         onClick={() => setIsCartOpen(true)}
         aria-label={`Open shopping cart with ${totalItemsCount} ${itemText}`}
-        className={`group flex flex-col items-center justify-center bg-[#232323] hover:bg-[#121212] text-white pt-2.5 pb-2 px-2.5 sm:px-3 rounded-l-xl shadow-[-4px_4px_18px_rgba(0,0,0,0.35)] border-t border-b border-l border-white/10 transition-all duration-300 cursor-pointer ${
-          hasBounced ? "-translate-x-2 scale-105 ring-2 ring-amber-400/40" : "hover:-translate-x-1"
-        }`}
+        className="flex flex-col items-center justify-center bg-[#212121] text-white pt-2.5 pb-2 px-2.5 sm:px-3 rounded-l-xl shadow-[-4px_4px_18px_rgba(0,0,0,0.35)] border-t border-b border-l border-neutral-700/50 cursor-pointer"
       >
         {/* Top: Shopping Bag Icon + Count & Item text */}
         <div className="flex items-center gap-2 px-1">
