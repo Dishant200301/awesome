@@ -129,79 +129,15 @@ export class AdminApiService {
     if (params?.sort) query.append("sort", params.sort);
 
     const remote = await this.request<any>(`/products?${query.toString()}`);
-    if (remote && Array.isArray(remote.items) && remote.items.length > 0) return remote;
-
-    // Fallback in-memory querying from persisted local storage
-    let list = [...getAdminProducts()];
-    if (params?.search) {
-      const q = params.search.toLowerCase();
-      list = list.filter((p) => 
-        (p.name && p.name.toLowerCase().includes(q)) || 
-        (p.brand && p.brand.toLowerCase().includes(q)) || 
-        (p.category && p.category.toLowerCase().includes(q)) || 
-        (p.sku && p.sku.toLowerCase().includes(q)) ||
-        (p.defaultSku && p.defaultSku.toLowerCase().includes(q))
-      );
+    if (remote && Array.isArray(remote.items)) {
+      return remote;
     }
-    if (params?.category && params.category !== 'All' && params.category !== 'ALL') {
-      list = list.filter((p) => p.category && p.category.toLowerCase() === params.category!.toLowerCase());
-    }
-    if (params?.subcategory && params.subcategory !== 'All' && params.subcategory !== 'ALL') {
-      list = list.filter((p) => {
-        const sub = (p.subcategory || p.subCategory || "").toLowerCase();
-        return sub === params.subcategory!.toLowerCase();
-      });
-    }
-    if (params?.brand && params.brand !== 'All' && params.brand !== 'ALL') {
-      list = list.filter((p) => p.brand && p.brand.toLowerCase() === params.brand!.toLowerCase());
-    }
-    if (params?.status && params.status !== 'All' && params.status !== 'ALL') {
-      const st = params.status.toLowerCase();
-      if (st === 'published' || st === 'active') list = list.filter((p) => p.isPublished || p.status === 'Published' || p.status === 'Active');
-      else if (st === 'draft') list = list.filter((p) => !p.isPublished || p.status === 'Draft');
-      else if (st === 'inactive') list = list.filter((p) => p.status === 'Inactive');
-      else if (st === 'out_of_stock' || st === 'out of stock') list = list.filter((p) => p.status === 'Out of Stock' || p.stock <= 0);
-    }
-    if (params?.stockStatus && params.stockStatus !== 'All' && params.stockStatus !== 'ALL') {
-      if (params.stockStatus === 'in_stock') list = list.filter(p => p.stock > (p.lowStockAlert || 10));
-      else if (params.stockStatus === 'low_stock') list = list.filter(p => p.stock > 0 && p.stock <= (p.lowStockAlert || 10));
-      else if (params.stockStatus === 'out_of_stock') list = list.filter(p => p.stock <= 0);
-    }
-    if (params?.minPrice !== undefined && !isNaN(params.minPrice)) {
-      list = list.filter(p => p.price >= params.minPrice!);
-    }
-    if (params?.maxPrice !== undefined && !isNaN(params.maxPrice)) {
-      list = list.filter(p => p.price <= params.maxPrice!);
-    }
-
-    if (params?.sort) {
-      if (params.sort === 'price_asc') list.sort((a, b) => a.price - b.price);
-      else if (params.sort === 'price_desc') list.sort((a, b) => b.price - a.price);
-      else if (params.sort === 'name_asc') list.sort((a, b) => a.name.localeCompare(b.name));
-      else if (params.sort === 'name_desc') list.sort((a, b) => b.name.localeCompare(a.name));
-      else if (params.sort === 'stock_asc') list.sort((a, b) => a.stock - b.stock);
-      else if (params.sort === 'stock_desc') list.sort((a, b) => b.stock - a.stock);
-      else if (params.sort === 'discount_desc') list.sort((a, b) => (b.discountPercentage || 0) - (a.discountPercentage || 0));
-      else if (params.sort === 'oldest') list.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
-      else list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-    }
-
-    const page = params?.page || 1;
-    const limit = params?.limit || 10;
-    const total = list.length;
-    const totalPages = Math.ceil(total / limit) || 1;
-    const items = list.slice((page - 1) * limit, page * limit);
-
-    return { items, total, page, limit, totalPages };
+    return { items: [], total: 0, page: 1, limit: 10, totalPages: 1 };
   }
 
   public static async getProductById(id: string): Promise<Product | null> {
     const remote = await this.request<Product>(`/products/${id}`);
-    if (remote) return remote;
-    const all = getAdminProducts();
-    const found = all.find((p) => String(p.id) === String(id) || p.slug === id);
-    if (found) return found;
-    return MOCK_PRODUCTS.find((p) => String(p.id) === String(id) || p.slug === id) || null;
+    return remote || null;
   }
 
   public static async createProduct(productData: Partial<Product>): Promise<Product> {
@@ -210,57 +146,9 @@ export class AdminApiService {
       body: JSON.stringify(productData)
     });
     if (remote) {
-      const idx = MOCK_PRODUCTS.findIndex((p) => String(p.id) === String(remote.id));
-      if (idx !== -1) {
-        MOCK_PRODUCTS[idx] = remote;
-      } else {
-        MOCK_PRODUCTS.unshift(remote);
-      }
-      saveStoredProducts(MOCK_PRODUCTS);
       return remote;
     }
-
-    const newProd: Product = {
-      id: productData.id || `prod-${Date.now()}`,
-      name: productData.name || "New Product",
-      slug: productData.slug || (productData.name ? productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'new-product'),
-      sku: productData.sku || `AWH-${Date.now()}`,
-      category: productData.category || "Latkan",
-      subcategory: productData.subcategory || "Mirror Latkan",
-      categories: productData.categories || [productData.category || "Latkan"],
-      brand: productData.brand || "Awesome Handmade",
-      collections: productData.collections || [],
-      tags: productData.tags || [],
-      price: productData.price || 799,
-      originalPrice: productData.originalPrice || 1299,
-      costPrice: productData.costPrice || 350,
-      stock: productData.stock || 100,
-      rating: 5.0,
-      salesCount: 0,
-      status: productData.status || (productData.isPublished !== false ? 'Published' : 'Draft'),
-      isPublished: productData.isPublished !== undefined ? productData.isPublished : true,
-      type: (productData.variations && productData.variations.length > 0) ? 'Variable' : 'Simple',
-      shortDescription: productData.shortDescription || "",
-      fullDescription: productData.fullDescription || "",
-      images: productData.images || ['/images/category/Latkan.webp'],
-      labels: { featured: true, bestSeller: false, newArrival: true, sale: false },
-      inventory: { sku: productData.sku || `AWH-${Date.now()}`, barcode: '890123456789', stock: productData.stock || 100, lowStockAlert: 20, allowBackorders: false, trackInventory: true },
-      shipping: productData.shipping || { weight: 0.15, length: 20, width: 15, height: 4 },
-      seo: productData.seo || { metaTitle: productData.name || '', metaDescription: '', keywords: '', canonicalUrl: '' },
-      attributes: productData.attributes || [],
-      variants: productData.variants || productData.variations || [],
-      variations: productData.variations || [],
-      descriptionCards: productData.descriptionCards || [],
-      highlights: productData.highlights || [],
-      washingInstructions: productData.washingInstructions || [],
-      manufacturingInfo: productData.manufacturingInfo || undefined,
-      idealForPills: productData.idealForPills || [],
-      createdAt: productData.createdAt || new Date().toISOString().split('T')[0]
-    };
-
-    MOCK_PRODUCTS.unshift(newProd);
-    saveStoredProducts(MOCK_PRODUCTS);
-    return newProd;
+    throw new Error("Failed to create product. Please verify MySQL database connection and required fields.");
   }
 
   public static async updateProduct(id: string, productData: Partial<Product>): Promise<Product | null> {
@@ -269,53 +157,21 @@ export class AdminApiService {
       body: JSON.stringify(productData)
     });
     if (remote) {
-      const idx = MOCK_PRODUCTS.findIndex((p) => String(p.id) === String(id));
-      if (idx !== -1) {
-        MOCK_PRODUCTS[idx] = remote;
-      } else {
-        MOCK_PRODUCTS.unshift(remote);
-      }
-      saveStoredProducts(MOCK_PRODUCTS);
       return remote;
     }
-
-    const idx = MOCK_PRODUCTS.findIndex((p) => String(p.id) === String(id));
-    if (idx === -1) return null;
-    MOCK_PRODUCTS[idx] = { ...MOCK_PRODUCTS[idx], ...productData };
-    saveStoredProducts(MOCK_PRODUCTS);
-    return MOCK_PRODUCTS[idx];
+    throw new Error("Failed to update product in MySQL database.");
   }
 
   public static async deleteProduct(id: string): Promise<boolean> {
-    try {
-      await deleteAdminProduct(id);
-      await this.request<any>(`/products/${id}`, { method: "DELETE" });
-    } catch (e) {
-      console.warn("Delete product network error:", e);
-    }
-    return true;
+    const res = await this.request<any>(`/products/${id}`, { method: "DELETE" });
+    return res !== null;
   }
 
   public static async duplicateProduct(id: string): Promise<Product | null> {
     const remote = await this.request<Product>(`/products/${id}/duplicate`, {
       method: "POST"
     });
-    if (remote) return remote;
-
-    const original = MOCK_PRODUCTS.find((p) => p.id === id);
-    if (!original) return null;
-    const cloned: Product = {
-      ...original,
-      id: `prod-${Date.now()}`,
-      name: `${original.name} (Copy)`,
-      slug: `${original.slug}-copy`,
-      sku: `${original.sku}-COPY`,
-      status: 'Draft',
-      isPublished: false,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    MOCK_PRODUCTS.unshift(cloned);
-    return cloned;
+    return remote || null;
   }
 
   public static async updateProductStatus(id: string, status?: string, isPublished?: boolean): Promise<Product | null> {
@@ -323,48 +179,23 @@ export class AdminApiService {
       method: "PATCH",
       body: JSON.stringify({ status, isPublished })
     });
-    if (remote) return remote;
-
-    const idx = MOCK_PRODUCTS.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
-    const resolvedIsPublished = isPublished !== undefined ? isPublished : status === 'Active' || status === 'Published';
-    MOCK_PRODUCTS[idx] = {
-      ...MOCK_PRODUCTS[idx],
-      isPublished: resolvedIsPublished,
-      status: (status || (resolvedIsPublished ? 'Published' : 'Inactive')) as any
-    };
-    return MOCK_PRODUCTS[idx];
+    return remote || null;
   }
 
   public static async bulkDeleteProducts(ids: string[]): Promise<boolean> {
-    for (const id of ids) {
-      await deleteAdminProduct(id);
-    }
-    try {
-      await this.request<any>("/products/bulk-delete", {
-        method: "POST",
-        body: JSON.stringify({ ids })
-      });
-    } catch (e) {
-      console.warn("Bulk delete network error:", e);
-    }
-    return true;
+    const res = await this.request<any>("/products/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids })
+    });
+    return res !== null;
   }
 
-  public static async bulkUpdateStatus(ids: string[], isPublished: boolean, status?: string): Promise<boolean> {
-    const remote = await this.request<any>("/products/bulk-status", {
+  public static async bulkUpdateStatus(ids: string[], isPublished?: boolean, status?: string): Promise<boolean> {
+    const res = await this.request<any>("/products/bulk-status", {
       method: "POST",
       body: JSON.stringify({ ids, isPublished, status })
     });
-    if (remote) return true;
-
-    MOCK_PRODUCTS.forEach((p) => {
-      if (ids.includes(p.id)) {
-        p.isPublished = isPublished;
-        p.status = (status || (isPublished ? 'Published' : 'Inactive')) as any;
-      }
-    });
-    return true;
+    return res !== null;
   }
 
   // AI Vision Product Analysis & Content Generator

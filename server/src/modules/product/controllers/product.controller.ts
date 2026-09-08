@@ -10,7 +10,7 @@ const setNoCache = (res: Response) => {
 
 export class ProductController {
   // GET /api/v1/products (with comprehensive multi-filter, search, sort & pagination)
-  public static getAllProducts(req: Request, res: Response): void {
+  public static async getAllProducts(req: Request, res: Response): Promise<void> {
     setNoCache(res);
     const hasFilterParams = Boolean(
       req.query.page || 
@@ -27,10 +27,11 @@ export class ProductController {
       req.query.sort
     );
 
+    await productStore.refreshFromMySQL();
+
     if (hasFilterParams) {
       const result = productStore.queryProducts({
         page: req.query.page ? Number(req.query.page) : 1,
-
         limit: req.query.limit ? Number(req.query.limit) : 10,
         search: req.query.search as string,
         category: req.query.category as string,
@@ -66,9 +67,9 @@ export class ProductController {
   }
 
   // POST /api/v1/products/:id/duplicate
-  public static duplicateProduct(req: Request, res: Response): void {
+  public static async duplicateProduct(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
-    const duplicated = productStore.duplicate(id);
+    const duplicated = await productStore.duplicate(id);
     if (!duplicated) {
       res.status(404).json({ success: false, message: "Product to duplicate not found" });
       return;
@@ -81,10 +82,10 @@ export class ProductController {
   }
 
   // PATCH /api/v1/products/:id/status
-  public static updateStatus(req: Request, res: Response): void {
+  public static async updateStatus(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
     const { status, isPublished } = req.body;
-    const updated = productStore.toggleStatus(id, status !== undefined ? status : (isPublished !== undefined ? (isPublished ? 'Published' : 'Inactive') : undefined));
+    const updated = await productStore.toggleStatus(id, status !== undefined ? status : (isPublished !== undefined ? (isPublished ? 'Published' : 'Inactive') : undefined));
     if (!updated) {
       res.status(404).json({ success: false, message: "Product not found" });
       return;
@@ -97,36 +98,38 @@ export class ProductController {
   }
 
   // POST /api/v1/products/bulk-delete
-  public static bulkDeleteProducts(req: Request, res: Response): void {
+  public static async bulkDeleteProducts(req: Request, res: Response): Promise<void> {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ success: false, message: "Invalid product IDs array" });
       return;
     }
-    const count = productStore.bulkDelete(ids);
+    const count = await productStore.bulkDelete(ids);
     res.status(200).json({ success: true, count, message: `Successfully deleted ${count} products` });
   }
 
   // POST /api/v1/products/bulk-status
-  public static bulkUpdateStatus(req: Request, res: Response): void {
+  public static async bulkUpdateStatus(req: Request, res: Response): Promise<void> {
     const { ids, isPublished, status } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ success: false, message: "Invalid product IDs array" });
       return;
     }
-    const count = productStore.bulkStatus(ids, isPublished !== false, status);
+    const count = await productStore.bulkStatus(ids, isPublished !== false, status);
     res.status(200).json({ success: true, count, message: `Successfully updated ${count} products` });
   }
 
   // GET /api/v1/products/export
-  public static exportProducts(_req: Request, res: Response): void {
+  public static async exportProducts(_req: Request, res: Response): Promise<void> {
+    await productStore.refreshFromMySQL();
     const products = productStore.getAll(false);
     res.status(200).json({ success: true, data: products });
   }
 
   // GET /api/v1/products/:query
-  public static getProductByIdOrSlug(req: Request, res: Response): void {
+  public static async getProductByIdOrSlug(req: Request, res: Response): Promise<void> {
     const { query } = req.params;
+    await productStore.refreshFromMySQL();
     const product = productStore.getByIdOrSlug(query);
 
     if (!product) {
@@ -144,13 +147,13 @@ export class ProductController {
   }
 
   // POST /api/v1/products (Admin API)
-  public static createProduct(req: Request, res: Response): void {
+  public static async createProduct(req: Request, res: Response): Promise<void> {
     try {
       if (!req.body || !req.body.name) {
         res.status(400).json({ success: false, message: "Product Name is required" });
         return;
       }
-      const newProduct = productStore.add(req.body);
+      const newProduct = await productStore.add(req.body);
       res.status(201).json({
         success: true,
         message: "Product created successfully!",
@@ -165,10 +168,10 @@ export class ProductController {
   }
 
   // PUT /api/v1/products/:id (Admin API)
-  public static updateProduct(req: Request, res: Response): void {
+  public static async updateProduct(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const updated = productStore.update(id, req.body);
+      const updated = await productStore.update(id, req.body);
 
       if (!updated) {
         res.status(404).json({
@@ -192,9 +195,9 @@ export class ProductController {
   }
 
   // DELETE /api/v1/products/:id (Admin API)
-  public static deleteProduct(req: Request, res: Response): void {
+  public static async deleteProduct(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
-    const deleted = productStore.delete(id);
+    const deleted = await productStore.delete(id);
 
     if (!deleted) {
       res.status(404).json({

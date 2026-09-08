@@ -1,167 +1,80 @@
-import fs from "fs";
-import path from "path";
 import { HeroSlide, HomepageBanner, ContentPageItem, BlogPost, FaqItem, StoreSettings } from "../../../types/admin.js";
+import {
+  fetchHeroSlidesFromMySQL,
+  syncHeroSlidesToMySQL,
+  fetchPromoBannerFromMySQL,
+  syncPromoBannerToMySQL
+} from "../../../database/mysqlSync.js";
 
-const DB_FILE_PATH = path.join(process.cwd(), "content_db.json");
-
-const DEFAULT_HERO_SLIDES: HeroSlide[] = [
-  {
-    id: "slide-1",
-    tag: "Grace in Every",
-    title: "Thread",
-    subtitle: "Timeless ethnic wear crafted with love, precision and elegance.",
-    image: "/images/home/hero/hero-1.webp",
-    mobileImage: "/images/home/hero/mobile-1.webp",
-    buttonText: "Shop Collection",
-    link: "/shop?category=Choli",
-    theme: "gold",
-    align: "left",
-    status: "Active",
-    sortOrder: 1
-  },
-  {
-    id: "slide-2",
-    tag: "Artisan Special",
-    title: "Twirl Into Tradition",
-    subtitle: "Heritage crafted for every celebration.",
-    image: "/images/home/hero/hero-2.webp",
-    mobileImage: "/images/home/hero/mobile-2.webp",
-    buttonText: "Shop Collection",
-    link: "/shop?category=Latkan",
-    theme: "gold",
-    align: "left",
-    status: "Active",
-    sortOrder: 2
-  },
-  {
-    id: "slide-3",
-    tag: "HANDCRAFTED JEWELLERY",
-    title: "Threads of Tradition",
-    subtitle: "A celebration of colour, craft and culture.",
-    image: "/images/home/hero/hero-3.webp",
-    mobileImage: "/images/home/hero/mobile-3.webp",
-    buttonText: "Shop Collection",
-    link: "/shop?category=Necklace",
-    theme: "maroon",
-    align: "left",
-    status: "Active",
-    sortOrder: 3
-  },
-  {
-    id: "slide-4",
-    tag: "COMFORT • STYLE • TRADITION",
-    title: "Kids CHOLI",
-    subtitle: "Soft fabric, elegant design, made with love.",
-    image: "/images/home/hero/hero-4.webp",
-    mobileImage: "/images/home/hero/mobile-4.webp",
-    buttonText: "Shop Collection",
-    link: "/shop?category=Choli&sub=Kids%20Choli",
-    theme: "purple",
-    align: "left",
-    status: "Active",
-    sortOrder: 4
-  },
-  {
-    id: "slide-5",
-    tag: "Kids Choli Collection",
-    title: "TWIRL IN TRADITION",
-    subtitle: "Little styles made for joyful celebrations",
-    image: "/images/home/hero/hero-5.webp",
-    mobileImage: "/images/home/hero/mobile-5.webp",
-    buttonText: "Shop Collection",
-    link: "/shop?category=Choli&sub=Kids%20Choli",
-    theme: "purple",
-    align: "left",
-    status: "Active",
-    sortOrder: 5
-  }
-];
+let heroSlides: HeroSlide[] = [];
 
 const DEFAULT_PROMO_BANNER: HomepageBanner = {
   id: "promo-banner-main",
-  title: "Handmade Necklace",
-  subtitle: "Crafted with colour, culture & love.",
-  image: "/images/banner/banner.webp",
-  mobileImage: "/images/banner/mobile-banner.webp",
-  badge: "Festive Collection",
-  buttonText: "SHOP NOW",
-  link: "/shop?category=Necklace",
-  gridPosition: "Main Promo Banner",
-  showTextOverlay: true,
-  status: "Active"
+  image: "/images/home/hero/hero-2.webp",
+  link: "/shop?category=Latkan",
+  status: "Active",
+  tagline: "Limited Time Festive Offer",
+  title: "Special Festive Collection",
+  subtitle: "Up to 30% off on authentic handcrafted mirror latkans and jewellery.",
+  badgeText: "Festive Special",
+  buttonText: "Explore Collection",
+  buttonLink: "/shop?category=Latkan",
+  imageUrl: "/images/home/hero/hero-2.webp",
+  mobileImageUrl: "/images/home/hero/mobile-2.webp",
+  bgColor: "#7A1C2E",
+  isActive: true
 };
 
-let heroSlides: HeroSlide[] = [...DEFAULT_HERO_SLIDES];
-let homepageBanners: HomepageBanner[] = [DEFAULT_PROMO_BANNER];
-let contentPages: ContentPageItem[] = [
-  {
-    id: "page-1",
-    title: "About Awesome Handmade",
-    slug: "about-us",
-    content: "Awesome Handmade is India's premier artisanal handcrafted fashion and accessories brand crafted with love and authentic craftsmanship in Surat, Gujarat.",
-    metaTitle: "About Us - Awesome Handmade",
-    metaDescription: "Learn about Awesome Handmade's story, artisan roots, and authentic handcrafting.",
-    status: "Published",
-    updatedAt: "2026-08-01"
-  }
-];
+let homepageBanners: HomepageBanner[] = [{ ...DEFAULT_PROMO_BANNER }];
+let contentPages: ContentPageItem[] = [];
 let blogPosts: BlogPost[] = [];
 let faqItems: FaqItem[] = [];
 let storeSettings: StoreSettings = {
   storeName: "Awesome Handmade",
-  storeLogo: "/images/common/logo.png",
-  email: "care@awesomehandmade.com",
-  phone: "+91 98243 02072",
+  supportEmail: "contact@awesomehandwork.com",
+  supportPhone: "+91 98765 43210",
   address: "Surat, Gujarat, India",
-  currency: "₹ (INR)",
-  taxRate: 18,
-  shippingFee: 99,
+  currency: "INR",
+  currencySymbol: "₹",
   freeShippingThreshold: 999,
-  facebookUrl: "https://facebook.com",
-  instagramUrl: "https://instagram.com",
-  twitterUrl: "https://twitter.com",
-  metaTitle: "Awesome Handmade - Indian Craft & Latkans",
-  metaDescription: "Shop authentic handcrafted Indian latkans, Navratri cholis, jewellery, and decor."
+  flatShippingRate: 49,
+  enableCod: true,
+  enableReviews: true,
+  autoApproveReviews: false,
+  maintenanceMode: false
 };
 
-const loadFromDisk = () => {
+// Initial sync from MySQL on startup
+export const refreshContentFromMySQL = async () => {
   try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.heroSlides) && parsed.heroSlides.length > 0) {
-        heroSlides = parsed.heroSlides;
-      }
-      if (parsed && Array.isArray(parsed.homepageBanners) && parsed.homepageBanners.length > 0) {
-        homepageBanners = parsed.homepageBanners;
-      }
-      if (parsed && Array.isArray(parsed.contentPages)) {
-        contentPages = parsed.contentPages;
-      }
+    const slidesFromDb = await fetchHeroSlidesFromMySQL();
+    if (Array.isArray(slidesFromDb) && slidesFromDb.length > 0) {
+      heroSlides = slidesFromDb;
     }
-  } catch (e) {
-    console.warn("[ContentStore] Could not read content_db.json, using defaults.");
+
+    const promoFromDb = await fetchPromoBannerFromMySQL();
+    if (promoFromDb) {
+      homepageBanners = [promoFromDb];
+    }
+  } catch (err) {
+    console.warn("[ContentStore] MySQL content refresh warning:", (err as Error).message);
   }
 };
 
-const saveToDisk = () => {
+refreshContentFromMySQL();
+
+// HERO SLIDES CRUD (Direct MySQL)
+export const getHeroSlidesStore = async (): Promise<HeroSlide[]> => {
   try {
-    fs.writeFileSync(
-      DB_FILE_PATH,
-      JSON.stringify({ heroSlides, homepageBanners, contentPages, blogPosts, faqItems, storeSettings }, null, 2),
-      "utf-8"
-    );
-  } catch (e) {
-    console.error("[ContentStore] Failed to write content_db.json:", e);
-  }
+    const slides = await fetchHeroSlidesFromMySQL();
+    if (Array.isArray(slides) && slides.length > 0) {
+      heroSlides = slides;
+    }
+  } catch {}
+  return heroSlides;
 };
 
-loadFromDisk();
-
-// HERO SLIDES CRUD
-export const getHeroSlidesStore = (): HeroSlide[] => heroSlides;
-
-export const syncHeroSlidesStore = (slides: HeroSlide[]): HeroSlide[] => {
+export const syncHeroSlidesStore = async (slides: HeroSlide[]): Promise<HeroSlide[]> => {
   if (Array.isArray(slides)) {
     heroSlides = slides.map((s, index) => ({
       id: s.id || `slide-${Date.now()}-${index}`,
@@ -177,12 +90,12 @@ export const syncHeroSlidesStore = (slides: HeroSlide[]): HeroSlide[] => {
       status: s.status || "Active",
       sortOrder: Number(s.sortOrder) || index + 1
     }));
-    saveToDisk();
+    await syncHeroSlidesToMySQL(heroSlides);
   }
   return heroSlides;
 };
 
-export const createHeroSlideStore = (data: Partial<HeroSlide>): HeroSlide => {
+export const createHeroSlideStore = async (data: Partial<HeroSlide>): Promise<HeroSlide> => {
   const newSlide: HeroSlide = {
     id: data.id || `slide-${Date.now()}`,
     tag: data.tag || "",
@@ -198,41 +111,54 @@ export const createHeroSlideStore = (data: Partial<HeroSlide>): HeroSlide => {
     sortOrder: heroSlides.length + 1
   };
   heroSlides.push(newSlide);
-  saveToDisk();
+  await syncHeroSlidesToMySQL(heroSlides);
   return newSlide;
 };
 
-export const updateHeroSlideStore = (id: string, data: Partial<HeroSlide>): HeroSlide | null => {
+export const updateHeroSlideStore = async (id: string, data: Partial<HeroSlide>): Promise<HeroSlide | null> => {
   const idx = heroSlides.findIndex((s) => s.id === id);
   if (idx === -1) return null;
   heroSlides[idx] = { ...heroSlides[idx], ...data };
-  saveToDisk();
+  await syncHeroSlidesToMySQL(heroSlides);
   return heroSlides[idx];
 };
 
-export const deleteHeroSlideStore = (id: string): boolean => {
+export const deleteHeroSlideStore = async (id: string): Promise<boolean> => {
   const initialLen = heroSlides.length;
   heroSlides = heroSlides.filter((s) => s.id !== id);
-  saveToDisk();
-  return heroSlides.length < initialLen;
+  if (heroSlides.length < initialLen) {
+    await syncHeroSlidesToMySQL(heroSlides);
+    return true;
+  }
+  return false;
 };
 
-// HOMEPAGE & PROMO BANNERS CRUD
-export const getHomepageBannersStore = (): HomepageBanner[] => homepageBanners;
+// HOMEPAGE & PROMO BANNERS CRUD (Direct MySQL)
+export const getHomepageBannersStore = async (): Promise<HomepageBanner[]> => {
+  try {
+    const promo = await fetchPromoBannerFromMySQL();
+    if (promo) homepageBanners = [promo];
+  } catch {}
+  return homepageBanners;
+};
 
-export const getPromoBannerStore = (): HomepageBanner => {
+export const getPromoBannerStore = async (): Promise<HomepageBanner> => {
+  try {
+    const promo = await fetchPromoBannerFromMySQL();
+    if (promo) return promo;
+  } catch {}
   return homepageBanners[0] || DEFAULT_PROMO_BANNER;
 };
 
-export const syncPromoBannersStore = (banners: HomepageBanner[]): HomepageBanner[] => {
-  if (Array.isArray(banners)) {
+export const syncPromoBannersStore = async (banners: HomepageBanner[]): Promise<HomepageBanner[]> => {
+  if (Array.isArray(banners) && banners.length > 0) {
     homepageBanners = banners;
-    saveToDisk();
+    await syncPromoBannerToMySQL(banners[0]);
   }
   return homepageBanners;
 };
 
-export const updatePromoBannerStore = (data: Partial<HomepageBanner>): HomepageBanner => {
+export const updatePromoBannerStore = async (data: Partial<HomepageBanner>): Promise<HomepageBanner> => {
   const current = homepageBanners[0] || DEFAULT_PROMO_BANNER;
   const updated: HomepageBanner = {
     ...current,
@@ -240,7 +166,7 @@ export const updatePromoBannerStore = (data: Partial<HomepageBanner>): HomepageB
     id: current.id || "promo-banner-main"
   };
   homepageBanners[0] = updated;
-  saveToDisk();
+  await syncPromoBannerToMySQL(updated);
   return updated;
 };
 
@@ -251,6 +177,5 @@ export const getStoreSettingsStore = () => storeSettings;
 
 export const updateStoreSettingsStore = (settings: Partial<StoreSettings>) => {
   storeSettings = { ...storeSettings, ...settings };
-  saveToDisk();
   return storeSettings;
 };

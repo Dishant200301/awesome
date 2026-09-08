@@ -15,6 +15,7 @@ export interface Subcategory {
   name: string;
   slug: string;
   image?: string;
+  isActive?: boolean;
 }
 
 export interface Brand {
@@ -22,6 +23,7 @@ export interface Brand {
   name: string;
   slug: string;
   logo?: string;
+  isActive?: boolean;
 }
 
 export interface AttributeValue {
@@ -78,6 +80,13 @@ export interface HomepageBanner {
   gridPosition?: 'Hero Side Upper' | 'Hero Side Lower' | 'Middle Wide' | 'Grid Left' | 'Grid Right' | 'Main Promo Banner';
   showTextOverlay?: boolean;
   status: 'Active' | 'Inactive';
+  tagline?: string;
+  badgeText?: string;
+  buttonLink?: string;
+  imageUrl?: string;
+  mobileImageUrl?: string;
+  bgColor?: string;
+  isActive?: boolean;
 }
 
 export interface ContentPageItem {
@@ -116,19 +125,27 @@ export interface FaqItem {
 
 export interface StoreSettings {
   storeName: string;
-  storeLogo: string;
-  email: string;
-  phone: string;
+  storeLogo?: string;
+  email?: string;
+  supportEmail?: string;
+  phone?: string;
+  supportPhone?: string;
   address: string;
   currency: string;
-  taxRate: number;
-  shippingFee: number;
+  currencySymbol?: string;
+  taxRate?: number;
+  shippingFee?: number;
+  flatShippingRate?: number;
   freeShippingThreshold: number;
-  facebookUrl: string;
-  instagramUrl: string;
-  twitterUrl: string;
-  metaTitle: string;
-  metaDescription: string;
+  enableCod?: boolean;
+  enableReviews?: boolean;
+  autoApproveReviews?: boolean;
+  maintenanceMode?: boolean;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+  metaTitle?: string;
+  metaDescription?: string;
 }
 
 export interface ReviewItem {

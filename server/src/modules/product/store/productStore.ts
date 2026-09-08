@@ -87,11 +87,13 @@ export interface ProductItem {
   hoverImage?: string;
   images: string[];
   galleryImages?: string[];
+  colorMediaConfigs?: any[];
 
   // Descriptions
   shortDescription?: string;
   fullDescription?: string;
   longDescription?: string;
+  description?: string;
 
   // Details, Specs, Attributes
   specifications?: ProductSpecification[];
@@ -131,41 +133,25 @@ export interface ProductItem {
   updatedAt?: string;
 }
 
-import fs from "fs";
-import path from "path";
-import { syncProductToMySQL, deleteProductFromMySQL } from "../../../database/mysqlSync.js";
-
-const DB_FILE_PATH = path.join(process.cwd(), "products_db.json");
+import { syncProductToMySQL, deleteProductFromMySQL, fetchProductsFromMySQL } from "../../../database/mysqlSync.js";
 
 class ProductStore {
   private products: ProductItem[] = [];
 
   constructor() {
-    this.loadFromDisk();
+    this.refreshFromMySQL();
   }
 
-  private loadFromDisk() {
+  public async refreshFromMySQL(): Promise<ProductItem[]> {
     try {
-      if (fs.existsSync(DB_FILE_PATH)) {
-        const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          this.products = parsed.filter(
-            (p) =>
-              p &&
-              p.name &&
-              !p.name.toLowerCase().includes("bralette") &&
-              !p.name.toLowerCase().includes("contour seamless bra") &&
-              !p.name.toLowerCase().includes("nipple covers")
-          ).map(p => this.normalizeProduct(p));
-          return;
-        }
+      const mysqlProducts = await fetchProductsFromMySQL(false);
+      if (Array.isArray(mysqlProducts)) {
+        this.products = mysqlProducts.map((p) => this.normalizeProduct(p));
       }
     } catch (e) {
-      console.warn("[ProductStore] Could not read products_db.json, using empty store.");
+      console.warn("[ProductStore] Error loading products from MySQL:", (e as Error).message);
     }
-    this.products = [];
-    this.saveToDisk();
+    return this.products;
   }
 
   private normalizeProduct(p: any): ProductItem {
@@ -230,15 +216,17 @@ class ProductStore {
       allowBackorders: Boolean(p.allowBackorders),
       trackInventory: p.trackInventory !== undefined ? Boolean(p.trackInventory) : true,
 
-      image: mainImg,
       mainImage: mainImg,
+      image: mainImg,
       hoverImage: p.hoverImage || "",
       images: allImages,
       galleryImages: galleryImgs,
+      colorMediaConfigs: Array.isArray(p.colorMediaConfigs) ? p.colorMediaConfigs : [],
 
-      shortDescription: p.shortDescription || p.subtitle || "",
-      fullDescription: p.fullDescription || p.longDescription || "",
-      longDescription: p.longDescription || p.fullDescription || "",
+      shortDescription: p.shortDescription || "",
+      fullDescription: p.fullDescription || p.description || "",
+      longDescription: p.longDescription || p.description || "",
+      description: p.description || p.fullDescription || "",
 
       specifications: Array.isArray(p.specifications) ? p.specifications : [],
       features: Array.isArray(p.features) ? p.features : [],
@@ -252,9 +240,9 @@ class ProductStore {
       colors: Array.isArray(p.colors) ? p.colors : [],
       variations: Array.isArray(p.variations) ? p.variations : (Array.isArray(p.variants) ? p.variants : []),
       variants: Array.isArray(p.variants) ? p.variants : (Array.isArray(p.variations) ? p.variations : []),
-      availableSizes: Array.isArray(p.availableSizes) ? p.availableSizes : ["Free Size"],
+      availableSizes: Array.isArray(p.availableSizes) ? p.availableSizes : [],
       descriptionCards: Array.isArray(p.descriptionCards) ? p.descriptionCards : [],
-      idealForPills: Array.isArray(p.idealForPills) ? p.idealForPills : ["Handmade", "Festive"],
+      idealForPills: Array.isArray(p.idealForPills) ? p.idealForPills : [],
       washingInstructions: Array.isArray(p.washingInstructions) ? p.washingInstructions : [],
       manufacturingInfo: p.manufacturingInfo || {
         manufacturer: "Awesome Handmade Studio",
@@ -280,14 +268,6 @@ class ProductStore {
     };
   }
 
-  private saveToDisk() {
-    try {
-      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(this.products, null, 2), "utf-8");
-    } catch (e) {
-      console.error("[ProductStore] Failed to write products_db.json:", e);
-    }
-  }
-
   public getAll(onlyPublished = false): ProductItem[] {
     if (onlyPublished) {
       return this.products.filter(p => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive');
@@ -301,7 +281,7 @@ class ProductStore {
     );
   }
 
-  public add(productData: Partial<ProductItem> | any): ProductItem {
+  public async add(productData: Partial<ProductItem> | any): Promise<ProductItem> {
     const normalized = this.normalizeProduct({
       ...productData,
       id: productData.id || `prod-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -309,84 +289,63 @@ class ProductStore {
       updatedAt: new Date().toISOString()
     });
 
-    const existingIdx = this.products.findIndex((p) => p.id === normalized.id);
-    if (existingIdx !== -1) {
-      this.products[existingIdx] = { ...this.products[existingIdx], ...normalized };
-    } else {
-      this.products.unshift(normalized);
-    }
-    this.saveToDisk();
-    syncProductToMySQL(normalized).catch((e) => console.warn("[MySQL Sync] add product error:", e));
+    await syncProductToMySQL(normalized);
+    await this.refreshFromMySQL();
     return normalized;
   }
 
-  public update(id: string, updateData: Partial<ProductItem> | any): ProductItem | null {
-    const index = this.products.findIndex((p) => p.id === id);
-    if (index === -1) return null;
-
-    const existing = this.products[index];
+  public async update(id: string, updateData: Partial<ProductItem> | any): Promise<ProductItem | null> {
+    const existing = this.products.find((p) => p.id === id);
     const merged = {
-      ...existing,
+      ...(existing || {}),
       ...updateData,
-      id, // protect ID
+      id,
       updatedAt: new Date().toISOString()
     };
 
     const normalized = this.normalizeProduct(merged);
-    this.products[index] = normalized;
-    this.saveToDisk();
-    syncProductToMySQL(normalized).catch((e) => console.warn("[MySQL Sync] update product error:", e));
+    await syncProductToMySQL(normalized);
+    await this.refreshFromMySQL();
     return normalized;
   }
 
-  public delete(id: string): boolean {
+  public async delete(id: string): Promise<boolean> {
     const target = String(id).trim();
-    const len = this.products.length;
-    this.products = this.products.filter((p) => String(p.id) !== target && String(p.slug) !== target);
-    const deleted = this.products.length < len;
-    if (deleted) {
-      this.saveToDisk();
-      deleteProductFromMySQL(target).catch((e) => console.warn("[MySQL Sync] delete product error:", e));
-    }
-    return deleted;
+    await deleteProductFromMySQL(target);
+    await this.refreshFromMySQL();
+    return true;
   }
 
-  public bulkDelete(ids: string[]): number {
+  public async bulkDelete(ids: string[]): Promise<number> {
     const stringIds = ids.map((i) => String(i).trim());
-    const initialLen = this.products.length;
-    this.products = this.products.filter(
-      (p) => !stringIds.includes(String(p.id)) && !stringIds.includes(String(p.slug))
-    );
-    const count = initialLen - this.products.length;
-    if (count > 0) {
-      this.saveToDisk();
-      stringIds.forEach((sid) => {
-        deleteProductFromMySQL(sid).catch((e) => console.warn("[MySQL Sync] bulkDelete product error:", e));
-      });
+    for (const sid of stringIds) {
+      await deleteProductFromMySQL(sid);
     }
-    return count;
+    await this.refreshFromMySQL();
+    return stringIds.length;
   }
 
-  public bulkStatus(ids: string[], isPublished: boolean, status?: string): number {
+  public async bulkStatus(ids: string[], isPublished: boolean, status?: string): Promise<number> {
     let count = 0;
     const resolvedStatus = status || (isPublished ? "Active" : "Inactive");
-    this.products = this.products.map((p) => {
-      if (ids.includes(p.id)) {
-        count++;
-        return {
+    for (const id of ids) {
+      const p = this.products.find((prod) => prod.id === id);
+      if (p) {
+        const updated = {
           ...p,
           isPublished,
           status: (resolvedStatus === 'Active' ? 'Published' : resolvedStatus) as any,
           updatedAt: new Date().toISOString()
         };
+        await syncProductToMySQL(updated);
+        count++;
       }
-      return p;
-    });
-    if (count > 0) this.saveToDisk();
+    }
+    await this.refreshFromMySQL();
     return count;
   }
 
-  public duplicate(id: string): ProductItem | null {
+  public async duplicate(id: string): Promise<ProductItem | null> {
     const original = this.products.find((p) => p.id === id);
     if (!original) return null;
 
@@ -404,16 +363,15 @@ class ProductStore {
       updatedAt: new Date().toISOString()
     };
 
-    this.products.unshift(cloned);
-    this.saveToDisk();
+    await syncProductToMySQL(cloned);
+    await this.refreshFromMySQL();
     return cloned;
   }
 
-  public toggleStatus(id: string, customStatus?: string): ProductItem | null {
-    const index = this.products.findIndex((p) => p.id === id);
-    if (index === -1) return null;
+  public async toggleStatus(id: string, customStatus?: string): Promise<ProductItem | null> {
+    const existing = this.products.find((p) => p.id === id);
+    if (!existing) return null;
 
-    const existing = this.products[index];
     let isPublished = !existing.isPublished;
     let status: any = isPublished ? 'Published' : 'Inactive';
 
@@ -429,8 +387,8 @@ class ProductStore {
       updatedAt: new Date().toISOString()
     };
 
-    this.products[index] = updated;
-    this.saveToDisk();
+    await syncProductToMySQL(updated);
+    await this.refreshFromMySQL();
     return updated;
   }
 

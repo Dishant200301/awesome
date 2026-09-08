@@ -29,7 +29,6 @@ import {
   DollarSign
 } from 'lucide-react';
 import { 
-  getAdminProducts,
   broadcastAdminProductChange
 } from '../data/mockAdminData';
 import { Product, Category, Subcategory, Brand } from '../types/admin';
@@ -168,22 +167,17 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
         sort: sortBy
       });
 
-      const localProducts = getAdminProducts();
-      if (res && Array.isArray(res.items) && res.items.length > 0) {
-        const serverIds = new Set(res.items.map((p: any) => String(p.id)));
-        const unsyncedLocals = localProducts.filter((p: any) => !serverIds.has(String(p.id)));
-        const combined = [...unsyncedLocals, ...res.items];
-        setProducts(combined);
-        setTotalCount(res.total !== undefined ? Math.max(res.total, combined.length) : combined.length);
+      if (res && Array.isArray(res.items)) {
+        setProducts(res.items);
+        setTotalCount(res.total !== undefined ? res.total : res.items.length);
       } else {
-        setProducts(localProducts);
-        setTotalCount(localProducts.length);
+        setProducts([]);
+        setTotalCount(0);
       }
     } catch (e) {
       console.error('Failed to load products:', e);
-      const fallback = getAdminProducts();
-      setProducts(fallback);
-      setTotalCount(fallback.length);
+      setProducts([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

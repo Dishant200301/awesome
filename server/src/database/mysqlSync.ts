@@ -223,6 +223,121 @@ export async function syncAllCategoriesToMySQL(parents: any[], subs: any[]): Pro
 }
 
 /**
+ * Fetch all products directly from MySQL tables (products, variants, images)
+ */
+export async function fetchProductsFromMySQL(onlyPublished = false): Promise<ProductItem[]> {
+  try {
+    let query = `
+      SELECT p.*, c.name as category_name, sc.name as subcategory_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN sub_categories sc ON p.subcategory_id = sc.id
+    `;
+    if (onlyPublished) {
+      query += ` WHERE p.is_published = 1 AND (p.status = 'Published' OR p.status = 'Active')`;
+    }
+    query += ` ORDER BY p.created_at DESC`;
+
+    const [rows] = await sequelize.query(query);
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return [];
+    }
+
+    const productIds = rows.map((r: any) => r.id);
+    let variantsRows: any[] = [];
+    let imagesRows: any[] = [];
+
+    try {
+      const [v] = await sequelize.query(
+        `SELECT * FROM product_variants WHERE product_id IN (?) ORDER BY id ASC`,
+        { replacements: [productIds] }
+      );
+      if (Array.isArray(v)) variantsRows = v;
+    } catch {}
+
+    try {
+      const [img] = await sequelize.query(
+        `SELECT * FROM product_images WHERE product_id IN (?) ORDER BY display_order ASC`,
+        { replacements: [productIds] }
+      );
+      if (Array.isArray(img)) imagesRows = img;
+    } catch {}
+
+    const variantsMap = new Map<string, any[]>();
+    for (const v of variantsRows) {
+      if (!variantsMap.has(v.product_id)) variantsMap.set(v.product_id, []);
+      variantsMap.get(v.product_id)!.push({
+        id: v.id,
+        sku: v.sku,
+        colorName: v.color_name,
+        colorHex: v.color_hex,
+        size: v.size_name,
+        sizeName: v.size_name,
+        price: Number(v.price),
+        originalPrice: Number(v.original_price),
+        costPrice: Number(v.cost_price),
+        stock: Number(v.stock),
+        thumbnail: v.thumbnail_url,
+        status: v.status
+      });
+    }
+
+    const imagesMap = new Map<string, string[]>();
+    for (const img of imagesRows) {
+      if (!imagesMap.has(img.product_id)) imagesMap.set(img.product_id, []);
+      imagesMap.get(img.product_id)!.push(img.image_url);
+    }
+
+    return rows.map((r: any) => {
+      const pImages = imagesMap.get(r.id) || (r.image_url ? [r.image_url] : ["/images/category/Latkan.webp"]);
+      const pVariants = variantsMap.get(r.id) || [];
+      const mainImg = r.image_url || pImages[0] || "/images/category/Latkan.webp";
+
+      return {
+        id: r.id,
+        name: r.name,
+        subtitle: r.subtitle || "",
+        brand: r.brand || "Awesome Handmade",
+        category: r.category_name || "Latkan",
+        subcategory: r.subcategory_name || "",
+        subCategory: r.subcategory_name || "",
+        categories: [r.category_name || "Latkan"],
+        slug: r.slug,
+        sku: r.default_sku,
+        defaultSku: r.default_sku,
+        barcode: r.barcode || "",
+        regularPrice: Number(r.original_price || r.price || 0),
+        originalPrice: Number(r.original_price || r.price || 0),
+        price: Number(r.price || 0),
+        discountType: "percentage",
+        discountValue: Number(r.discount_percentage || 0),
+        stock: Number(r.stock || 0),
+        mainImage: mainImg,
+        image: mainImg,
+        images: pImages,
+        galleryImages: pImages.filter((img) => img !== mainImg),
+        shortDescription: r.short_description || "",
+        description: r.full_description || r.short_description || "",
+        fullDescription: r.full_description || "",
+        longDescription: r.full_description || "",
+        variations: pVariants,
+        variants: pVariants,
+        rating: Number(r.rating || 5.0),
+        reviewCount: Number(r.review_count || 1),
+        isFeatured: Boolean(r.is_featured),
+        isPublished: Boolean(r.is_published),
+        status: r.status || (r.is_published ? "Published" : "Draft"),
+        createdAt: r.created_at ? new Date(r.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString()
+      } as any;
+    });
+  } catch (err) {
+    console.error("[MySQL Sync] Error fetching products from database:", (err as Error).message);
+    return [];
+  }
+}
+
+/**
  * Cleanly syncs a Product (and its variants/images) to MySQL tables
  */
 export async function syncProductToMySQL(p: ProductItem): Promise<void> {
