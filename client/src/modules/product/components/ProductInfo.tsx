@@ -443,7 +443,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
         <div className="flex items-center gap-2 pt-0.5">
           <div className="flex text-amber-400 gap-0.5">
             {[...Array(5)].map((_, i) => {
-              const ratingVal = product.rating || 5;
+              const ratingVal = Number(product.rating || 0);
               const isFilled = i < Math.floor(ratingVal);
               return (
                 <FiStar
@@ -454,17 +454,20 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
               );
             })}
           </div>
-          {product.reviewCount !== undefined && (
-            <span
-              onClick={() => {
-                const revEl = document.getElementById("customer-reviews");
-                revEl?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="text-xs text-zinc-400 hover:text-zinc-700 cursor-pointer transition-colors font-medium"
-            >
-              ({product.reviewCount} reviews)
-            </span>
-          )}
+          <span
+            onClick={() => {
+              const revEl = document.getElementById("customer-reviews");
+              revEl?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="text-xs text-zinc-400 hover:text-zinc-700 cursor-pointer transition-colors font-medium"
+          >
+            {Number(product.rating || 0) > 0 && (
+              <span className="font-bold text-zinc-700 mr-1.5">
+                {Number(product.rating).toFixed(1)}
+              </span>
+            )}
+            ({Number(product.reviewCount || 0)} {Number(product.reviewCount || 0) === 1 ? "review" : "reviews"})
+          </span>
         </div>
       </div>
 

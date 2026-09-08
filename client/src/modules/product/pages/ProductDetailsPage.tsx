@@ -34,6 +34,25 @@ export const ProductDetailsPage: React.FC = () => {
     () => product?.colors?.[0]?.sizes?.[0] || product?.variations?.[0]?.size || product?.availableSizes?.[0] || "Standard Pair"
   );
 
+  const [currentRating, setCurrentRating] = useState<number>(() => Number(product?.rating || 0));
+  const [currentReviewCount, setCurrentReviewCount] = useState<number>(() => Number(product?.reviewCount || 0));
+
+  useEffect(() => {
+    if (product) {
+      setCurrentRating(Number(product.rating || 0));
+      setCurrentReviewCount(Number(product.reviewCount || 0));
+    }
+  }, [product?.id, product?.rating, product?.reviewCount]);
+
+  const productWithDynamicReviews = React.useMemo(() => {
+    if (!product) return product;
+    return {
+      ...product,
+      rating: currentRating,
+      reviewCount: currentReviewCount,
+    };
+  }, [product, currentRating, currentReviewCount]);
+
   useEffect(() => {
     const qColor = searchParams.get("color");
     if (qColor) {
@@ -327,7 +346,7 @@ export const ProductDetailsPage: React.FC = () => {
             {/* Right Column: Product Information (50% Width on Tablet & Laptop) */}
             <div className="w-full">
               <ProductInfo
-                product={product}
+                product={productWithDynamicReviews}
                 activeVariation={activeVariation}
                 selectedColor={selectedColor}
                 onSelectVariation={(v) => {
@@ -358,7 +377,7 @@ export const ProductDetailsPage: React.FC = () => {
 
         {/* PRODUCT DESCRIPTION & FEATURE CARDS */}
         <ProductDescriptionSection
-          product={product}
+          product={productWithDynamicReviews}
           cards={product.descriptionCards}
           selectedColor={selectedColor}
           idealForPills={product.idealForPills}
@@ -375,7 +394,7 @@ export const ProductDetailsPage: React.FC = () => {
           highlights={product.highlights}
           productAttributes={product.productAttributes}
           careInstructions={product.extendedDetails?.careInstructions || (product as any).careInstructions}
-          reviewCount={product.reviewCount}
+          reviewCount={currentReviewCount}
         />
         {/* BENEFITS SECTION */}
         {/* <BenefitsSection /> */}
@@ -389,8 +408,12 @@ export const ProductDetailsPage: React.FC = () => {
           <CustomerReviewsSection
             productId={product.id}
             productName={product.name}
-            productRating={product.rating || 4.9}
-            productReviewCount={product.reviewCount || (product as any).salesCount || 12}
+            productRating={currentRating}
+            productReviewCount={currentReviewCount}
+            onReviewsUpdated={(newAvg, newCount) => {
+              setCurrentRating(newAvg);
+              setCurrentReviewCount(newCount);
+            }}
           />
         </div>
       </div>

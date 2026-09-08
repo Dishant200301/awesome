@@ -266,8 +266,6 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   const [sellingPrice, setSellingPrice] = useState<string>('799');
   const [regularPrice, setRegularPrice] = useState<string>('999');
   const [stock, setStock] = useState<string>('25');
-  const [rating, setRating] = useState<string>('5.0');
-  const [reviewCount, setReviewCount] = useState<string>('0');
 
   // 4. PRODUCT IMAGES (Main + Gallery)
   const [images, setImages] = useState<string[]>([
@@ -422,8 +420,6 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         setRegularPrice(String(prod.regularPrice || prod.originalPrice || prod.price || 999));
         setSku(prod.sku || prod.defaultSku || 'AH-LAT-001');
         setStock(String(prod.stock !== undefined ? prod.stock : 25));
-        setRating(String(prod.rating !== undefined && prod.rating !== null ? prod.rating : '5.0'));
-        setReviewCount(String(prod.reviewCount !== undefined && prod.reviewCount !== null ? prod.reviewCount : '0'));
 
         // Descriptions & Content
         setShortDescription(prod.shortDescription || prod.subtitle || '');
@@ -1016,8 +1012,8 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 galleryImages: effectiveGallery
               }
             ],
-      rating: !isNaN(Number(rating)) && Number(rating) >= 0 ? Number(Number(rating).toFixed(1)) : (rawExistingProduct?.rating !== undefined ? Number(rawExistingProduct.rating) : 5.0),
-      reviewCount: !isNaN(Number(reviewCount)) && Number(reviewCount) >= 0 ? Math.floor(Number(reviewCount)) : (rawExistingProduct?.reviewCount !== undefined ? Number(rawExistingProduct.reviewCount) : 0)
+      rating: rawExistingProduct?.rating !== undefined && rawExistingProduct?.rating !== null ? Number(rawExistingProduct.rating) : 0,
+      reviewCount: rawExistingProduct?.reviewCount !== undefined && rawExistingProduct?.reviewCount !== null ? Number(rawExistingProduct.reviewCount) : 0
     };
 
     try {
@@ -1180,9 +1176,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
           </div>
 
           {/* Row 1: Name, Category, Subcategory */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {/* Product Name */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 lg:col-span-2">
               <label className="text-xs font-semibold text-neutral-700">
                 Product Name <span className="text-rose-500">*</span>
               </label>
@@ -1252,7 +1248,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
           {/* Row 2: For Simple vs Variable */}
           {productType === 'Simple' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-neutral-700">SKU</label>
                 <input
@@ -1314,7 +1310,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 pt-1">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-neutral-700">SKU</label>
                 <input
@@ -1328,109 +1324,8 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                   className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-mono"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">Brand (Optional)</label>
-                <input
-                  type="text"
-                  value={brand}
-                  onChange={(e) => {
-                    setBrand(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="e.g. Awesome Handmade"
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">Tags (Optional)</label>
-                <input
-                  type="text"
-                  value={tags}
-                  onChange={(e) => {
-                    setTags(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="e.g. handmade, bridal"
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                />
-              </div>
             </div>
           )}
-
-          {/* Row 3: Rating & Customer Reviews (Editable & Dynamic) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-neutral-100">
-            {productType === 'Simple' && (
-              <>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-neutral-700">Brand (Optional)</label>
-                  <input
-                    type="text"
-                    value={brand}
-                    onChange={(e) => {
-                      setBrand(e.target.value);
-                      setIsDirty(true);
-                    }}
-                    placeholder="e.g. Awesome Handmade"
-                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-neutral-700">Tags (Optional)</label>
-                  <input
-                    type="text"
-                    value={tags}
-                    onChange={(e) => {
-                      setTags(e.target.value);
-                      setIsDirty(true);
-                    }}
-                    placeholder="e.g. handmade, bridal"
-                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                  />
-                </div>
-              </>
-            )}
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-700 flex items-center gap-1">
-                <span>Rating (★)</span>
-                <span className="text-[10px] text-neutral-400 font-normal">(0.0 - 5.0)</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="5"
-                value={rating}
-                onChange={(e) => {
-                  setRating(e.target.value);
-                  setIsDirty(true);
-                }}
-                placeholder="e.g. 5.0"
-                className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-700 flex items-center gap-1">
-                <span>Reviews Count</span>
-                <span className="text-[10px] text-neutral-400 font-normal">(Total reviews)</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={reviewCount}
-                onChange={(e) => {
-                  setReviewCount(e.target.value);
-                  setIsDirty(true);
-                }}
-                placeholder="e.g. 0"
-                className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium"
-              />
-            </div>
-          </div>
         </div>
 
         {/* 3. VARIANT ATTRIBUTES & GENERATION (ONLY IN VARIABLE PRODUCT MODE) */}

@@ -972,10 +972,14 @@ export default function ShopPage() {
     const c5 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 5).length;
     const c4 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 4).length;
     const c3 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 3).length;
+    const c2 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 2).length;
+    const c1 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 1).length;
     return [
       { stars: 5, count: c5 },
       { stars: 4, count: c4 },
       { stars: 3, count: c3 },
+      { stars: 2, count: c2 },
+      { stars: 1, count: c1 },
     ];
   }, [categoryScopedItems]);
 
@@ -1124,25 +1128,21 @@ export default function ShopPage() {
                   ({allShopItems.length})
                 </span>
               </button>
-            </li>
-
-            {(liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || []))
+            </li>            {(liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || []))
               .filter((c: any) => c && c.name && c.isActive !== false)
               .map((cat: any) => {
-              const catKey = cat.name;
-              const catName = cat.name;
-              const isActive = (selectedCategory || "").toLowerCase() === catKey.toLowerCase();
-              const realCount = allShopItems.filter((item) => matchProductCategory(item.parentProduct, catKey)).length;
-              const subList = (Array.isArray(cat.subs) ? cat.subs : (Array.isArray(cat.subcategories) ? cat.subcategories : []))
-                .filter((s: any) => s && s.name && s.isActive !== false);
+                const catKey = cat.name;
+                const catName = cat.name;
+                const isActive = (selectedCategory || "").toLowerCase() === catKey.toLowerCase();
+                const realCount = allShopItems.filter((item) => matchProductCategory(item.parentProduct, catKey)).length;
 
-              return (
-                <li key={cat.id || catKey} className="space-y-1">
-                  <div className="flex items-center justify-between w-full">
+                return (
+                  <li key={cat.id || catKey}>
                     <button
                       type="button"
                       onClick={() => {
-                        if (isActive && !selectedSubCategory) {
+                        setCurrentPage(1);
+                        if (isActive) {
                           setSelectedCategory(null);
                           setSelectedSubCategory(null);
                           setSearchParams({});
@@ -1152,75 +1152,18 @@ export default function ShopPage() {
                           setSearchParams({ category: catKey });
                         }
                       }}
-                      className={`flex flex-1 items-center justify-between text-left hover:text-[#520618] transition-colors cursor-pointer py-1 ${
-                        isActive ? "text-[#520618] font-extrabold" : ""
+                      className={`flex w-full items-center justify-between text-left hover:text-[#520618] transition-colors cursor-pointer py-1 ${
+                        isActive ? "text-[#520618] font-extrabold" : "text-zinc-600 hover:text-zinc-900"
                       }`}
                     >
                       <span className="truncate">{catName}</span>
-                      <span className="text-zinc-400 font-normal text-[10px] shrink-0 ml-1">
+                      <span className={`text-[10px] shrink-0 ml-1 font-normal ${isActive ? "text-[#520618] font-bold" : "text-zinc-400"}`}>
                         ({realCount})
                       </span>
                     </button>
-                  </div>
-
-                  {/* Dynamic Subcategories under Selected Category */}
-                  {isActive && subList.length > 0 && (
-                    <ul className="pl-3 py-1 space-y-1 border-l-2 border-[#520618]/25 ml-1 animate-fade-slide-down">
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedSubCategory(null);
-                            setSearchParams({ category: catKey });
-                          }}
-                          className={`flex w-full items-center justify-between text-left text-[11px] py-0.5 hover:text-[#520618] transition-colors cursor-pointer ${
-                            !selectedSubCategory ? "text-[#520618] font-bold" : "text-zinc-500 hover:text-zinc-800"
-                          }`}
-                        >
-                          <span>• All {catName}</span>
-                        </button>
-                      </li>
-                      {subList.map((sub: any) => {
-                        const subName = sub.name;
-                        const isSubActive = (selectedSubCategory || "").toLowerCase() === subName.toLowerCase() ||
-                          (selectedSubCategory || "").toLowerCase() === (sub.slug || "").toLowerCase();
-                        const subCount = allShopItems.filter((item: any) => {
-                          if (!matchProductCategory(item.parentProduct, catKey)) return false;
-                          const pSub = (item.subcategory || item.parentProduct?.subcategory || item.parentProduct?.subCategory || "").toLowerCase();
-                          const sTarget = subName.toLowerCase();
-                          return pSub === sTarget || pSub.includes(sTarget) || sTarget.includes(pSub);
-                        }).length;
-
-                        return (
-                          <li key={sub.slug || subName}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (isSubActive) {
-                                  setSelectedSubCategory(null);
-                                  setSearchParams({ category: catKey });
-                                } else {
-                                  setSelectedSubCategory(subName);
-                                  setSearchParams({ category: catKey, sub: subName });
-                                }
-                              }}
-                              className={`flex w-full items-center justify-between text-left text-[11px] py-0.5 hover:text-[#520618] transition-colors cursor-pointer ${
-                                isSubActive ? "text-[#520618] font-bold" : "text-zinc-500 hover:text-zinc-800"
-                              }`}
-                            >
-                              <span className="truncate">• {subName}</span>
-                              <span className="text-zinc-400 font-normal text-[9px] shrink-0 ml-1">
-                                ({subCount})
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </li>
-              );
-            })}
+                  </li>
+                );
+              })}
           </ul>
         )}
       </div>

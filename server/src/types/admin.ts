@@ -155,6 +155,7 @@ export interface ReviewItem {
   productImage?: string;
   author: string;
   email: string;
+  title?: string;
   rating: number;
   comment: string;
   date: string;

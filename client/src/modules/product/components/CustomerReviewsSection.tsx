@@ -12,89 +12,15 @@ import { API_BASE_URL } from "@/modules/core/lib/apiStore";
 export interface Review {
   id: string;
   author: string;
+  email?: string;
   rating: number;
   date: string;
   verified: boolean;
-  title: string;
+  title?: string;
   comment: string;
   likes: number;
-  sizeBought: string;
+  sizeBought?: string;
 }
-
-const REVIEWS_DATA: Review[] = [
-  {
-    id: "r1",
-    author: "Priya S.",
-    rating: 5,
-    date: "July 18, 2026",
-    verified: true,
-    title: "Absolute game changer for bridal & festive outfits!",
-    comment:
-      "I ordered mirror latkans and necklace set from Awesome Handmade. The finish, real mirror shine, and resham thread work are exceptional! Made my bridal lehenga look so royal.",
-    likes: 42,
-    sizeBought: "Standard Pair",
-  },
-  {
-    id: "r2",
-    author: "Ananya R.",
-    rating: 5,
-    date: "July 12, 2026",
-    verified: true,
-    title: "Stunning Gujarati craftsmanship & fast dispatch",
-    comment:
-      "The Navratri Choli and matching earrings received so many compliments! Authentic traditional mirror embroidery made with love in Surat. Highly recommend!",
-    likes: 28,
-    sizeBought: "Free Size",
-  },
-  {
-    id: "r3",
-    author: "Meera K.",
-    rating: 5,
-    date: "June 29, 2026",
-    verified: true,
-    title: "Perfect festive gift hampers for family!",
-    comment:
-      "Ordered macrame keychain gift hampers for our wedding favor gifts. Beautiful packaging, handmade quality and pristine detailing.",
-    likes: 19,
-    sizeBought: "Gift Box",
-  },
-  {
-    id: "r4",
-    author: "Sneha M.",
-    rating: 5,
-    date: "June 15, 2026",
-    verified: true,
-    title: "Best handmade accessories in Surat",
-    comment:
-      "Intricate thread work and anti-tarnish beads. Very lightweight to wear with lehengas. Fast 2-day delivery by Awesome Handmade!",
-    likes: 15,
-    sizeBought: "Standard",
-  },
-  {
-    id: "r5",
-    author: "Kavita P.",
-    rating: 5,
-    date: "June 02, 2026",
-    verified: true,
-    title: "Beautiful mirror work and fine finish",
-    comment:
-      "The craftsmanship is authentic and artistic. The golden tassels and mirror shine are exactly as pictured on the site.",
-    likes: 11,
-    sizeBought: "Free Size",
-  },
-  {
-    id: "r6",
-    author: "Ritu D.",
-    rating: 4,
-    date: "May 20, 2026",
-    verified: true,
-    title: "Lovely handcrafted details and packing",
-    comment:
-      "Carefully packaged with a personal artisan note. Perfect gift for the festive season.",
-    likes: 8,
-    sizeBought: "Standard",
-  },
-];
 
 /* Custom Shadcn UI Style Select Dropdown Component */
 interface ShadcnSelectOption {
@@ -122,7 +48,6 @@ const ShadcnSelect: React.FC<ShadcnSelectProps> = ({
 
   return (
     <div className={`relative inline-block text-left ${className}`}>
-      {/* Shadcn UI Trigger Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -141,7 +66,6 @@ const ShadcnSelect: React.FC<ShadcnSelectProps> = ({
         />
       </button>
 
-      {/* Shadcn UI Popover Menu */}
       {isOpen && (
         <div className="absolute left-0 top-full mt-1.5 z-50 min-w-full w-max bg-white border border-zinc-200/90 rounded-md shadow-lg p-1 font-sans">
           {options.map((opt) => {
@@ -177,13 +101,15 @@ export interface CustomerReviewsSectionProps {
   productName?: string;
   productRating?: number;
   productReviewCount?: number;
+  onReviewsUpdated?: (newRating: number, newCount: number) => void;
 }
 
 export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
   productId,
   productName,
-  productRating = 4.9,
-  productReviewCount = 12,
+  productRating = 0,
+  productReviewCount = 0,
+  onReviewsUpdated,
 }) => {
   const [liveReviews, setLiveReviews] = useState<Review[]>([]);
   const [likesState, setLikesState] = useState<Record<string, number>>({});
@@ -201,31 +127,35 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Fetch live reviews from database API
+  // Fetch real reviews from database API
   useEffect(() => {
     if (!productId) return;
     fetch(`${API_BASE_URL}/reviews?productId=${productId}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((json) => {
-        if (json?.data && Array.isArray(json.data) && json.data.length > 0) {
+        if (json?.data && Array.isArray(json.data)) {
           const mapped: Review[] = json.data.map((r: any) => ({
             id: String(r.id),
-            author: r.author || "Artisan Lover",
+            author: r.author || "Customer",
+            email: r.email || "",
             rating: Number(r.rating) || 5,
-            date: r.date || new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+            date: r.date || (r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })),
             verified: r.verified !== undefined ? Boolean(r.verified) : true,
-            title: r.title || r.comment?.slice(0, 45) || "Handcrafted Quality",
+            title: r.title || "",
             comment: r.comment || "",
-            likes: Number(r.likes) || 12,
-            sizeBought: r.sizeBought || "Standard Pair",
+            likes: Number(r.likes) || 0,
+            sizeBought: r.sizeBought || "",
           }));
           setLiveReviews(mapped);
+          const liveCount = mapped.length;
+          const liveAvg = liveCount > 0 ? Number((mapped.reduce((acc, r) => acc + r.rating, 0) / liveCount).toFixed(1)) : 0;
+          onReviewsUpdated?.(liveAvg, liveCount);
         }
       })
       .catch(() => {});
   }, [productId]);
 
-  const allReviews = liveReviews.length > 0 ? liveReviews : REVIEWS_DATA;
+  const allReviews = liveReviews;
 
   const handleLike = (id: string) => {
     if (likedMap[id]) return;
@@ -241,13 +171,13 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
     const newRevObj: Review = {
       id: `rev-${Date.now()}`,
       author: newAuthor.trim(),
+      email: newEmail.trim(),
       rating: newRating,
       date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
       verified: true,
-      title: newTitle.trim() || "Exquisite Handmade Quality",
+      title: newTitle.trim(),
       comment: newComment.trim(),
-      likes: 1,
-      sizeBought: "Standard Pair",
+      likes: 0,
     };
 
     try {
@@ -265,7 +195,13 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
           status: "Approved",
         }),
       });
-      setLiveReviews((prev) => [newRevObj, ...prev]);
+
+      const updated = [newRevObj, ...liveReviews];
+      setLiveReviews(updated);
+      const newCount = updated.length;
+      const newAvg = Number((updated.reduce((acc, r) => acc + r.rating, 0) / newCount).toFixed(1));
+      onReviewsUpdated?.(newAvg, newCount);
+
       setSubmitSuccess(true);
       setTimeout(() => {
         setSubmitSuccess(false);
@@ -277,7 +213,11 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
         setNewRating(5);
       }, 1500);
     } catch {
-      setLiveReviews((prev) => [newRevObj, ...prev]);
+      const updated = [newRevObj, ...liveReviews];
+      setLiveReviews(updated);
+      const newCount = updated.length;
+      const newAvg = Number((updated.reduce((acc, r) => acc + r.rating, 0) / newCount).toFixed(1));
+      onReviewsUpdated?.(newAvg, newCount);
       setIsWriteModalOpen(false);
     } finally {
       setIsSubmitting(false);
@@ -294,6 +234,8 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
     { value: "5", label: "5 Stars" },
     { value: "4", label: "4 Stars" },
     { value: "3", label: "3 Stars" },
+    { value: "2", label: "2 Stars" },
+    { value: "1", label: "1 Star" },
   ];
 
   // Filter and sort reviews according to user selection
@@ -307,8 +249,12 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
-  const displayRating = Number(productRating || 4.9).toFixed(1);
-  const displayReviewCount = liveReviews.length > 0 ? liveReviews.length : (productReviewCount || allReviews.length);
+  const currentCount = liveReviews.length;
+  const currentAvg = currentCount > 0
+    ? Number((liveReviews.reduce((acc, r) => acc + r.rating, 0) / currentCount).toFixed(1))
+    : Number(productRating || 0);
+  const displayRating = currentAvg > 0 ? currentAvg.toFixed(1) : "0.0";
+  const displayReviewCount = currentCount > 0 ? currentCount : (productReviewCount || 0);
 
   return (
     <section className="w-full py-10 md:py-12 px-4 md:px-8 max-w-[1500px] mx-auto space-y-6 md:space-y-8 font-sans">
@@ -332,45 +278,47 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
         </button>
       </div>
 
-      {/* Overall Rating Box & Filters Row (Full width & stacked filters on mobile, Left-Right on Laptop/Tablet) */}
+      {/* Overall Rating Box & Filters Row */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-zinc-200 pb-4">
-        {/* Left Side: Overall Rating Card (Full width on mobile w-full, w-fit on tablet/desktop) */}
+        {/* Left Side: Overall Rating Card */}
         <div className="flex items-center justify-between sm:justify-start gap-3 p-4 sm:p-5 rounded-2xl border border-zinc-200/80 bg-[#f5f2ee]/60 w-full md:w-fit shrink-0">
           <span className="text-3xl sm:text-4xl font-black text-zinc-900">{displayRating}</span>
           <div className="flex items-center gap-1.5">
-            <div className="flex text-amber-500">
+            <div className="flex text-amber-400">
               {[...Array(5)].map((_, i) => (
                 <FiStar
                   key={i}
                   size={18}
-                  className={i < Math.floor(Number(displayRating)) ? "fill-amber-500 text-amber-500" : "fill-amber-200 text-amber-300"}
+                  className={i < Math.floor(Number(displayRating)) ? "fill-amber-400 text-amber-400" : "fill-zinc-200 text-zinc-300"}
                 />
               ))}
             </div>
-            <span className="text-xs sm:text-sm font-bold text-[#520618] ml-1">({displayReviewCount} reviews)</span>
+            <span className="text-xs sm:text-sm font-bold text-[#520618] ml-1">
+              ({displayReviewCount} {displayReviewCount === 1 ? "review" : "reviews"})
+            </span>
           </div>
         </div>
 
-        {/* Right Side: Sort & Filter Dropdowns (Stacked vertically on mobile, side-by-side on tablet/desktop) */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-start md:justify-end gap-3 w-full md:w-auto">
-          {/* Sort By Dropdown (Shadcn UI Style) */}
-          <ShadcnSelect
-            labelPrefix="Sort by"
-            value={sortBy}
-            onChange={(val) => setSortBy(val)}
-            options={sortOptions}
-            className="w-full sm:w-auto"
-          />
+        {/* Right Side: Sort & Filter Dropdowns (Only if reviews exist) */}
+        {allReviews.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-start md:justify-end gap-3 w-full md:w-auto">
+            <ShadcnSelect
+              labelPrefix="Sort by"
+              value={sortBy}
+              onChange={(val) => setSortBy(val)}
+              options={sortOptions}
+              className="w-full sm:w-auto"
+            />
 
-          {/* Filter Dropdown (Placed below Sort by on mobile view) */}
-          <ShadcnSelect
-            labelPrefix="Filter"
-            value={filterRating}
-            onChange={(val) => setFilterRating(val)}
-            options={filterOptions}
-            className="w-full sm:w-auto"
-          />
-        </div>
+            <ShadcnSelect
+              labelPrefix="Filter"
+              value={filterRating}
+              onChange={(val) => setFilterRating(val)}
+              options={filterOptions}
+              className="w-full sm:w-auto"
+            />
+          </div>
+        )}
       </div>
 
       {/* Write Review Modal */}
@@ -398,7 +346,7 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
               <form onSubmit={handleReviewSubmit} className="mt-5 space-y-4">
                 {/* Rating selection */}
                 <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1.5">Rating</label>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1.5">Rating *</label>
                   <div className="flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -409,7 +357,7 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
                       >
                         <FiStar
                           size={24}
-                          className={star <= newRating ? "fill-amber-400 text-amber-400" : "text-zinc-300"}
+                          className={star <= newRating ? "fill-amber-400 text-amber-400" : "text-zinc-300 fill-zinc-100"}
                         />
                       </button>
                     ))}
@@ -449,7 +397,7 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
                     type="text"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="e.g. Exquisite mirror work and fast delivery!"
+                    placeholder="e.g. Exquisite mirror work and fine quality!"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#520618]/20 focus:border-[#520618]"
                   />
                 </div>
@@ -491,23 +439,51 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
 
       {/* Reviews List */}
       <div className="space-y-6 divide-y divide-zinc-200/80">
-        {filteredAndSortedReviews.length === 0 ? (
+        {allReviews.length === 0 ? (
+          <div className="py-12 px-4 text-center bg-zinc-50/60 rounded-2xl border border-dashed border-zinc-200 space-y-3">
+            <div className="w-12 h-12 mx-auto rounded-full bg-amber-50 flex items-center justify-center text-amber-500">
+              <FiStar size={24} />
+            </div>
+            <h3 className="text-base font-bold text-zinc-800">No reviews yet</h3>
+            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              Be the first to share your experience with this handcrafted creation!
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setIsWriteModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#520618] hover:bg-[#3d0411] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+              >
+                <FiEdit3 size={13} />
+                <span>Write the First Review</span>
+              </button>
+            </div>
+          </div>
+        ) : filteredAndSortedReviews.length === 0 ? (
           <div className="py-10 text-center text-zinc-500 font-medium text-xs md:text-sm bg-zinc-50/50 rounded-xl border border-dashed border-zinc-200">
-            No reviews found matching the selected filter rating ({filterRating} Stars).
+            No reviews found matching the selected filter ({filterRating} Stars).
           </div>
         ) : (
           filteredAndSortedReviews.map((review) => (
             <div key={review.id} className="pt-6 first:pt-0 space-y-2">
-              {/* First Line: Author • Stars • Date */}
+              {/* First Line: Author • Verified Buyer • Email (if present) • Stars • Date */}
               <div className="flex items-center gap-2 text-xs text-zinc-600 flex-wrap">
                 <span className="font-bold text-zinc-900">{review.author}</span>
+                {review.verified && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded">
+                    Verified Buyer
+                  </span>
+                )}
+                {review.email && (
+                  <span className="text-zinc-400 text-[11px]">({review.email})</span>
+                )}
                 <span className="text-zinc-300">•</span>
-                <div className="flex text-amber-500 items-center">
+                <div className="flex text-amber-400 items-center">
                   {[...Array(5)].map((_, i) => (
                     <FiStar
                       key={i}
-                      size={12}
-                      className={i < review.rating ? "fill-amber-500 text-amber-500" : "text-zinc-300"}
+                      size={13}
+                      className={i < review.rating ? "fill-amber-400 text-amber-400" : "text-zinc-300 fill-zinc-100"}
                     />
                   ))}
                 </div>
@@ -516,18 +492,21 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
               </div>
 
               {/* Below Top Line: Heading Title */}
-              <h4 className="font-bold text-sm text-zinc-900 leading-snug">
-                {review.title}
-              </h4>
+              {review.title && (
+                <h4 className="font-bold text-sm text-zinc-900 leading-snug">
+                  {review.title}
+                </h4>
+              )}
 
-              {/* Below Heading: Paragraph Comment (2 lines max on mobile) */}
-              <p className="text-xs md:text-sm text-zinc-700 leading-relaxed max-w-4xl line-clamp-2 sm:line-clamp-none">
+              {/* Below Heading: Paragraph Comment */}
+              <p className="text-xs md:text-sm text-zinc-700 leading-relaxed max-w-4xl whitespace-pre-line">
                 {review.comment}
               </p>
 
               {/* Helpful Like Button */}
-              <div className="py-4">
+              <div className="py-2">
                 <button
+                  type="button"
                   onClick={() => handleLike(review.id)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
                     likedMap[review.id]
@@ -536,7 +515,7 @@ export const CustomerReviewsSection: React.FC<CustomerReviewsSectionProps> = ({
                   }`}
                 >
                   <FiThumbsUp size={13} />
-                  <span>Helpful ({likesState[review.id]})</span>
+                  <span>Helpful ({likesState[review.id] || review.likes || 0})</span>
                 </button>
               </div>
             </div>
