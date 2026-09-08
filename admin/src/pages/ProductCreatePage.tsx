@@ -66,7 +66,8 @@ const STANDARD_ATTRIBUTES = [
 export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate, editingProductId }) => {
   const params = useParams<{ id?: string }>();
   const routerNavigate = useNavigate();
-  const effectiveProductId = editingProductId || params.id;
+  const rawId = (editingProductId || params.id)?.trim();
+  const effectiveProductId = (rawId && !['new', 'create', 'add', 'add-product'].includes(rawId.toLowerCase())) ? rawId : undefined;
   const isEditMode = Boolean(effectiveProductId);
 
   const navigateBack = () => {
@@ -972,8 +973,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         productType === 'Variable'
           ? variants.map((v, i) => {
               const vImgList = (v.images && v.images.length > 0) ? v.images : (v.mainImage ? [v.mainImage] : [effectiveMainImage]);
+              const resolvedVarId = (v.id && !v.id.match(/^var-\d+$/)) ? v.id : `var-${effectiveProductId || 'prod'}-${i}-${Date.now().toString().slice(-4)}`;
               return {
-                id: v.id || `var-${i}`,
+                id: resolvedVarId,
                 colorName: v.optionValue || v.name,
                 colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
                 size: 'Free Size',
@@ -1019,7 +1021,16 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     try {
       let savedProduct: Product | null = null;
       if (isEditMode && effectiveProductId) {
-        savedProduct = await AdminApiService.updateProduct(effectiveProductId, payload);
+        try {
+          savedProduct = await AdminApiService.updateProduct(effectiveProductId, payload);
+        } catch (updateErr: any) {
+          // If product not found in MySQL yet (e.g. from local draft or mock list), create it
+          if (updateErr.message && (updateErr.message.includes('not found') || updateErr.message.includes('404'))) {
+            savedProduct = await AdminApiService.createProduct({ ...payload, id: effectiveProductId });
+          } else {
+            throw updateErr;
+          }
+        }
         showToast('Product updated successfully!');
       } else {
         savedProduct = await AdminApiService.createProduct(payload);

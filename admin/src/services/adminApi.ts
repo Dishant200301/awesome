@@ -18,8 +18,9 @@ const API_BASE = getAdminApiBase();
 
 export class AdminApiService {
   private static async request<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+    const isMutation = options?.method && options.method !== 'GET';
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), isMutation ? 60000 : 25000);
 
     try {
       const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -29,15 +30,39 @@ export class AdminApiService {
         signal: options?.signal || controller.signal,
       });
       clearTimeout(timeoutId);
-      if (!res.ok) return null;
+
+      if (!res.ok) {
+        let errMessage = `HTTP ${res.status}: Failed to process request`;
+        try {
+          const errData = await res.json();
+          if (errData && (errData.message || errData.error)) {
+            errMessage = errData.message || errData.error;
+          }
+        } catch {
+          try {
+            const rawText = await res.text();
+            if (rawText) errMessage = rawText.slice(0, 300);
+          } catch {}
+        }
+        console.error(`[AdminApiService] HTTP ${res.status} error for ${endpoint}:`, errMessage);
+        if (isMutation) {
+          throw new Error(errMessage);
+        }
+        return null;
+      }
+
       const data = await res.json();
       // If it's a paginated envelope response with total/items/products, preserve the entire envelope object
       if (data && typeof data === "object" && ("total" in data || "items" in data || "products" in data || "totalPages" in data)) {
         return data;
       }
       return data.data !== undefined ? data.data : data;
-    } catch {
+    } catch (err: any) {
       clearTimeout(timeoutId);
+      if (isMutation) {
+        console.error(`[AdminApiService] Mutation failed for ${endpoint}:`, err);
+        throw err;
+      }
       return null; 
     }
   }

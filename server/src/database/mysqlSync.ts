@@ -342,36 +342,64 @@ export async function fetchProductsFromMySQL(onlyPublished = false): Promise<Pro
  */
 export async function syncProductToMySQL(p: ProductItem): Promise<void> {
   try {
-    const slug = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const sku = p.defaultSku || p.sku || `SKU-${p.id}`;
+    const rawSlug = (p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).trim();
+    const rawSku = (p.defaultSku || p.sku || `SKU-${p.id}`).trim();
     const mainImg = p.image || p.mainImage || "/images/category/Latkan.webp";
 
     // 1. Resolve category_id if needed
     let categoryId: string | null = null;
     if (p.category) {
-      const [rows] = await sequelize.query(
-        `SELECT id FROM categories WHERE id = ? OR name = ? LIMIT 1`,
-        { replacements: [p.category, p.category] }
-      );
-      if (Array.isArray(rows) && rows.length > 0) {
-        categoryId = (rows[0] as any).id;
-      }
+      try {
+        const [rows] = await sequelize.query(
+          `SELECT id FROM categories WHERE id = ? OR name = ? LIMIT 1`,
+          { replacements: [p.category, p.category] }
+        );
+        if (Array.isArray(rows) && rows.length > 0) {
+          categoryId = (rows[0] as any).id;
+        }
+      } catch {}
     }
 
     // 2. Resolve subcategory_id if needed
     let subcategoryId: string | null = null;
     const subName = p.subcategory || p.subCategory;
     if (subName) {
-      const [rows] = await sequelize.query(
-        `SELECT id FROM sub_categories WHERE id = ? OR name = ? OR slug = ? LIMIT 1`,
-        { replacements: [subName, subName, subName.toLowerCase().replace(/[^a-z0-9]+/g, "-")] }
-      );
-      if (Array.isArray(rows) && rows.length > 0) {
-        subcategoryId = (rows[0] as any).id;
-      }
+      try {
+        const [rows] = await sequelize.query(
+          `SELECT id FROM sub_categories WHERE id = ? OR name = ? OR slug = ? LIMIT 1`,
+          { replacements: [subName, subName, subName.toLowerCase().replace(/[^a-z0-9]+/g, "-")] }
+        );
+        if (Array.isArray(rows) && rows.length > 0) {
+          subcategoryId = (rows[0] as any).id;
+        }
+      } catch {}
     }
 
-    // 3. Insert or update product
+    // 3. Prevent duplicate SKU collision with other products
+    let finalSku = rawSku;
+    try {
+      const [existingSku] = await sequelize.query(
+        `SELECT id FROM products WHERE default_sku = ? AND id != ? LIMIT 1`,
+        { replacements: [rawSku, p.id] }
+      );
+      if (Array.isArray(existingSku) && existingSku.length > 0) {
+        finalSku = `${rawSku}-${p.id.slice(-4)}`;
+      }
+    } catch {}
+
+    // 4. Prevent duplicate slug collision with other products
+    let finalSlug = rawSlug;
+    try {
+      const [existingSlug] = await sequelize.query(
+        `SELECT id FROM products WHERE slug = ? AND id != ? LIMIT 1`,
+        { replacements: [rawSlug, p.id] }
+      );
+      if (Array.isArray(existingSlug) && existingSlug.length > 0) {
+        finalSlug = `${rawSlug}-${p.id.slice(-4)}`;
+      }
+    } catch {}
+
+    // 5. Insert or update product
     await sequelize.query(
       `INSERT INTO products (
          id, name, subtitle, slug, product_type,
@@ -413,7 +441,7 @@ export async function syncProductToMySQL(p: ProductItem): Promise<void> {
           p.id,
           p.name,
           p.subtitle || null,
-          slug,
+          finalSlug,
           p.variations && p.variations.length > 0 ? "variable" : "simple",
           p.shortDescription || null,
           p.fullDescription || p.longDescription || null,
@@ -424,7 +452,7 @@ export async function syncProductToMySQL(p: ProductItem): Promise<void> {
           p.rating !== undefined && p.rating !== null ? Number(p.rating) : 0,
           p.reviewCount !== undefined && p.reviewCount !== null ? Math.floor(Number(p.reviewCount)) : 0,
           Number(p.stock) || 0,
-          sku,
+          finalSku,
           p.barcode || null,
           mainImg,
           p.isFeatured ? 1 : 0,
@@ -440,12 +468,20 @@ export async function syncProductToMySQL(p: ProductItem): Promise<void> {
       }
     );
 
-    // 3. Sync Variants if variable
-    if (Array.isArray(p.variations) && p.variations.length > 0) {
-      for (let i = 0; i < p.variations.length; i++) {
-        const v = p.variations[i];
-        const vId = v.id || `var-${p.id}-${i}`;
-        const vSku = v.sku || `${sku}-V${i + 1}`;
+    // 6. Sync Variants if variable
+    const variations = Array.isArray(p.variations) && p.variations.length > 0
+      ? p.variations
+      : (Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []);
+
+    if (variations.length > 0) {
+      const activeVariantIds: string[] = [];
+      for (let i = 0; i < variations.length; i++) {
+        const v = variations[i];
+        const vId = (v.id && !v.id.match(/^var-\d+$/)) ? v.id : `var-${p.id}-${i}`;
+        activeVariantIds.push(vId);
+        const baseVSku = (v.sku && v.sku.trim()) || `${finalSku}-V${i + 1}`;
+        const vSku = baseVSku;
+
         await sequelize.query(
           `INSERT INTO product_variants (
              id, product_id, sku, barcode, color_name, color_hex,
@@ -480,24 +516,55 @@ export async function syncProductToMySQL(p: ProductItem): Promise<void> {
           }
         );
       }
+
+      // Purge old variants for this product not in current set
+      if (activeVariantIds.length > 0) {
+        try {
+          await sequelize.query(
+            `DELETE FROM product_variants WHERE product_id = ? AND id NOT IN (?)`,
+            { replacements: [p.id, activeVariantIds] }
+          );
+        } catch {}
+      }
+    } else {
+      // Simple product - clean up any obsolete variants
+      try {
+        await sequelize.query(
+          `DELETE FROM product_variants WHERE product_id = ?`,
+          { replacements: [p.id] }
+        );
+      } catch {}
     }
 
-    // 4. Sync Images
+    // 7. Sync Images
     const imgList = Array.isArray(p.images) && p.images.length > 0 ? p.images : [mainImg];
+    const activeImgIds: string[] = [];
     for (let i = 0; i < imgList.length; i++) {
       const url = imgList[i];
       if (!url) continue;
       const imgId = `img-${p.id}-${i}`;
+      activeImgIds.push(imgId);
+      const safeAlt = `${(p.name || '').slice(0, 180)} image ${i + 1}`;
       await sequelize.query(
         `INSERT INTO product_images (id, product_id, variant_id, image_url, alt_text, display_order)
          VALUES (?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            image_url = VALUES(image_url),
+           alt_text = VALUES(alt_text),
            display_order = VALUES(display_order)`,
         {
-          replacements: [imgId, p.id, null, url, `${p.name} image ${i + 1}`, i]
+          replacements: [imgId, p.id, null, url, safeAlt, i]
         }
       );
+    }
+
+    if (activeImgIds.length > 0) {
+      try {
+        await sequelize.query(
+          `DELETE FROM product_images WHERE product_id = ? AND id NOT IN (?)`,
+          { replacements: [p.id, activeImgIds] }
+        );
+      } catch {}
     }
   } catch (err) {
     console.error(`[MySQL Sync] Failed to sync product '${p.name}':`, (err as Error).message);
