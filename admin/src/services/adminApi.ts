@@ -31,6 +31,10 @@ export class AdminApiService {
       clearTimeout(timeoutId);
       if (!res.ok) return null;
       const data = await res.json();
+      // If it's a paginated envelope response with total/items/products, preserve the entire envelope object
+      if (data && typeof data === "object" && ("total" in data || "items" in data || "products" in data || "totalPages" in data)) {
+        return data;
+      }
       return data.data !== undefined ? data.data : data;
     } catch {
       clearTimeout(timeoutId);
@@ -115,6 +119,7 @@ export class AdminApiService {
     sort?: string;
   }) {
     const query = new URLSearchParams();
+    query.append("admin", "true");
     if (params?.page) query.append("page", params.page.toString());
     if (params?.limit) query.append("limit", params.limit.toString());
     if (params?.search) query.append("search", params.search);
@@ -129,10 +134,56 @@ export class AdminApiService {
     if (params?.sort) query.append("sort", params.sort);
 
     const remote = await this.request<any>(`/products?${query.toString()}`);
-    if (remote && Array.isArray(remote.items)) {
-      return remote;
+    if (!remote) {
+      return { items: [], total: 0, page: 1, limit: 10, totalPages: 1 };
     }
-    return { items: [], total: 0, page: 1, limit: 10, totalPages: 1 };
+
+    let rawList: any[] = [];
+    let total = 0;
+    let page = 1;
+    let limit = 10;
+    let totalPages = 1;
+
+    if (Array.isArray(remote)) {
+      rawList = remote;
+      total = remote.length;
+    } else if (typeof remote === "object") {
+      if (Array.isArray(remote.items)) rawList = remote.items;
+      else if (Array.isArray(remote.data)) rawList = remote.data;
+      else if (Array.isArray(remote.products)) rawList = remote.products;
+
+      total = remote.total !== undefined ? Number(remote.total) : rawList.length;
+      page = Number(remote.page) || 1;
+      limit = Number(remote.limit) || rawList.length || 10;
+      totalPages = Number(remote.totalPages) || Math.max(1, Math.ceil(total / (limit || 10)));
+    }
+
+    const items: Product[] = rawList.map((p) => ({
+      ...p,
+      id: String(p.id),
+      name: p.name || "",
+      price: Number(p.price || 0),
+      regularPrice: Number(p.regularPrice || p.originalPrice || p.price || 0),
+      originalPrice: Number(p.originalPrice || p.regularPrice || p.price || 0),
+      stock: Number(p.stock !== undefined ? p.stock : (p.stockQuantity !== undefined ? p.stockQuantity : 0)),
+      status: p.status || (p.isPublished !== false ? "Published" : "Draft"),
+      isPublished: p.isPublished !== false && p.status !== "Draft" && p.status !== "Inactive",
+      category: p.category || p.categoryName || "",
+      subcategory: p.subcategory || p.subCategory || p.subcategoryName || "",
+      brand: p.brand || "",
+      sku: p.sku || p.defaultSku || `SKU-${p.id}`,
+      image: p.image || p.mainImage || (Array.isArray(p.images) && p.images[0]) || "/images/category/Latkan.webp",
+      mainImage: p.mainImage || p.image || (Array.isArray(p.images) && p.images[0]) || "/images/category/Latkan.webp",
+      images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : ["/images/category/Latkan.webp"])
+    }));
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages
+    };
   }
 
   public static async getProductById(id: string): Promise<Product | null> {

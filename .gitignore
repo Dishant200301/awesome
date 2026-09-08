@@ -10,6 +10,9 @@ node_modules/
 dist/
 dist-ssr/
 .output/
+!admin/dist/**
+!server/dist/**
+!client/dist/**
 
 # IDEs / Editors
 .vscode/

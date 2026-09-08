@@ -1,0 +1,11 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # 1. Allow existing files, directories, or assets (JS, CSS, images)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 2. Support React Router SPA fallback on refresh
+  RewriteRule . index.html [L]
+</IfModule>

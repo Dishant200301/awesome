@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Prevent infinite redirect on index.html
+  RewriteRule ^index\.html$ - [L]
+
+  # 2. Allow real existing files, directories, and assets (css, js, images, api, admin)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 3. Route all other requests (React Router SPA routes like /product/*, /shop, /about) to index.html
+  RewriteRule . /index.html [L]
+</IfModule>
