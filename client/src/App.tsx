@@ -12,6 +12,7 @@ import ContactPage from "@/modules/contact/pages/ContactPage";
 import NotFound from "@/modules/core/components/NotFound";
 import ScrollToTop from "@/modules/core/components/ScrollToTop";
 import CartDrawer from "@/modules/core/components/CartDrawer";
+import StickyCartWidget from "@/modules/core/components/StickyCartWidget";
 import AuthModal from "@/modules/core/components/AuthModal";
 import { CartProvider } from "@/modules/product/context/CartContext";
 import { WishlistProvider } from "@/modules/product/context/WishlistContext";
@@ -34,6 +35,7 @@ export default function App() {
                   <ScrollToTop />
                   <Toaster position="top-center" richColors />
                   <CartDrawer />
+                  <StickyCartWidget />
                   <AuthModal />
                   <MobileProductQuickViewSheet />
                   <DesktopProductQuickViewModal />

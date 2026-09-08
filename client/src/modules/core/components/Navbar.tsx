@@ -269,8 +269,29 @@ export default function Navbar() {
               </ul>
             </nav>
 
-            {/* RIGHT: Mobile Menu / Desktop Balance Spacer */}
-            <div className="flex items-center justify-end min-[1024px]:hidden xl:flex xl:flex-1">
+            {/* RIGHT: Header Actions (Cart Icon & Mobile Menu) */}
+            <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 min-[1024px]:flex xl:flex-1">
+              {/* Shopping Bag Button (Opens Right-Side Cart Drawer) */}
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                aria-label="Open Shopping Bag"
+                className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-brand-cream text-brand-ink transition-colors cursor-pointer group"
+              >
+                <div className="relative flex items-center justify-center">
+                  <ShoppingBag className="h-5 w-5 text-neutral-800 group-hover:text-brand-maroon transition-colors stroke-[1.75]" />
+                  {totalItemsCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2 bg-brand-maroon text-white text-[10px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center shadow-xs">
+                      {totalItemsCount > 9 ? "9+" : totalItemsCount}
+                    </span>
+                  )}
+                </div>
+                <span className="hidden sm:inline-block text-xs font-semibold text-neutral-800 group-hover:text-brand-maroon">
+                  Bag
+                </span>
+              </button>
+
+              {/* Mobile Menu Button */}
               <button
                 type="button"
                 onClick={() => setOpen(true)}

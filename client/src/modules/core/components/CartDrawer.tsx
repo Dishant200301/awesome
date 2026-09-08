@@ -70,19 +70,19 @@ export const CartDrawer: React.FC = () => {
 
   return (
     <div
-      className={`fixed inset-0 z-100 transition-all duration-300 ${
+      className={`fixed inset-0 z-[9999] transition-all duration-300 ${
         isCartOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-2xs transition-opacity duration-300"
+        className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
         onClick={() => setIsCartOpen(false)}
       />
 
       {/* Slide-over Drawer Panel */}
       <aside
-        className={`absolute right-0 top-0 flex h-full max-h-screen w-full sm:w-auto max-w-[100vw] transition-transform duration-300 ease-out z-50 ${
+        className={`absolute right-0 top-0 flex h-full max-h-screen w-full sm:w-auto max-w-[100vw] transition-transform duration-300 ease-out z-[10000] shadow-2xl ${
           isCartOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -317,21 +317,39 @@ export const CartDrawer: React.FC = () => {
 
           {/* Footer Checkout Section */}
           {cartItems.length > 0 && (
-            <div className="border-t border-neutral-200 p-4 sm:p-6 space-y-3 bg-white shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCartOpen(false);
-                  if (isLoggedIn) {
+            <div className="border-t border-neutral-200 p-4 sm:p-5 space-y-3 bg-white shrink-0">
+              <div className="flex items-center justify-between text-xs font-semibold text-neutral-600">
+                <span>Estimated Subtotal</span>
+                <span className="text-sm font-bold text-neutral-900">{formattedTotalPrice}</span>
+              </div>
+              <p className="text-[11px] text-neutral-400">Taxes, discounts, and shipping calculated at checkout.</p>
+              
+              <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCartOpen(false);
                     navigate("/cart");
-                  } else {
-                    openAuthModal("/cart");
-                  }
-                }}
-                className="w-full py-3.5 sm:py-4 bg-[#212121] hover:bg-black text-white font-bold text-xs uppercase tracking-[0.15em] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md active:scale-98 rounded-lg sm:rounded-none"
-              >
-                <span>CHECKOUT &bull; {formattedTotalPrice}</span>
-              </button>
+                  }}
+                  className="py-3 px-3 border border-neutral-300 hover:border-neutral-900 hover:bg-neutral-50 text-neutral-900 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer rounded-lg text-center"
+                >
+                  View Cart
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCartOpen(false);
+                    if (isLoggedIn) {
+                      navigate("/checkout");
+                    } else {
+                      openAuthModal("/checkout");
+                    }
+                  }}
+                  className="py-3 px-3 bg-neutral-950 hover:bg-black text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer rounded-lg text-center shadow-md flex items-center justify-center gap-1.5 active:scale-98"
+                >
+                  <span>Checkout</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
