@@ -905,8 +905,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
                             >
                               {p.name}
                             </h4>
-                            <p className="text-[10px] text-neutral-400 line-clamp-1 font-mono">
-                              /{p.slug}
+                            <p className="text-[10px] text-neutral-400 line-clamp-1 font-mono" title={`Slug: /${p.slug || (p.name ? p.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : 'product')}`}>
+                              /{p.slug || (p.name ? p.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : 'product')}
                             </p>
                           </div>
                         </div>

@@ -919,7 +919,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       ...(rawExistingProduct || {}),
       name: name.trim(),
       displayName: name.trim(),
-      slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      slug: (slug.trim() || name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')),
       sku: sku.trim() || 'AH-LAT-001',
       defaultSku: sku.trim() || 'AH-LAT-001',
       category: category.trim(),
@@ -1186,12 +1186,20 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 type="text"
                 value={name}
                 onChange={(e) => {
-                  setName(e.target.value);
+                  const val = e.target.value;
+                  setName(val);
+                  setSlug(val.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''));
                   setIsDirty(true);
                 }}
                 placeholder="e.g. Royal Mirror Latkan"
                 className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium"
               />
+              <div className="flex items-center gap-1 text-[10px] text-neutral-400 font-mono">
+                <span>Slug:</span>
+                <span className="text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold truncate max-w-[240px]">
+                  /{slug || (name ? name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : 'product-slug')}
+                </span>
+              </div>
             </div>
 
             {/* Category */}
