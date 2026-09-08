@@ -520,8 +520,8 @@ export const DesktopProductQuickViewModal: React.FC = () => {
                       </span>
                       <div className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/60">
                         <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                        <span>{product.rating !== undefined && product.rating !== null ? product.rating : 4.8}</span>
-                        <span className="text-zinc-400 font-normal">({(product as any).salesCount ?? product.reviewCount ?? 0} reviews)</span>
+                        <span>{Number(product.rating || 0) > 0 ? Number(product.rating).toFixed(1) : "0.0"}</span>
+                        <span className="text-zinc-400 font-normal">({product.reviewCount ?? 0} reviews)</span>
                       </div>
                     </div>
 
@@ -800,7 +800,7 @@ export const DesktopProductQuickViewModal: React.FC = () => {
                                   </span>
                                   <div className="flex items-center gap-0.5 text-[9px] font-semibold text-amber-600">
                                     <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                                    <span>{relP.rating || 4.8}</span>
+                                    <span>{Number(relP.rating || 0) > 0 ? Number(relP.rating).toFixed(1) : "0.0"}</span>
                                   </div>
                                 </div>
                                 <h4 className="text-xs font-semibold text-zinc-900 line-clamp-1 group-hover:text-[#520618] transition-colors">

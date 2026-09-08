@@ -203,9 +203,18 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
   const baseTitle = p.name || "Handcrafted Product";
   const pSlug = p.slug || pId;
   const pCategory = p.category || "Latkan";
-  const pSubcategory = prodAny.subcategory || prodAny.subCategory || "";
-  const pRating = Number(p.rating !== undefined && p.rating !== null ? p.rating : 4.8);
-  const pReviewCount = Number(prodAny.reviewCount || p.reviewCount || (p.salesCount && p.salesCount > 0 ? p.salesCount : 12));
+  const pRating = Number(
+    p.rating !== undefined && p.rating !== null
+      ? p.rating
+      : (prodAny.parentProduct?.rating !== undefined && prodAny.parentProduct.rating !== null ? prodAny.parentProduct.rating : 0)
+  );
+  const pReviewCount = Number(
+    prodAny.reviewCount !== undefined && prodAny.reviewCount !== null
+      ? prodAny.reviewCount
+      : (p.reviewCount !== undefined && p.reviewCount !== null
+          ? p.reviewCount
+          : (prodAny.parentProduct?.reviewCount !== undefined && prodAny.parentProduct.reviewCount !== null ? prodAny.parentProduct.reviewCount : 0))
+  );
   const pSales = Number(p.salesCount !== undefined && p.salesCount !== null ? p.salesCount : pReviewCount);
 
   const extractUrl = (val: any): string => {
@@ -871,7 +880,8 @@ export default function ShopPage() {
     // Rating Filter
     if (selectedRatings.length > 0) {
       list = list.filter((item) => {
-        const r = Number(item.rating !== undefined && item.rating !== null ? item.rating : 4.8);
+        const r = Number(item.rating !== undefined && item.rating !== null ? item.rating : 0);
+        if (r <= 0) return false;
         const starLevel = r >= 4.5 ? 5 : r >= 3.5 ? 4 : r >= 2.5 ? 3 : r >= 1.5 ? 2 : 1;
         return selectedRatings.includes(starLevel);
       });
@@ -954,7 +964,8 @@ export default function ShopPage() {
   // Live Rating Real Counts scoped to category products
   const ratingCounts = useMemo(() => {
     const getStarLevel = (r: any) => {
-      const val = Number(r !== undefined && r !== null ? r : 4.8);
+      const val = Number(r !== undefined && r !== null ? r : 0);
+      if (val <= 0) return 0;
       return val >= 4.5 ? 5 : val >= 3.5 ? 4 : val >= 2.5 ? 3 : val >= 1.5 ? 2 : 1;
     };
     const c5 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 5).length;
@@ -1859,13 +1870,28 @@ export default function ShopPage() {
                                   </div>
                                 )}
 
-                                <div className="flex items-center gap-1.5 text-amber-500 text-xs font-bold">
-                                  <div className="flex items-center gap-1">
-                                    <Star className="w-3.5 h-3.5 fill-current" />
-                                    <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
+                                <div className="flex items-center gap-1.5 text-xs font-medium">
+                                  <div className="flex items-center text-amber-400 gap-0.5">
+                                    {[...Array(5)].map((_, i) => {
+                                      const ratingVal = Number(p.rating || 0);
+                                      const isFilled = i < Math.floor(ratingVal);
+                                      return (
+                                        <Star
+                                          key={i}
+                                          className={`w-3 h-3 ${
+                                            isFilled
+                                              ? "fill-amber-400 text-amber-400"
+                                              : "text-zinc-200 fill-zinc-200"
+                                          }`}
+                                        />
+                                      );
+                                    })}
                                   </div>
+                                  <span className="font-semibold text-zinc-800 text-[11px]">
+                                    {Number(p.rating || 0) > 0 ? Number(p.rating).toFixed(1) : "0.0"}
+                                  </span>
                                   <span className="text-zinc-400 font-normal text-[10px]">
-                                    ({p.reviewCount || (p.salesCount && p.salesCount > 0 ? p.salesCount : 12)})
+                                    ({Number(p.reviewCount || 0)})
                                   </span>
                                 </div>
 
@@ -2048,13 +2074,28 @@ export default function ShopPage() {
                           </div>
                         )}
 
-                        <div className="flex items-center gap-1.5 text-amber-500 text-[11px] sm:text-xs font-bold">
-                          <div className="flex items-center gap-1">
-                            <Star className="w-3.5 h-3.5 fill-current" />
-                            <span className="text-zinc-800">{p.rating !== undefined && p.rating !== null ? p.rating : 4.8}</span>
+                        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-medium">
+                          <div className="flex items-center text-amber-400 gap-0.5">
+                            {[...Array(5)].map((_, i) => {
+                              const ratingVal = Number(p.rating || 0);
+                              const isFilled = i < Math.floor(ratingVal);
+                              return (
+                                <Star
+                                  key={i}
+                                  className={`w-3 h-3 ${
+                                    isFilled
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-zinc-200 fill-zinc-200"
+                                  }`}
+                                />
+                              );
+                            })}
                           </div>
+                          <span className="font-semibold text-zinc-800 text-[11px]">
+                            {Number(p.rating || 0) > 0 ? Number(p.rating).toFixed(1) : "0.0"}
+                          </span>
                           <span className="text-zinc-400 font-normal text-[10px]">
-                            ({p.reviewCount || (p.salesCount && p.salesCount > 0 ? p.salesCount : 12)})
+                            ({Number(p.reviewCount || 0)})
                           </span>
                         </div>
 
