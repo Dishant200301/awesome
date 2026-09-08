@@ -1,6 +1,6 @@
 import { productStore } from "./productStore.js";
 import { getCategoriesStore, getAttributesStore } from "./taxonomyStore.js";
-import { getContactMessagesStore } from "./contactStore.js";
+import { getContactMessagesSync } from "./contactStore.js";
 
 export interface DashboardAnalytics {
   totalProducts: number;
@@ -21,7 +21,7 @@ export const getDashboardAnalyticsStore = (): DashboardAnalytics => {
   const products = productStore.getAll(false);
   const categories = getCategoriesStore();
   const attributes = getAttributesStore();
-  const messages = getContactMessagesStore();
+  const messages = getContactMessagesSync();
 
   const totalProducts = products.length;
   const publishedProducts = products.filter((p: any) => p.isPublished || p.status === 'Published').length;

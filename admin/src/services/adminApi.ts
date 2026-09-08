@@ -826,7 +826,9 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
     if (params?.search) query.append("search", params.search);
 
     const remote = await this.request<ContactMessage[]>(`/contacts?${query.toString()}`);
-    let list: ContactMessage[] = Array.isArray(remote) ? remote : [...MOCK_CONTACT_MESSAGES];
+    let list: ContactMessage[] = (Array.isArray(remote) && remote.length > 0)
+      ? remote
+      : [...MOCK_CONTACT_MESSAGES];
 
     if (params?.status && params.status.toUpperCase() !== 'ALL') {
       list = list.filter((m) => m.status.toLowerCase() === params.status!.toLowerCase());

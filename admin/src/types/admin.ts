@@ -349,6 +349,7 @@ export interface ContactMessage {
   date: string;
   status: 'New' | 'Read' | 'Replied' | 'Archived';
   replyText?: string;
+  createdAt?: string;
 }
 
 export interface OrderItem {
