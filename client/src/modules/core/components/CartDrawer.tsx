@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { X, ShoppingBag, Lock, Minus, Plus } from "lucide-react";
 import { useCart } from "@/modules/product/context/CartContext";
 import { useAuth } from "@/modules/core/context/AuthContext";
@@ -9,8 +9,16 @@ export const CartDrawer: React.FC = () => {
   const { isCartOpen, setIsCartOpen, cartItems, removeFromCart, updateQuantity, totalPrice, totalItemsCount, addToCart } = useCart();
   const { isLoggedIn, openAuthModal } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [liveProducts, setLiveProducts] = useState(() => getLiveProductsList());
+
+  // Close drawer if user navigates to checkout or cart pages
+  useEffect(() => {
+    if (location.pathname.startsWith("/checkout") || location.pathname.startsWith("/order-success") || location.pathname === "/cart") {
+      if (isCartOpen) setIsCartOpen(false);
+    }
+  }, [location.pathname, isCartOpen, setIsCartOpen]);
 
   useEffect(() => {
     const unsub = subscribeToProductStore(() => {

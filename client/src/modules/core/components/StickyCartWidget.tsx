@@ -1,12 +1,20 @@
 import React from "react";
+import { useLocation } from "react-router-dom";
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "@/modules/product/context/CartContext";
 
 export const StickyCartWidget: React.FC = () => {
   const { totalItemsCount, totalPrice, setIsCartOpen, isCartOpen } = useCart();
+  const location = useLocation();
 
-  // Hide widget completely when cart is empty (0 items) or when drawer is open
-  if (totalItemsCount <= 0 || isCartOpen) return null;
+  // Hide on checkout, cart, or order-success pages
+  const isCheckoutOrCartPage =
+    location.pathname.startsWith("/checkout") ||
+    location.pathname.startsWith("/order-success") ||
+    location.pathname === "/cart";
+
+  // Hide widget completely when on checkout/cart pages, when cart is empty, or when drawer is open
+  if (totalItemsCount <= 0 || isCartOpen || isCheckoutOrCartPage) return null;
 
   const itemText = totalItemsCount === 1 ? "Item" : "Items";
   const formattedPrice = `₹${totalPrice.toLocaleString("en-IN")}.00`;
