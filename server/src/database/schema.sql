@@ -3,8 +3,9 @@
 -- Engine: InnoDB | Character Set: utf8mb4_unicode_ci
 -- =========================================================
 
-CREATE DATABASE IF NOT EXISTS awesome CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE awesome;
+-- Note: Select your database (e.g. u382338879_awesome_hand) in phpMyAdmin before running
+-- CREATE DATABASE IF NOT EXISTS awesome CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE awesome;
 
 -- 1. CATEGORIES
 CREATE TABLE IF NOT EXISTS categories (
