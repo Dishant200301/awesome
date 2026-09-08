@@ -157,9 +157,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Automatically open right-side Cart Drawer whenever item is added
-    setIsCartOpen(true);
-
     // If logged in, sync mutation to backend API
     if (isLoggedIn) {
       fetch(`${API_BASE_URL}/cart/add`, {
