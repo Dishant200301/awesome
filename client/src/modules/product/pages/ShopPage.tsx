@@ -203,6 +203,7 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
   const baseTitle = p.name || "Handcrafted Product";
   const pSlug = p.slug || pId;
   const pCategory = p.category || "Latkan";
+  const pSubcategory = p.subcategory || prodAny.subCategory || "";
   const pRating = Number(
     p.rating !== undefined && p.rating !== null
       ? p.rating
