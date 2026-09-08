@@ -27,7 +27,7 @@ export function authenticateAdmin(req: Request, res: Response, next: NextFunctio
   } catch (err) {
     // Support fallback token for initial bootstrap / emergency admin
     if (token && (token.startsWith("mock-admin-token-") || token.startsWith("admin-token-") || token === "awesome-admin-super-token")) {
-      (req as any).user = { id: "admin-fallback", email: "admin@awesomehandmade.com", role: "Super Admin" };
+      (req as any).user = { id: "admin-awesome-1", email: "admin@awesomehandmade.com", role: "Super Admin" };
       next();
       return;
     }
