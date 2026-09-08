@@ -400,13 +400,15 @@ export const ProductDescriptionSection: React.FC<ProductDescriptionSectionProps>
           <div className="space-y-8 text-zinc-700 text-sm sm:text-base leading-relaxed font-sans">
             {/* Dynamic Full / Short Description Text from Admin */}
             {rawDescription ? (
-              <div className="space-y-3 pt-2">
-                <h3 className="text-base sm:text-lg md:text-xl font-bold text-zinc-900 tracking-wider uppercase ">
-                  Product Overview
-                </h3>
+              <div className="space-y-4 pt-2">
+                {!rawDescription.toLowerCase().includes("product overview") && (
+                  <h3 className="text-base sm:text-lg md:text-xl font-bold text-zinc-900 tracking-wider uppercase">
+                    Product Overview
+                  </h3>
+                )}
                 {isHTML ? (
                   <div
-                    className="prose prose-zinc max-w-none text-zinc-700 leading-relaxed text-sm sm:text-base font-sans"
+                    className="prose prose-zinc max-w-none text-zinc-700 leading-relaxed text-sm sm:text-base font-sans [&_h1]:text-lg sm:[&_h1]:text-xl [&_h1]:font-bold [&_h1]:text-zinc-900 [&_h1]:mt-6 [&_h1]:mb-3 [&_h1:first-child]:mt-0 [&_h2]:text-base sm:[&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-zinc-900 [&_h2]:mt-6 [&_h2]:mb-3 [&_h2:first-child]:mt-0 [&_h3]:text-sm sm:[&_h3]:text-base [&_h3]:font-bold [&_h3]:text-zinc-900 [&_h3]:tracking-wider [&_h3]:uppercase [&_h3]:mt-6 [&_h3]:mb-3 [&_h3:first-child]:mt-0 [&_p]:mb-3.5 [&_p]:leading-relaxed [&_p]:text-zinc-700 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-5 [&_ul]:space-y-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-5 [&_ol]:space-y-2 [&_li]:leading-relaxed [&_li]:text-zinc-700 [&_strong]:text-zinc-900 [&_strong]:font-semibold"
                     dangerouslySetInnerHTML={{ __html: rawDescription }}
                   />
                 ) : (

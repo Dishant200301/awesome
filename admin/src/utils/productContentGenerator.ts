@@ -466,32 +466,32 @@ export function generateSmartProductContent(params: {
 
   // 5. Generate Rich HTML Long Description with distinct headers and dynamic sections
   const introIntros = [
-    `<p>Immerse yourself in timeless Indian heritage with our authentically crafted <strong>${productName}</strong>. Lovingly assembled by seasoned artisans in Surat, this piece seamlessly blends age-old traditional craftsmanship with modern quality standards and enduring durability.</p>`,
-    `<p>Add an aura of opulent festive grace to your ethnic collection with the magnificent <strong>${productName}</strong>. Every detail is sculpted and finished by master artisans using premium materials and heritage-inspired techniques.</p>`,
-    `<p>Discover authentic artisanal splendor with our bespoke <strong>${productName}</strong>. Designed to captivate at first glance, each piece reflects generations of ethnic needlework and metalcraft from Gujarat's master craft clusters.</p>`,
-    `<p>Celebrate auspicious traditions and festive joyousness with the royal <strong>${productName}</strong>. Handcrafted with meticulous care, it delivers an enchanting blend of radiant tones, intricate textures, and flawless finishing.</p>`
+    `<p style="margin-bottom: 14px; line-height: 1.65;">Immerse yourself in timeless Indian heritage with our authentically crafted <strong>${productName}</strong>. Lovingly assembled by seasoned artisans in Surat, this piece seamlessly blends age-old traditional craftsmanship with modern quality standards and enduring durability.</p>`,
+    `<p style="margin-bottom: 14px; line-height: 1.65;">Add an aura of opulent festive grace to your ethnic collection with the magnificent <strong>${productName}</strong>. Every detail is sculpted and finished by master artisans using premium materials and heritage-inspired techniques.</p>`,
+    `<p style="margin-bottom: 14px; line-height: 1.65;">Discover authentic artisanal splendor with our bespoke <strong>${productName}</strong>. Designed to captivate at first glance, each piece reflects generations of ethnic needlework and metalcraft from Gujarat's master craft clusters.</p>`,
+    `<p style="margin-bottom: 14px; line-height: 1.65;">Celebrate auspicious traditions and festive joyousness with the royal <strong>${productName}</strong>. Handcrafted with meticulous care, it delivers an enchanting blend of radiant tones, intricate textures, and flawless finishing.</p>`
   ];
   const chosenIntro = introIntros[getIndex(introIntros.length, 9)];
 
-  const longDescription = `<h3>PRODUCT OVERVIEW</h3>
+  const longDescription = `<h3 style="margin-top: 8px; margin-bottom: 10px; font-weight: 700; letter-spacing: 0.04em;">PRODUCT OVERVIEW</h3>
 ${chosenIntro}
 
-<h3>KEY CRAFTSMANSHIP HIGHLIGHTS</h3>
-<ul>
-  <li><strong>Artisanal Technique:</strong> Handcrafted using authentic ${chosenTechniques.join(' & ')}.</li>
-  <li><strong>Premium Materials:</strong> Meticulously constructed with ${chosenMaterials.join(', ')} for opulent depth and luster.</li>
-  <li><strong>Flawless Pairing:</strong> Specially curated for ${chosenOccasions.join(', ')}.</li>
-  <li><strong>Quality Guaranteed:</strong> ${chosenHighlights[0]}</li>
-  <li><strong>Durable Construction:</strong> ${chosenHighlights[1]}</li>
+<h3 style="margin-top: 22px; margin-bottom: 10px; font-weight: 700; letter-spacing: 0.04em;">KEY CRAFTSMANSHIP HIGHLIGHTS</h3>
+<ul style="margin-top: 6px; margin-bottom: 16px; padding-left: 20px; line-height: 1.7;">
+  <li style="margin-bottom: 8px;"><strong>Artisanal Technique:</strong> Handcrafted using authentic ${chosenTechniques.join(' & ')}.</li>
+  <li style="margin-bottom: 8px;"><strong>Premium Materials:</strong> Meticulously constructed with ${chosenMaterials.join(', ')} for opulent depth and luster.</li>
+  <li style="margin-bottom: 8px;"><strong>Flawless Pairing:</strong> Specially curated for ${chosenOccasions.join(', ')}.</li>
+  <li style="margin-bottom: 8px;"><strong>Quality Guaranteed:</strong> ${chosenHighlights[0]}</li>
+  <li style="margin-bottom: 8px;"><strong>Durable Construction:</strong> ${chosenHighlights[1]}</li>
 </ul>
 
-<h3>STYLING & OCCASION GUIDE</h3>
-<p>${chosenStylingTip}</p>
-<p><strong>Recommended For:</strong> ${chosenOccasions.join(' • ')}</p>
+<h3 style="margin-top: 22px; margin-bottom: 10px; font-weight: 700; letter-spacing: 0.04em;">STYLING & OCCASION GUIDE</h3>
+<p style="margin-bottom: 8px; line-height: 1.65;">${chosenStylingTip}</p>
+<p style="margin-bottom: 16px; line-height: 1.65;"><strong>Recommended For:</strong> ${chosenOccasions.join(' • ')}</p>
 
-<h3>CARE & MAINTENANCE</h3>
-<ul>
-  ${chosenCare.map((c) => `<li>${c}</li>`).join('\n  ')}
+<h3 style="margin-top: 22px; margin-bottom: 10px; font-weight: 700; letter-spacing: 0.04em;">CARE & MAINTENANCE</h3>
+<ul style="margin-top: 6px; margin-bottom: 16px; padding-left: 20px; line-height: 1.7;">
+  ${chosenCare.map((c) => `<li style="margin-bottom: 8px;">${c}</li>`).join('\n  ')}
 </ul>`;
 
   // 6. Dynamic Specifications
