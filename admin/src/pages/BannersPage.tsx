@@ -1005,7 +1005,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="font-semibold text-neutral-700">Redirect Link</label>
                   <input
                     type="text"
@@ -1015,9 +1015,36 @@ export const BannersPage: React.FC<BannersPageProps> = ({
                         prev ? { ...prev, link: e.target.value } : null
                       )
                     }
-                    placeholder="e.g. #categories or /shop?category=Choli"
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                    placeholder="e.g. /shop?category=Choli or /shop?category=Latkan"
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-xs"
                   />
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span className="text-[10px] text-neutral-400 font-medium">Quick link:</span>
+                    {[
+                      { label: 'Choli', url: '/shop?category=Choli' },
+                      { label: 'Latkan', url: '/shop?category=Latkan' },
+                      { label: 'Necklace', url: '/shop?category=Necklace' },
+                      { label: 'Earrings', url: '/shop?category=Earrings' },
+                      { label: 'Kids Choli', url: '/shop?category=Choli&sub=Kids%20Choli' },
+                      { label: 'Waist Belt', url: '/shop?category=Waist%20Belt' },
+                      { label: 'All Products', url: '/shop' }
+                    ].map((btn) => (
+                      <button
+                        key={btn.label}
+                        type="button"
+                        onClick={() =>
+                          setEditingSlide((prev) => (prev ? { ...prev, link: btn.url } : null))
+                        }
+                        className={`px-2 py-0.5 rounded text-[10px] border transition-colors ${
+                          editingSlide.link === btn.url
+                            ? 'bg-neutral-900 text-white border-neutral-900 font-medium'
+                            : 'bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                        }`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 

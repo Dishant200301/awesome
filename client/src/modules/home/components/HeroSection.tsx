@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Leaf, Sparkles, Heart } from 'lucide-react';
 import { PaginationDots } from '@/modules/core/components/PaginationDots';
 import { getLiveHeroSlides, subscribeToHeroSlides, fetchLiveHeroSlides, LiveHeroSlide } from '@/modules/core/lib/apiStore';
@@ -123,14 +124,67 @@ export const HeroSection: React.FC = () => {
     setIsPaused(false);
   };
 
+  // Helper to resolve the correct target shop link according to the slide's category theme
+  const resolveSlideLink = (slide: LiveHeroSlide, index: number): string => {
+    const raw = (slide.link || '').trim();
+    if (raw && raw !== '#' && raw !== '#categories' && !raw.startsWith('#')) {
+      return raw;
+    }
+
+    const idx = index % 5;
+    const text = `${slide.title || ''} ${slide.tag || ''} ${slide.subtitle || ''}`.toLowerCase();
+
+    // Kids Choli (Slide 4, Slide 5, or text match)
+    if (text.includes('kid') && text.includes('choli')) {
+      return '/shop?category=Choli&sub=Kids%20Choli';
+    }
+    // Latkan (Slide 2 or text match)
+    if (text.includes('latkan') || text.includes('artisan') || idx === 1) {
+      return '/shop?category=Latkan';
+    }
+    // Handcrafted Jewellery / Necklace (Slide 3 or text match)
+    if (text.includes('jeweller') || text.includes('necklace') || idx === 2) {
+      return '/shop?category=Necklace';
+    }
+    // Kids Choli (Slides 4 & 5)
+    if (idx === 3 || idx === 4) {
+      return '/shop?category=Choli&sub=Kids%20Choli';
+    }
+    // Slide 1 / Traditional Choli
+    return '/shop?category=Choli';
+  };
+
+  const renderSlideButton = (slide: LiveHeroSlide, index: number, isMobile: boolean, customClass?: string) => {
+    const buttonText = slide.buttonText || 'Shop Collection';
+    const targetLink = resolveSlideLink(slide, index);
+    const isExternal = targetLink.startsWith('http://') || targetLink.startsWith('https://');
+
+    const defaultMobileClass = "font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto active:scale-95 transition-transform cursor-pointer";
+    const defaultDesktopClass = "font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-lg pointer-events-auto hover:brightness-105 active:scale-95 transition-all cursor-pointer";
+
+    const btnClass = customClass || (isMobile ? defaultMobileClass : defaultDesktopClass);
+
+    if (isExternal) {
+      return (
+        <a href={targetLink} target="_blank" rel="noopener noreferrer" className={btnClass}>
+          {buttonText}
+        </a>
+      );
+    }
+
+    return (
+      <Link to={targetLink} className={btnClass}>
+        {buttonText}
+      </Link>
+    );
+  };
+
   // Render Exact Original Font & Styling For Each Slide with Dynamic Admin Content
   const renderSlideOverlay = (slide: LiveHeroSlide, index: number, isMobile: boolean) => {
     const slideIdx = index % 5;
     const tag = slide.tag || '';
     const title = slide.title || '';
     const subtitle = slide.subtitle || '';
-    const buttonText = slide.buttonText || 'Shop Collection';
-    const link = slide.link || '#categories';
 
     // =========================================================================
     // SLIDE 1: Grace in Every Thread (Royal Gold Cormorant)
@@ -159,12 +213,7 @@ export const HeroSection: React.FC = () => {
                 {subtitle}
               </p>
             )}
-            <a
-              href={link}
-              className="font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto active:scale-95 transition-transform cursor-pointer"
-            >
-              {buttonText}
-            </a>
+            {renderSlideButton(slide, index, true)}
           </div>
         );
       }
@@ -192,12 +241,7 @@ export const HeroSection: React.FC = () => {
               {subtitle}
             </p>
           )}
-          <a
-            href={link}
-            className="font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-lg pointer-events-auto hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-          >
-            {buttonText}
-          </a>
+          {renderSlideButton(slide, index, false)}
         </div>
       );
     }
@@ -229,12 +273,7 @@ export const HeroSection: React.FC = () => {
                 {subtitle}
               </p>
             )}
-            <a
-              href={link}
-              className="font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto active:scale-95 transition-transform cursor-pointer"
-            >
-              {buttonText}
-            </a>
+            {renderSlideButton(slide, index, true)}
           </div>
         );
       }
@@ -262,12 +301,7 @@ export const HeroSection: React.FC = () => {
               {subtitle}
             </p>
           )}
-          <a
-            href={link}
-            className="font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-lg pointer-events-auto hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-          >
-            {buttonText}
-          </a>
+          {renderSlideButton(slide, index, false)}
         </div>
       );
     }
@@ -294,12 +328,7 @@ export const HeroSection: React.FC = () => {
                 {subtitle}
               </p>
             )}
-            <a
-              href={link}
-              className="font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto active:scale-95 transition-transform cursor-pointer"
-            >
-              {buttonText}
-            </a>
+            {renderSlideButton(slide, index, true)}
           </div>
         );
       }
@@ -322,12 +351,7 @@ export const HeroSection: React.FC = () => {
               {subtitle}
             </p>
           )}
-          <a
-            href={link}
-            className="font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-          >
-            {buttonText}
-          </a>
+          {renderSlideButton(slide, index, false)}
         </div>
       );
     }
@@ -375,12 +399,7 @@ export const HeroSection: React.FC = () => {
                 <span className="text-[11px] xs:text-[12px] font-medium text-[#2C1B63]">Made with Love</span>
               </div>
             </div>
-            <a
-              href={link}
-              className="font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto active:scale-95 transition-transform cursor-pointer"
-            >
-              {buttonText}
-            </a>
+            {renderSlideButton(slide, index, true)}
           </div>
         );
       }
@@ -425,12 +444,7 @@ export const HeroSection: React.FC = () => {
               <span className="text-[12px] md:text-[12.5px] lg:text-[13.5px] xl:text-[15px] font-medium text-[#2C1B63]">Made with Love</span>
             </div>
           </div>
-          <a
-            href={link}
-            className="font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-          >
-            {buttonText}
-          </a>
+          {renderSlideButton(slide, index, false)}
         </div>
       );
     }
@@ -466,12 +480,12 @@ export const HeroSection: React.FC = () => {
                 {subtitle}
               </p>
             )}
-            <a
-              href={link}
-              className="font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-sm pointer-events-auto active:scale-95 transition-all duration-200 mt-1 cursor-pointer"
-            >
-              {buttonText}
-            </a>
+            {renderSlideButton(
+              slide,
+              index,
+              true,
+              "font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-sm pointer-events-auto active:scale-95 transition-all duration-200 mt-1 cursor-pointer"
+            )}
           </div>
         );
       }
@@ -503,12 +517,12 @@ export const HeroSection: React.FC = () => {
               {subtitle}
             </p>
           )}
-          <a
-            href={link}
-            className="font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-sm pointer-events-auto hover:brightness-105 active:scale-95 transition-all duration-200 mt-1 cursor-pointer"
-          >
-            {buttonText}
-          </a>
+          {renderSlideButton(
+            slide,
+            index,
+            false,
+            "font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-sm pointer-events-auto hover:brightness-105 active:scale-95 transition-all duration-200 mt-1 cursor-pointer"
+          )}
         </div>
       );
     }
@@ -537,12 +551,7 @@ export const HeroSection: React.FC = () => {
               {subtitle}
             </p>
           )}
-          <a
-            href={link}
-            className="font-cormorant inline-flex items-center justify-center px-3 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[16px] sm:text-[17.5px] capitalize tracking-wide rounded-[10px] shadow-md pointer-events-auto active:scale-95 transition-transform cursor-pointer"
-          >
-            {buttonText}
-          </a>
+          {renderSlideButton(slide, index, true)}
         </div>
       );
     }
@@ -564,12 +573,7 @@ export const HeroSection: React.FC = () => {
             {subtitle}
           </p>
         )}
-        <a
-          href={link}
-          className="font-cormorant inline-flex items-center justify-center px-6 py-2.5 md:px-7 md:py-3 lg:px-9 lg:py-3.5 xl:px-11 xl:py-4.5 bg-gradient-to-r from-[#E859B1] to-[#F7D85E] text-[#410815] font-bold text-[15px] md:text-[16px] lg:text-[18px] xl:text-[21px] capitalize tracking-wide rounded-[10px] shadow-lg pointer-events-auto hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-        >
-          {buttonText}
-        </a>
+        {renderSlideButton(slide, index, false)}
       </div>
     );
   };

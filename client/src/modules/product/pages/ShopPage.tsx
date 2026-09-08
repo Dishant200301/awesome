@@ -507,15 +507,17 @@ export default function ShopPage() {
 
   // Top header categories derived dynamically from Admin with live item counts
   const dynamicShopCategories = useMemo(() => {
-    return liveCategoriesList.map((c) => {
-      const realCount = allShopItems.filter((item) => matchProductCategory(item.parentProduct, c.name)).length;
-      return {
-        id: c.name,
-        name: c.name,
-        count: `${realCount} items`,
-        img: c.image || "/images/category/Latkan.webp",
-      };
-    });
+    return liveCategoriesList
+      .filter((c: any) => c && c.name && c.isActive !== false)
+      .map((c) => {
+        const realCount = allShopItems.filter((item) => matchProductCategory(item.parentProduct, c.name)).length;
+        return {
+          id: c.name,
+          name: c.name,
+          count: `${realCount} items`,
+          img: c.image || "/images/category/Latkan.webp",
+        };
+      });
   }, [liveCategoriesList, allShopItems]);
 
   const handleProductClick = (e: React.MouseEvent, productId: string | number) => {
@@ -932,28 +934,45 @@ export default function ShopPage() {
     return map;
   }, [filterConfig?.categories, allShopItems]);
 
-  // Live Rating Real Counts
+  // Products scoped to current category for dynamic category-relevant filters
+  const categoryScopedItems = useMemo(() => {
+    if (!selectedCategory || selectedCategory.toLowerCase() === "all") {
+      return allShopItems;
+    }
+    if (selectedCategory === "newArrival") {
+      return allShopItems.filter((item) => item.labels?.newArrival || item.parentProduct?.labels?.newArrival);
+    }
+    if (selectedCategory === "bestSeller") {
+      return allShopItems.filter((item) => item.labels?.bestSeller || item.parentProduct?.labels?.bestSeller);
+    }
+    if (selectedCategory === "sale") {
+      return allShopItems.filter((item) => item.labels?.sale || item.parentProduct?.labels?.sale);
+    }
+    return allShopItems.filter((item) => matchProductCategory(item.parentProduct, selectedCategory));
+  }, [allShopItems, selectedCategory]);
+
+  // Live Rating Real Counts scoped to category products
   const ratingCounts = useMemo(() => {
     const getStarLevel = (r: any) => {
       const val = Number(r !== undefined && r !== null ? r : 4.8);
       return val >= 4.5 ? 5 : val >= 3.5 ? 4 : val >= 2.5 ? 3 : val >= 1.5 ? 2 : 1;
     };
-    const c5 = allShopItems.filter((item) => getStarLevel(item.rating) === 5).length;
-    const c4 = allShopItems.filter((item) => getStarLevel(item.rating) === 4).length;
-    const c3 = allShopItems.filter((item) => getStarLevel(item.rating) === 3).length;
+    const c5 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 5).length;
+    const c4 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 4).length;
+    const c3 = categoryScopedItems.filter((item) => getStarLevel(item.rating || item.parentProduct?.rating) === 3).length;
     return [
       { stars: 5, count: c5 },
       { stars: 4, count: c4 },
       { stars: 3, count: c3 },
     ];
-  }, [allShopItems]);
+  }, [categoryScopedItems]);
 
-  // Live Dynamic Colors extracted from current shop products & variants with accurate counts (only pure color names)
+  // Live Dynamic Colors extracted from relevant category shop products & variants with accurate counts (only pure color names)
   const availableDynamicColors = useMemo(() => {
     const colorMap = new Map<string, { name: string; hex: string }>();
 
-    // 1. Populate from active shop items
-    allShopItems.forEach((item: any) => {
+    // 1. Populate from active category shop items
+    categoryScopedItems.forEach((item: any) => {
       const pureColor = extractPureColor(item.variantColor || "");
       if (pureColor && !["standard", "default", "none", "free size"].includes(pureColor.toLowerCase())) {
         const key = pureColor.toLowerCase();
@@ -983,28 +1002,11 @@ export default function ShopPage() {
       }
     });
 
-    // 2. Also populate from filterConfig colors if present
-    if (Array.isArray(filterConfig?.colors)) {
-      filterConfig.colors.forEach((c: any) => {
-        const rawColName = (typeof c === "string" ? c : c.name || "").trim();
-        const pure = extractPureColor(rawColName);
-        if (pure && !["standard", "default", "none", "free size"].includes(pure.toLowerCase())) {
-          const key = pure.toLowerCase();
-          if (!colorMap.has(key)) {
-            colorMap.set(key, {
-              name: pure,
-              hex: (typeof c === "object" ? c.hex : null) || getColorHex(pure),
-            });
-          }
-        }
-      });
-    }
-
-    // 3. Compute exact product/variant count for each distinct color
+    // 2. Compute exact product/variant count for each distinct color in this category
     const result: Array<{ name: string; hex: string; count: number }> = [];
     colorMap.forEach((val) => {
       const cleanC = val.name.toLowerCase().trim();
-      const countForColor = allShopItems.filter((item: any) => {
+      const countForColor = categoryScopedItems.filter((item: any) => {
         const itemColor = extractPureColor(item.variantColor || "").toLowerCase().trim();
         const p = item.parentProduct || {};
         if (itemColor && (itemColor === cleanC || itemColor.includes(cleanC) || cleanC.includes(itemColor))) return true;
@@ -1025,14 +1027,14 @@ export default function ShopPage() {
     });
 
     return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [allShopItems, filterConfig?.colors]);
+  }, [categoryScopedItems]);
 
-  // Live Dynamic Sizes extracted from products and admin filter config with product count
+  // Live Dynamic Sizes extracted STRICTLY from current category products with real counts > 0
   const availableDynamicSizes = useMemo(() => {
     const sizeMap = new Map<string, number>();
 
-    // 1. Gather sizes from all products
-    allShopItems.forEach((item: any) => {
+    // 1. Gather sizes strictly from products in the current category/view
+    categoryScopedItems.forEach((item: any) => {
       const p = item.parentProduct || {};
       const productSizes = new Set<string>();
       if (item.variantSize) productSizes.add(item.variantSize.trim());
@@ -1060,26 +1062,16 @@ export default function ShopPage() {
       });
     });
 
-    // 2. Also ensure sizes from filterConfig are included
-    (filterConfig?.sizes || []).forEach((s: any) => {
-      const sz = (typeof s === "string" ? s : s.name || s.id || "").trim();
-      if (sz && !sizeMap.has(sz)) {
-        sizeMap.set(sz, 0);
+    // Only include sizes that have count > 0 for this category's products
+    const list: Array<{ name: string; count: number }> = [];
+    sizeMap.forEach((count, name) => {
+      if (count > 0) {
+        list.push({ name, count });
       }
     });
 
-    // If still empty, add default handcrafted sizes
-    if (sizeMap.size === 0) {
-      ["Free Size", "Standard Pair", "S", "M", "L", "XL"].forEach((sz) => sizeMap.set(sz, 0));
-    }
-
-    const list: Array<{ name: string; count: number }> = [];
-    sizeMap.forEach((count, name) => {
-      list.push({ name, count });
-    });
-
     return list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [allShopItems, filterConfig?.sizes]);
+  }, [categoryScopedItems]);
 
   // Sidebar Filter Component (matching Hervia Tea collapsible accordion design)
   const FilterSidebar = (
@@ -1122,14 +1114,15 @@ export default function ShopPage() {
               </button>
             </li>
 
-            {(liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || [])).map((cat: any) => {
+            {(liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || []))
+              .filter((c: any) => c && c.name && c.isActive !== false)
+              .map((cat: any) => {
               const catKey = cat.name;
               const catName = cat.name;
               const isActive = (selectedCategory || "").toLowerCase() === catKey.toLowerCase();
               const realCount = allShopItems.filter((item) => matchProductCategory(item.parentProduct, catKey)).length;
-              const subList = Array.isArray(cat.subs) && cat.subs.length > 0
-                ? cat.subs
-                : (Array.isArray(cat.subcategories) ? cat.subcategories : []);
+              const subList = (Array.isArray(cat.subs) ? cat.subs : (Array.isArray(cat.subcategories) ? cat.subcategories : []))
+                .filter((s: any) => s && s.name && s.isActive !== false);
 
               return (
                 <li key={cat.id || catKey} className="space-y-1">
@@ -1360,46 +1353,48 @@ export default function ShopPage() {
       </div>
 
       {/* 4. Size Filter */}
-      <div className="border-b border-zinc-200 pb-2">
-        <button
-          type="button"
-          onClick={() => toggleSection("size")}
-          className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-zinc-900 mb-3 cursor-pointer"
-        >
-          <span>Size</span>
-          {openSections.size ? (
-            <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
-          ) : (
-            <Plus className="w-6 h-6 stroke-1 text-zinc-800" />
+      {availableDynamicSizes.length > 0 && (
+        <div className="border-b border-zinc-200 pb-2">
+          <button
+            type="button"
+            onClick={() => toggleSection("size")}
+            className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-zinc-900 mb-3 cursor-pointer"
+          >
+            <span>Size</span>
+            {openSections.size ? (
+              <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
+            ) : (
+              <Plus className="w-6 h-6 stroke-1 text-zinc-800" />
+            )}
+          </button>
+          {openSections.size && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {availableDynamicSizes.map((s) => {
+                const sizeVal = s.name;
+                const checked = selectedSizes.includes(sizeVal);
+                return (
+                  <button
+                    key={sizeVal}
+                    type="button"
+                    onClick={() => toggleSize(sizeVal)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${checked
+                      ? "bg-[#520618] text-white border-[#520618] shadow-xs"
+                      : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                      }`}
+                  >
+                    <span>{sizeVal}</span>
+                    {s.count > 0 && (
+                      <span className={`text-[10px] ${checked ? "text-white/80" : "text-zinc-400"}`}>
+                        ({s.count})
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           )}
-        </button>
-        {openSections.size && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {availableDynamicSizes.map((s) => {
-              const sizeVal = s.name;
-              const checked = selectedSizes.includes(sizeVal);
-              return (
-                <button
-                  key={sizeVal}
-                  type="button"
-                  onClick={() => toggleSize(sizeVal)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${checked
-                    ? "bg-[#520618] text-white border-[#520618] shadow-xs"
-                    : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                    }`}
-                >
-                  <span>{sizeVal}</span>
-                  {s.count > 0 && (
-                    <span className={`text-[10px] ${checked ? "text-white/80" : "text-zinc-400"}`}>
-                      ({s.count})
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 5. Dynamic Custom Attributes Filters (Material, Craft Technique, Occasion, etc.) */}
       {(filterConfig?.attributes || []).map((attr: any) => {
@@ -1447,49 +1442,54 @@ export default function ShopPage() {
       })}
 
       {/* 6. Rating Filter */}
-      <div>
-        <button
-          type="button"
-          onClick={() => toggleSection("rating")}
-          className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-zinc-900 mb-3 cursor-pointer"
-        >
-          <span>Rating</span>
-          {openSections.rating ? (
-            <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
-          ) : (
-            <Plus className="w-6 h-6 stroke-1 text-zinc-800" />
-          )}
-        </button>
-        {openSections.rating && (
-          <ul className="space-y-2.5 text-xs text-zinc-600">
-            {ratingCounts.map(({ stars, count }) => {
-              const checked = selectedRatings.includes(stars);
-              return (
-                <li key={stars} className="flex items-center justify-between cursor-pointer">
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleRating(stars)}
-                      className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
-                    />
-                    <div className="flex items-center text-amber-500">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-3.5 h-3.5 fill-current ${i >= stars ? "text-zinc-300 fill-zinc-200" : ""
-                            }`}
+      {ratingCounts.some((r) => r.count > 0) && (
+        <div>
+          <button
+            type="button"
+            onClick={() => toggleSection("rating")}
+            className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-zinc-900 mb-3 cursor-pointer"
+          >
+            <span>Rating</span>
+            {openSections.rating ? (
+              <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
+            ) : (
+              <Plus className="w-6 h-6 stroke-1 text-zinc-800" />
+            )}
+          </button>
+          {openSections.rating && (
+            <ul className="space-y-2.5 text-xs text-zinc-600">
+              {ratingCounts
+                .filter(({ count }) => count > 0)
+                .map(({ stars, count }) => {
+                  const checked = selectedRatings.includes(stars);
+                  return (
+                    <li key={stars} className="flex items-center justify-between cursor-pointer">
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleRating(stars)}
+                          className="w-4 h-4 rounded border-zinc-300 text-[#520618] focus:ring-[#520618]/20 cursor-pointer accent-[#520618]"
                         />
-                      ))}
-                    </div>
-                  </label>
-                  <span className="text-zinc-400 text-[10px]">({count})</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                        <div className="flex items-center text-amber-500">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3.5 h-3.5 fill-current ${
+                                i >= stars ? "text-zinc-300 fill-zinc-200" : ""
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </label>
+                      <span className="text-zinc-400 text-[10px]">({count})</span>
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Reset Button */}
       {(selectedCategory ||

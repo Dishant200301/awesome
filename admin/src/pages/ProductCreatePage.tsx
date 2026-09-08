@@ -83,6 +83,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [rawExistingProduct, setRawExistingProduct] = useState<any>(null);
 
   // Dynamic Categories from Backend API & MySQL
   const [mainCategories, setMainCategories] = useState<Category[]>([]);
@@ -392,6 +393,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       try {
         const prod = await AdminApiService.getProductById(effectiveProductId);
         if (!prod || !isMounted) return;
+        setRawExistingProduct(prod);
 
         // Basic Info
         setName(prod.name || prod.displayName || '');
@@ -437,6 +439,20 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         addImg((prod as any).thumbnail);
         if (Array.isArray(prod.galleryImages)) prod.galleryImages.forEach(addImg);
         if (Array.isArray(prod.images)) prod.images.forEach(addImg);
+        if (Array.isArray(prod.variations)) {
+          prod.variations.forEach((v: any) => {
+            addImg(v.mainImage || v.thumbnail || v.image);
+            if (Array.isArray(v.images)) v.images.forEach(addImg);
+            if (Array.isArray(v.galleryImages)) v.galleryImages.forEach(addImg);
+          });
+        }
+        if (Array.isArray(prod.variants)) {
+          prod.variants.forEach((v: any) => {
+            addImg(v.mainImage || v.image);
+            if (Array.isArray(v.images)) v.images.forEach(addImg);
+            if (Array.isArray(v.galleryImages)) v.galleryImages.forEach(addImg);
+          });
+        }
 
         if (loadedImgs.length > 0) {
           setImages(loadedImgs);
@@ -900,6 +916,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     );
 
     const payload: Partial<Product> = {
+      ...(rawExistingProduct || {}),
       name: name.trim(),
       displayName: name.trim(),
       slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -915,6 +932,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       subtitle: shortDescription.trim(),
       fullDescription: description.trim(),
       longDescription: description.trim(),
+      description: description.trim(),
       status: finalStatus,
       isPublished: isLive,
       type: productType,

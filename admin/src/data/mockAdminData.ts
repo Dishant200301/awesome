@@ -20,9 +20,40 @@ export const sanitizeProducts = (list: any[]): Product[] => {
   );
 };
 
-export const MOCK_PRODUCTS: Product[] = [];
+const STORAGE_KEY = 'awesome_admin_products';
+
+export const loadStoredProducts = (): Product[] => {
+  try {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return sanitizeProducts(parsed);
+        }
+      }
+    }
+  } catch (e) {}
+  return [];
+};
+
+export const saveStoredProducts = (list: Product[]) => {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+  } catch (e) {}
+};
+
+export const MOCK_PRODUCTS: Product[] = loadStoredProducts();
 
 export const getAdminProducts = (): Product[] => {
+  if (MOCK_PRODUCTS.length === 0) {
+    const fromStorage = loadStoredProducts();
+    if (fromStorage.length > 0) {
+      MOCK_PRODUCTS.push(...fromStorage);
+    }
+  }
   return MOCK_PRODUCTS;
 };
 
@@ -139,6 +170,7 @@ export const broadcastAdminProductChange = (updatedProduct?: Product) => {
       MOCK_PRODUCTS.unshift(updatedProduct);
       syncProductToBackend(updatedProduct, false);
     }
+    saveStoredProducts(MOCK_PRODUCTS);
   }
 
   // 1. BroadcastChannel
@@ -234,7 +266,7 @@ export const MOCK_HERO_SLIDES: HeroSlide[] = [
     image: "/images/home/hero/hero-1.webp",
     mobileImage: "/images/home/hero/mobile-1.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Choli",
     theme: "gold",
     align: "left",
     status: "Active",
@@ -248,7 +280,7 @@ export const MOCK_HERO_SLIDES: HeroSlide[] = [
     image: "/images/home/hero/hero-2.webp",
     mobileImage: "/images/home/hero/mobile-2.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Latkan",
     theme: "gold",
     align: "left",
     status: "Active",
@@ -262,7 +294,7 @@ export const MOCK_HERO_SLIDES: HeroSlide[] = [
     image: "/images/home/hero/hero-3.webp",
     mobileImage: "/images/home/hero/mobile-3.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Necklace",
     theme: "maroon",
     align: "left",
     status: "Active",
@@ -276,7 +308,7 @@ export const MOCK_HERO_SLIDES: HeroSlide[] = [
     image: "/images/home/hero/hero-4.webp",
     mobileImage: "/images/home/hero/mobile-4.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Choli&sub=Kids%20Choli",
     theme: "purple",
     align: "left",
     status: "Active",
@@ -290,7 +322,7 @@ export const MOCK_HERO_SLIDES: HeroSlide[] = [
     image: "/images/home/hero/hero-5.webp",
     mobileImage: "/images/home/hero/mobile-5.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Choli&sub=Kids%20Choli",
     theme: "purple",
     align: "left",
     status: "Active",

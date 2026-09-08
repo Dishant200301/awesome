@@ -168,13 +168,16 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
         sort: sortBy
       });
 
-      if (res && res.items) {
-        setProducts(res.items);
-        setTotalCount(res.total !== undefined ? res.total : res.items.length);
+      const localProducts = getAdminProducts();
+      if (res && Array.isArray(res.items) && res.items.length > 0) {
+        const serverIds = new Set(res.items.map((p: any) => String(p.id)));
+        const unsyncedLocals = localProducts.filter((p: any) => !serverIds.has(String(p.id)));
+        const combined = [...unsyncedLocals, ...res.items];
+        setProducts(combined);
+        setTotalCount(res.total !== undefined ? Math.max(res.total, combined.length) : combined.length);
       } else {
-        const fallback = getAdminProducts();
-        setProducts(fallback);
-        setTotalCount(fallback.length);
+        setProducts(localProducts);
+        setTotalCount(localProducts.length);
       }
     } catch (e) {
       console.error('Failed to load products:', e);

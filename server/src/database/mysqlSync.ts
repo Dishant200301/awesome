@@ -21,7 +21,7 @@ export async function fetchCategoriesFromMySQL(): Promise<{ categories: any[]; s
       metaTitle: c.meta_title || "",
       metaDescription: c.meta_description || "",
       metaKeywords: c.meta_keywords || "",
-      isActive: Boolean(c.is_active),
+      isActive: c.is_active !== null && c.is_active !== undefined && c.is_active !== 0 && c.is_active !== "0" && Boolean(c.is_active),
       createdAt: c.created_at ? new Date(c.created_at).toISOString().split("T")[0] : "2026-01-15"
     }));
 
@@ -42,7 +42,7 @@ export async function fetchCategoriesFromMySQL(): Promise<{ categories: any[]; s
       metaTitle: s.meta_title || "",
       metaDescription: s.meta_description || "",
       metaKeywords: s.meta_keywords || "",
-      isActive: Boolean(s.is_active),
+      isActive: s.is_active !== null && s.is_active !== undefined && s.is_active !== 0 && s.is_active !== "0" && Boolean(s.is_active),
       createdAt: s.created_at ? new Date(s.created_at).toISOString().split("T")[0] : "2026-01-20"
     }));
 
@@ -85,7 +85,7 @@ export async function syncCategoryToMySQL(cat: Partial<Category> | any): Promise
           cat.metaTitle || cat.meta_title || null,
           cat.metaDescription || cat.meta_description || null,
           cat.metaKeywords || cat.meta_keywords || null,
-          cat.isActive !== false ? 1 : 0
+          (cat.isActive === false || cat.isActive === 0 || cat.isActive === "0" || cat.isActive === "false") ? 0 : 1
         ]
       }
     );
@@ -156,7 +156,7 @@ export async function syncSubcategoryToMySQL(sub: Partial<Subcategory> | any): P
           sub.metaTitle || sub.meta_title || null,
           sub.metaDescription || sub.meta_description || null,
           sub.metaKeywords || sub.meta_keywords || null,
-          sub.isActive !== false ? 1 : 0
+          (sub.isActive === false || sub.isActive === 0 || sub.isActive === "0" || sub.isActive === "false") ? 0 : 1
         ]
       }
     );

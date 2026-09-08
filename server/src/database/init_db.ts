@@ -29,22 +29,37 @@ async function ensureColumnExists(
 
 export async function initializeMySQLDatabase() {
   try {
-    // 1. Connect without specifying DB to ensure database creation
-    const connection = await mysql.createConnection({
-      host: config.db.host,
-      port: config.db.port,
-      user: config.db.user,
-      password: config.db.password,
-      multipleStatements: true
-    });
-
-    console.log(`🔌 Connected to MySQL server at ${config.db.host}:${config.db.port}`);
-
-    // 2. Ensure database exists & select it
-    await connection.query(
-      `CREATE DATABASE IF NOT EXISTS \`${config.db.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-    );
-    await connection.query(`USE \`${config.db.name}\`;`);
+    // 1. Connect (try directly with database first, or fallback without database for initial setup)
+    let connection: mysql.Connection;
+    try {
+      connection = await mysql.createConnection({
+        host: config.db.host,
+        port: config.db.port,
+        user: config.db.user,
+        password: config.db.password,
+        database: config.db.name,
+        multipleStatements: true
+      });
+      console.log(`🔌 Connected to MySQL server at ${config.db.host}:${config.db.port} [DB: ${config.db.name}]`);
+    } catch {
+      // Fallback: Connect without specifying DB to attempt database creation (for local dev)
+      connection = await mysql.createConnection({
+        host: config.db.host,
+        port: config.db.port,
+        user: config.db.user,
+        password: config.db.password,
+        multipleStatements: true
+      });
+      console.log(`🔌 Connected to MySQL server at ${config.db.host}:${config.db.port}`);
+      try {
+        await connection.query(
+          `CREATE DATABASE IF NOT EXISTS \`${config.db.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+        );
+      } catch (createErr) {
+        console.warn("⚠️ CREATE DATABASE skipped (standard on cloud/shared hosting):", (createErr as Error).message);
+      }
+      await connection.query(`USE \`${config.db.name}\`;`);
+    }
 
     // 3. Read & execute SQL Schema file
     const possiblePaths = [
@@ -110,6 +125,10 @@ export async function initializeMySQLDatabase() {
   }
 }
 
-if (process.argv[1] === __filename) {
-  initializeMySQLDatabase().then(() => process.exit(0));
+if (
+  process.argv[1] &&
+  (path.resolve(process.argv[1]) === path.resolve(__filename) ||
+    process.argv[1].replace(/\\/g, "/").endsWith("init_db.ts"))
+) {
+  initializeMySQLDatabase().then((success) => process.exit(success ? 0 : 1));
 }

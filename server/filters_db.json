@@ -53,21 +53,6 @@
       ]
     },
     {
-      "id": "cat-1788347632497",
-      "name": "efef",
-      "slug": "efef",
-      "key": "efef",
-      "subcategories": [
-        {
-          "id": "sub-1788347656976",
-          "categoryId": "cat-1788347632497",
-          "categoryName": "efef",
-          "name": "fefe",
-          "slug": "fefe"
-        }
-      ]
-    },
-    {
       "id": "cat-10",
       "name": "Waist Belt",
       "slug": "waist-belt",
@@ -241,30 +226,9 @@
       "slug": "bracelet",
       "key": "Bracelet",
       "subcategories": []
-    },
-    {
-      "id": "cat-1788775635865",
-      "name": "grrr",
-      "slug": "grrr",
-      "key": "grrr",
-      "subcategories": []
-    },
-    {
-      "id": "cat-1788779401372",
-      "name": "u99",
-      "slug": "u99",
-      "key": "u99",
-      "subcategories": []
     }
   ],
   "subcategories": [
-    {
-      "id": "sub-1788347656976",
-      "categoryId": "cat-1788347632497",
-      "categoryName": "efef",
-      "name": "fefe",
-      "slug": "fefe"
-    },
     {
       "id": "sub-1",
       "categoryId": "cat-1",

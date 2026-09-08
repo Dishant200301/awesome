@@ -2,8 +2,8 @@ import app from "./app.js";
 import { config } from "./config/index.js";
 import { sequelize } from "./database/index.js";
 
-const PORT = config.port || 5000;
-const HOST = process.env.HOST || "127.0.0.1";
+const PORT = Number(process.env.PORT) || config.port || 5000;
+const HOST = process.env.HOST || "0.0.0.0";
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`🚀 AwesomeHandwork API running on http://${HOST}:${PORT} [${config.env}]`);

@@ -746,11 +746,65 @@ export const deleteCustomerReview = async (reviewId: string) => {
   } catch (err) {}
 };
 
+let allRawCategories: any[] = [];
+let allRawSubcategories: any[] = [];
+
+// Initialize cached taxonomy immediately from localStorage if available
+try {
+  if (typeof window !== "undefined") {
+    const cachedCats = localStorage.getItem("awesome_cached_categories");
+    if (cachedCats) {
+      const parsed = JSON.parse(cachedCats);
+      if (parsed && Array.isArray(parsed.categories)) {
+        allRawCategories = parsed.categories;
+        allRawSubcategories = parsed.subcategories || [];
+      }
+    }
+  }
+} catch (e) {}
+
+export const getInactiveCategoryNames = (): Set<string> => {
+  const inactive = new Set<string>();
+  if (Array.isArray(allRawCategories)) {
+    allRawCategories.forEach((c: any) => {
+      if (c.isActive === false) {
+        if (c.name) inactive.add(c.name.trim().toLowerCase());
+        if (c.slug) inactive.add(c.slug.trim().toLowerCase());
+      }
+    });
+  }
+  return inactive;
+};
+
+export const getInactiveSubcategoryNames = (): Set<string> => {
+  const inactive = new Set<string>();
+  if (Array.isArray(allRawSubcategories)) {
+    allRawSubcategories.forEach((s: any) => {
+      if (s.isActive === false) {
+        if (s.name) inactive.add(s.name.trim().toLowerCase());
+        if (s.slug) inactive.add(s.slug.trim().toLowerCase());
+      }
+    });
+  }
+  return inactive;
+};
+
 export const getLiveProductsList = () => {
+  const inactiveCats = getInactiveCategoryNames();
+  const inactiveSubs = getInactiveSubcategoryNames();
+
   const map = new Map<string, any>();
   if (Array.isArray(liveProducts)) {
     liveProducts.forEach((p) => {
       if (p && p.id !== undefined && p.id !== null) {
+        const catStr = (p.category || "").trim().toLowerCase();
+        if (catStr && inactiveCats.has(catStr)) {
+          return;
+        }
+        const subStr = (p.subcategory || p.subCategory || "").trim().toLowerCase();
+        if (subStr && inactiveSubs.has(subStr)) {
+          return;
+        }
         map.set(String(p.id), p);
       }
     });
@@ -829,18 +883,22 @@ export const getLiveFilters = () => {
     })
     .filter((c) => c.count > 0);
 
-  // Also include any product categories from live products not present in list
+  // Also include any product categories from live products not present in list, but EXCLUDE inactive ones!
+  const inactiveCats = getInactiveCategoryNames();
   const catNamesSet = new Set(liveCats.map((c) => c.name.toLowerCase()));
   currentLiveProds.forEach((p) => {
-    if (p.category && !catNamesSet.has(p.category.toLowerCase())) {
-      const cCount = currentLiveProds.filter((x) => matchCat(x, p.category)).length;
-      if (cCount > 0) {
-        liveCats.push({
-          name: p.category,
-          key: p.category,
-          count: cCount,
-        });
-        catNamesSet.add(p.category.toLowerCase());
+    if (p.category) {
+      const lower = p.category.toLowerCase().trim();
+      if (!catNamesSet.has(lower) && !inactiveCats.has(lower)) {
+        const cCount = currentLiveProds.filter((x) => matchCat(x, p.category)).length;
+        if (cCount > 0) {
+          liveCats.push({
+            name: p.category,
+            key: p.category,
+            count: cCount,
+          });
+          catNamesSet.add(lower);
+        }
       }
     }
   });
@@ -1110,6 +1168,15 @@ export const fetchLiveCategories = async (): Promise<any[]> => {
     if (res.ok) {
       const json = await res.json();
       if (json?.data && Array.isArray(json.data.categories)) {
+        allRawCategories = json.data.categories;
+        allRawSubcategories = json.data.subcategories || [];
+
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('awesome_cached_categories', JSON.stringify(json.data));
+          }
+        } catch {}
+
         const activeCategories = json.data.categories.filter((c: any) => c.isActive !== false);
         const subs = (Array.isArray(json.data.subcategories) ? json.data.subcategories : []).filter((s: any) => s.isActive !== false);
         liveCategoryData = activeCategories.map((cat: any) => {
@@ -1120,13 +1187,15 @@ export const fetchLiveCategories = async (): Promise<any[]> => {
           );
           return {
             ...cat,
-            subs: parentSubs.length > 0 ? parentSubs.map((s: any) => ({
+            subs: parentSubs.map((s: any) => ({
+              id: s.id,
               name: s.name,
               slug: s.slug || s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-            })) : (cat.subs || [])
+            }))
           };
         });
         categoryListeners.forEach((fn) => fn());
+        notifyListeners();
         return getLiveCategories();
       }
     }
@@ -1218,7 +1287,7 @@ const DEFAULT_LIVE_HERO_SLIDES: LiveHeroSlide[] = [
     image: "/images/home/hero/hero-1.webp",
     mobileImage: "/images/home/hero/mobile-1.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Choli",
     theme: "gold",
     align: "left",
     status: "Active",
@@ -1232,7 +1301,7 @@ const DEFAULT_LIVE_HERO_SLIDES: LiveHeroSlide[] = [
     image: "/images/home/hero/hero-2.webp",
     mobileImage: "/images/home/hero/mobile-2.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Latkan",
     theme: "gold",
     align: "left",
     status: "Active",
@@ -1246,7 +1315,7 @@ const DEFAULT_LIVE_HERO_SLIDES: LiveHeroSlide[] = [
     image: "/images/home/hero/hero-3.webp",
     mobileImage: "/images/home/hero/mobile-3.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Necklace",
     theme: "maroon",
     align: "left",
     status: "Active",
@@ -1260,7 +1329,7 @@ const DEFAULT_LIVE_HERO_SLIDES: LiveHeroSlide[] = [
     image: "/images/home/hero/hero-4.webp",
     mobileImage: "/images/home/hero/mobile-4.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Choli&sub=Kids%20Choli",
     theme: "purple",
     align: "left",
     status: "Active",
@@ -1274,7 +1343,7 @@ const DEFAULT_LIVE_HERO_SLIDES: LiveHeroSlide[] = [
     image: "/images/home/hero/hero-5.webp",
     mobileImage: "/images/home/hero/mobile-5.webp",
     buttonText: "Shop Collection",
-    link: "#categories",
+    link: "/shop?category=Choli&sub=Kids%20Choli",
     theme: "purple",
     align: "left",
     status: "Active",

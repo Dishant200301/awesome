@@ -1,288 +1,101 @@
 [
   {
-    "id": "attr-style",
-    "name": "Style",
-    "slug": "style",
-    "type": "select",
-    "usage": "PRODUCT",
-    "showInHighlights": true,
-    "isRequired": false,
-    "displayOrder": 2,
-    "isActive": true,
-    "options": [
-      {
-        "id": "opt-st-1",
-        "attributeId": "attr-style",
-        "label": "Contemporary Seamless",
-        "value": "Contemporary Seamless",
-        "displayOrder": 1,
-        "isActive": true
-      },
-      {
-        "id": "opt-st-2",
-        "attributeId": "attr-style",
-        "label": "Wirefree Contour",
-        "value": "Wirefree Contour",
-        "displayOrder": 2,
-        "isActive": true
-      },
-      {
-        "id": "opt-st-3",
-        "attributeId": "attr-style",
-        "label": "Everyday Bralette",
-        "value": "Everyday Bralette",
-        "displayOrder": 3,
-        "isActive": true
-      },
-      {
-        "id": "opt-st-4",
-        "attributeId": "attr-style",
-        "label": "Plunge Push-Up",
-        "value": "Plunge Push-Up",
-        "displayOrder": 4,
-        "isActive": true
-      }
-    ],
-    "createdAt": "2026-08-08T05:20:02.504Z",
-    "updatedAt": "2026-08-08T05:20:02.504Z"
-  },
-  {
-    "id": "attr-underwire",
-    "name": "Underwire Type",
-    "slug": "underwire-type",
-    "type": "select",
-    "usage": "PRODUCT",
-    "showInHighlights": true,
-    "isRequired": false,
-    "displayOrder": 3,
-    "isActive": true,
-    "options": [
-      {
-        "id": "opt-uw-1",
-        "attributeId": "attr-underwire",
-        "label": "Wire Free",
-        "value": "Wire Free",
-        "displayOrder": 1,
-        "isActive": true
-      },
-      {
-        "id": "opt-uw-2",
-        "attributeId": "attr-underwire",
-        "label": "Underwire",
-        "value": "Underwire",
-        "displayOrder": 2,
-        "isActive": true
-      },
-      {
-        "id": "opt-uw-3",
-        "attributeId": "attr-underwire",
-        "label": "Flexi-Wire",
-        "value": "Flexi-Wire",
-        "displayOrder": 3,
-        "isActive": true
-      },
-      {
-        "id": "opt-uw-4",
-        "attributeId": "attr-underwire",
-        "label": "Convertible Wire",
-        "value": "Convertible Wire",
-        "displayOrder": 4,
-        "isActive": true
-      }
-    ],
-    "createdAt": "2026-08-08T05:20:02.504Z",
-    "updatedAt": "2026-08-08T05:20:02.504Z"
-  },
-  {
-    "id": "attr-support",
-    "name": "Support",
-    "slug": "support",
-    "type": "select",
-    "usage": "PRODUCT",
-    "showInHighlights": true,
-    "isRequired": false,
-    "displayOrder": 5,
-    "isActive": true,
-    "options": [
-      {
-        "id": "opt-sp-1",
-        "attributeId": "attr-support",
-        "label": "High Support Contour Shaper",
-        "value": "High Support Contour Shaper",
-        "displayOrder": 1,
-        "isActive": true
-      },
-      {
-        "id": "opt-sp-2",
-        "attributeId": "attr-support",
-        "label": "Medium Everyday Support",
-        "value": "Medium Everyday Support",
-        "displayOrder": 2,
-        "isActive": true
-      },
-      {
-        "id": "opt-sp-3",
-        "attributeId": "attr-support",
-        "label": "Light Gentle Stretch Support",
-        "value": "Light Gentle Stretch Support",
-        "displayOrder": 3,
-        "isActive": true
-      }
-    ],
-    "createdAt": "2026-08-08T05:20:02.504Z",
-    "updatedAt": "2026-08-08T05:20:02.504Z"
-  },
-  {
-    "id": "attr-fabric-tech",
-    "name": "Fabric Technology",
-    "slug": "fabric-technology",
-    "type": "select",
-    "usage": "PRODUCT",
-    "showInHighlights": true,
-    "isRequired": false,
-    "displayOrder": 6,
-    "isActive": true,
-    "options": [
-      {
-        "id": "opt-ft-1",
-        "attributeId": "attr-fabric-tech",
-        "label": "Moisture Wicking",
-        "value": "Moisture Wicking",
-        "displayOrder": 1,
-        "isActive": true
-      },
-      {
-        "id": "opt-ft-2",
-        "attributeId": "attr-fabric-tech",
-        "label": "4-Way Ultra Stretch",
-        "value": "4-Way Ultra Stretch",
-        "displayOrder": 2,
-        "isActive": true
-      },
-      {
-        "id": "opt-ft-3",
-        "attributeId": "attr-fabric-tech",
-        "label": "Breathable Micro-Knit",
-        "value": "Breathable Micro-Knit",
-        "displayOrder": 3,
-        "isActive": true
-      },
-      {
-        "id": "opt-ft-4",
-        "attributeId": "attr-fabric-tech",
-        "label": "Quick Dry Soft Touch",
-        "value": "Quick Dry Soft Touch",
-        "displayOrder": 4,
-        "isActive": true
-      }
-    ],
-    "createdAt": "2026-08-08T05:20:02.504Z",
-    "updatedAt": "2026-08-08T05:20:02.504Z"
-  },
-  {
-    "id": "attr-care",
-    "name": "Product Care Instructions",
-    "slug": "product-care-instructions",
-    "type": "textarea",
-    "usage": "PRODUCT",
-    "showInHighlights": false,
-    "isRequired": false,
-    "displayOrder": 7,
-    "isActive": true,
-    "options": [],
-    "createdAt": "2026-08-08T05:20:02.504Z",
-    "updatedAt": "2026-08-08T05:20:02.504Z"
-  },
-  {
-    "id": "attr-1786167524666",
-    "name": "color",
+    "id": "attr-color",
+    "name": "Color",
     "slug": "color",
     "type": "SWATCH",
     "usage": "BOTH",
     "showInHighlights": true,
-    "isRequired": false,
-    "sortOrder": 10,
+    "isRequired": true,
+    "sortOrder": 1,
     "status": "active",
     "isActive": true,
     "values": [
-      {
-        "id": "val-1786167535506-3ix",
-        "attributeId": "attr-1786167524666",
-        "label": "black",
-        "value": "p",
-        "colorCode": "#000000",
-        "status": "active",
-        "sortOrder": 1
-      },
-      {
-        "id": "val-1786167597022-eyf",
-        "attributeId": "attr-1786167524666",
-        "label": "yellow",
-        "value": "y",
-        "colorCode": "#59f505",
-        "status": "active",
-        "sortOrder": 2
-      },
-      {
-        "id": "val-1786167606671-l2w",
-        "attributeId": "attr-1786167524666",
-        "label": "blue",
-        "value": "b",
-        "colorCode": "#4a0df2",
-        "status": "active",
-        "sortOrder": 3
-      }
-    ],
-    "createdAt": "2026-08-08T05:38:44.666Z",
-    "updatedAt": "2026-09-01T11:18:41.005Z",
-    "displayName": "color"
+      { "id": "val-c1", "attributeId": "attr-color", "label": "Maroon", "value": "Maroon", "colorCode": "#800000", "status": "active", "sortOrder": 1 },
+      { "id": "val-c2", "attributeId": "attr-color", "label": "Gold", "value": "Gold", "colorCode": "#D4AF37", "status": "active", "sortOrder": 2 },
+      { "id": "val-c3", "attributeId": "attr-color", "label": "Royal Blue", "value": "Royal Blue", "colorCode": "#4169E1", "status": "active", "sortOrder": 3 },
+      { "id": "val-c4", "attributeId": "attr-color", "label": "Emerald Green", "value": "Emerald Green", "colorCode": "#50C878", "status": "active", "sortOrder": 4 },
+      { "id": "val-c5", "attributeId": "attr-color", "label": "Pink", "value": "Pink", "colorCode": "#FF69B4", "status": "active", "sortOrder": 5 },
+      { "id": "val-c6", "attributeId": "attr-color", "label": "Yellow", "value": "Yellow", "colorCode": "#FFD700", "status": "active", "sortOrder": 6 },
+      { "id": "val-c7", "attributeId": "attr-color", "label": "Red", "value": "Red", "colorCode": "#DC2626", "status": "active", "sortOrder": 7 },
+      { "id": "val-c8", "attributeId": "attr-color", "label": "White", "value": "White", "colorCode": "#FFFFFF", "status": "active", "sortOrder": 8 },
+      { "id": "val-c9", "attributeId": "attr-color", "label": "Black", "value": "Black", "colorCode": "#18181B", "status": "active", "sortOrder": 9 },
+      { "id": "val-c10", "attributeId": "attr-color", "label": "Purple", "value": "Purple", "colorCode": "#9333EA", "status": "active", "sortOrder": 10 }
+    ]
   },
   {
-    "id": "attr-1786168137017",
-    "name": "size",
+    "id": "attr-size",
+    "name": "Size",
     "slug": "size",
+    "type": "BUTTON",
+    "usage": "BOTH",
+    "showInHighlights": true,
+    "isRequired": true,
+    "sortOrder": 2,
+    "status": "active",
+    "isActive": true,
+    "values": [
+      { "id": "val-s1", "attributeId": "attr-size", "label": "Standard Pair", "value": "Standard Pair", "status": "active", "sortOrder": 1 },
+      { "id": "val-s2", "attributeId": "attr-size", "label": "Free Size", "value": "Free Size", "status": "active", "sortOrder": 2 },
+      { "id": "val-s3", "attributeId": "attr-size", "label": "S", "value": "S", "status": "active", "sortOrder": 3 },
+      { "id": "val-s4", "attributeId": "attr-size", "label": "M", "value": "M", "status": "active", "sortOrder": 4 },
+      { "id": "val-s5", "attributeId": "attr-size", "label": "L", "value": "L", "status": "active", "sortOrder": 5 },
+      { "id": "val-s6", "attributeId": "attr-size", "label": "XL", "value": "XL", "status": "active", "sortOrder": 6 }
+    ]
+  },
+  {
+    "id": "attr-material",
+    "name": "Material",
+    "slug": "material",
+    "type": "SELECT",
+    "usage": "BOTH",
+    "showInHighlights": true,
+    "isRequired": false,
+    "sortOrder": 3,
+    "status": "active",
+    "isActive": true,
+    "values": [
+      { "id": "val-m1", "attributeId": "attr-material", "label": "Silk Thread & Pearls", "value": "Silk Thread & Pearls", "status": "active", "sortOrder": 1 },
+      { "id": "val-m2", "attributeId": "attr-material", "label": "Mirror & Glass Beads", "value": "Mirror & Glass Beads", "status": "active", "sortOrder": 2 },
+      { "id": "val-m3", "attributeId": "attr-material", "label": "Macrame Cotton Cord", "value": "Macrame Cotton Cord", "status": "active", "sortOrder": 3 },
+      { "id": "val-m4", "attributeId": "attr-material", "label": "Brass & Ghungroo", "value": "Brass & Ghungroo", "status": "active", "sortOrder": 4 },
+      { "id": "val-m5", "attributeId": "attr-material", "label": "Velvet & Zari", "value": "Velvet & Zari", "status": "active", "sortOrder": 5 }
+    ]
+  },
+  {
+    "id": "attr-craft",
+    "name": "Craft Technique",
+    "slug": "craft-technique",
     "type": "SELECT",
     "usage": "PRODUCT",
     "showInHighlights": true,
     "isRequired": false,
-    "sortOrder": 9,
+    "sortOrder": 4,
     "status": "active",
     "isActive": true,
     "values": [
-      {
-        "id": "val-1786168132109-1dk",
-        "attributeId": "",
-        "label": "S",
-        "value": "s",
-        "status": "active",
-        "sortOrder": 1
-      },
-      {
-        "id": "val-1786168144190-dy7",
-        "attributeId": "attr-1786168137017",
-        "label": "M",
-        "value": "M",
-        "status": "active",
-        "sortOrder": 2
-      },
-      {
-        "id": "val-1786168149295-nft",
-        "attributeId": "attr-1786168137017",
-        "label": "XL",
-        "value": "X",
-        "status": "active",
-        "sortOrder": 3
-      },
-      {
-        "id": "val-1786168169855-2ik",
-        "attributeId": "attr-1786168137017",
-        "label": "XXL",
-        "value": "X",
-        "status": "active",
-        "sortOrder": 4
-      }
-    ],
-    "createdAt": "2026-08-08T05:48:57.017Z",
-    "updatedAt": "2026-08-08T05:49:31.279Z"
+      { "id": "val-cr1", "attributeId": "attr-craft", "label": "Kutchi Mirror Embroidery", "value": "Kutchi Mirror Embroidery", "status": "active", "sortOrder": 1 },
+      { "id": "val-cr2", "attributeId": "attr-craft", "label": "Hand-knotted Macrame", "value": "Hand-knotted Macrame", "status": "active", "sortOrder": 2 },
+      { "id": "val-cr3", "attributeId": "attr-craft", "label": "Thread Tassel Weaving", "value": "Thread Tassel Weaving", "status": "active", "sortOrder": 3 },
+      { "id": "val-cr4", "attributeId": "attr-craft", "label": "Handcrafted Beading", "value": "Handcrafted Beading", "status": "active", "sortOrder": 4 }
+    ]
+  },
+  {
+    "id": "attr-occasion",
+    "name": "Occasion",
+    "slug": "occasion",
+    "type": "SELECT",
+    "usage": "BOTH",
+    "showInHighlights": true,
+    "isRequired": false,
+    "sortOrder": 5,
+    "status": "active",
+    "isActive": true,
+    "values": [
+      { "id": "val-oc1", "attributeId": "attr-occasion", "label": "Navratri Garba", "value": "Navratri Garba", "status": "active", "sortOrder": 1 },
+      { "id": "val-oc2", "attributeId": "attr-occasion", "label": "Wedding & Festive", "value": "Wedding & Festive", "status": "active", "sortOrder": 2 },
+      { "id": "val-oc3", "attributeId": "attr-occasion", "label": "Ethnic Daily", "value": "Ethnic Daily", "status": "active", "sortOrder": 3 },
+      { "id": "val-oc4", "attributeId": "attr-occasion", "label": "Gift Hamper", "value": "Gift Hamper", "status": "active", "sortOrder": 4 }
+    ]
   }
 ]

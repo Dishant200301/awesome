@@ -2,19 +2,14 @@
   RewriteEngine On
   RewriteBase /
 
-  # 1. Reverse Proxy API requests to Node.js Backend (Port 5000)
-  RewriteRule ^api/(.*)$ http://127.0.0.1:5000/api/$1 [P,L]
+  # 1. Prevent infinite redirect on index.html
+  RewriteRule ^index\.html$ - [L]
 
-  # 2. If real file or folder exists, serve it directly
+  # 2. Allow real existing files, directories, and assets (css, js, images, api, admin)
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 3. For all React SPA routes (e.g. /product, /product/:id, /shop), fallback to index.html
-  RewriteRule ^ index.html [L]
-</IfModule>
-
-<IfModule mod_proxy.c>
-  ProxyPreserveHost On
-  ProxyRequests Off
+  # 3. Route all other requests (React Router SPA routes like /product/*, /shop, /about) to index.html
+  RewriteRule . /index.html [L]
 </IfModule>

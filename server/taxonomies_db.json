@@ -43,20 +43,6 @@
       "createdAt": "2026-09-07"
     },
     {
-      "id": "cat-1788347632497",
-      "name": "efef",
-      "slug": "efef",
-      "description": "",
-      "image": "/images/category/Latkan.webp",
-      "imageUrl": "/images/category/Latkan.webp",
-      "bannerImage": "",
-      "metaTitle": "",
-      "metaDescription": "",
-      "metaKeywords": "",
-      "isActive": true,
-      "createdAt": "2026-09-07"
-    },
-    {
       "id": "cat-10",
       "name": "Waist Belt",
       "slug": "waist-belt",
@@ -181,55 +167,9 @@
       "metaKeywords": "",
       "isActive": true,
       "createdAt": "2026-09-07"
-    },
-    {
-      "id": "cat-1788775635865",
-      "name": "grrr",
-      "slug": "grrr",
-      "description": "",
-      "image": "/images/category/Latkan.webp",
-      "imageUrl": "/images/category/Latkan.webp",
-      "bannerImage": "",
-      "metaTitle": "g | Awesome Handmade",
-      "metaDescription": "",
-      "metaKeywords": "",
-      "isActive": true,
-      "createdAt": "2026-09-07"
-    },
-    {
-      "id": "cat-1788779401372",
-      "name": "u99",
-      "slug": "u99",
-      "description": "",
-      "image": "/images/category/Latkan.webp",
-      "imageUrl": "/images/category/Latkan.webp",
-      "bannerImage": "",
-      "metaTitle": "u | Awesome Handmade",
-      "metaDescription": "",
-      "metaKeywords": "",
-      "isActive": true,
-      "createdAt": "2026-09-07"
     }
   ],
   "subcategories": [
-    {
-      "id": "sub-1788347656976",
-      "categoryId": "cat-1788347632497",
-      "parentId": "cat-1788347632497",
-      "categoryName": "efef",
-      "parentName": "efef",
-      "name": "fefe",
-      "slug": "fefe",
-      "description": "",
-      "image": "/images/category/Latkan.webp",
-      "imageUrl": "/images/category/Latkan.webp",
-      "bannerImage": "",
-      "metaTitle": "",
-      "metaDescription": "",
-      "metaKeywords": "",
-      "isActive": true,
-      "createdAt": "2026-09-07"
-    },
     {
       "id": "sub-1",
       "categoryId": "cat-1",

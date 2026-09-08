@@ -687,7 +687,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                                 id={`cat-status-${cat.id}`}
                                 size="sm"
                                 checked={cat.isActive !== false}
-                                onCheckedChange={(checked) => {
+                                onCheckedChange={async (checked) => {
                                   setCategories((prev) =>
                                     prev.map((c) => (c.id === cat.id ? { ...c, isActive: checked } : c))
                                   );
@@ -696,6 +696,39 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                                       checked ? 'Active (Visible on Website)' : 'Inactive (Hidden from Website)'
                                     }.`
                                   );
+
+                                  try {
+                                    const isSub = cat.type === 'sub' || !!cat.parentId;
+                                    const endpoint = isSub
+                                      ? `${API_BASE}/taxonomies/subcategories/${cat.id}`
+                                      : `${API_BASE}/taxonomies/categories/${cat.id}`;
+
+                                    const res = await fetch(endpoint, {
+                                      method: 'PUT',
+                                      headers: getAdminAuthHeaders(),
+                                      body: JSON.stringify({
+                                        name: cat.name,
+                                        slug: cat.slug,
+                                        categoryId: (cat as any).categoryId || cat.parentId,
+                                        parentId: (cat as any).categoryId || cat.parentId,
+                                        image: cat.image || cat.imageUrl || '',
+                                        bannerImage: cat.bannerImage || '',
+                                        description: cat.description || '',
+                                        metaTitle: cat.metaTitle || '',
+                                        metaDescription: cat.metaDescription || '',
+                                        metaKeywords: cat.metaKeywords || '',
+                                        isActive: checked
+                                      })
+                                    });
+                                    if (!res.ok) {
+                                      const errData = await res.json().catch(() => ({}));
+                                      console.error("PUT category error:", errData);
+                                    }
+                                    broadcastChange();
+                                  } catch (err) {
+                                    console.error("Failed to update category status:", err);
+                                    loadCategoriesFromServer();
+                                  }
                                 }}
                               />
                               <span

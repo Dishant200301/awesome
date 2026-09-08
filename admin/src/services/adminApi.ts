@@ -7,7 +7,8 @@ import {
   MOCK_CONTACT_MESSAGES,
   getGlobalVariantsList,
   getAdminProducts,
-  deleteAdminProduct
+  deleteAdminProduct,
+  saveStoredProducts
 } from "../data/mockAdminData";
 import { Product, Category, Subcategory, Brand, Attribute, ContactMessage, SizeGuide, HeroSlide, HomepageBanner, AdminReviewItem } from "../types/admin";
 
@@ -128,10 +129,10 @@ export class AdminApiService {
     if (params?.sort) query.append("sort", params.sort);
 
     const remote = await this.request<any>(`/products?${query.toString()}`);
-    if (remote && remote.items) return remote;
+    if (remote && Array.isArray(remote.items) && remote.items.length > 0) return remote;
 
-    // Fallback in-memory querying
-    let list = [...MOCK_PRODUCTS];
+    // Fallback in-memory querying from persisted local storage
+    let list = [...getAdminProducts()];
     if (params?.search) {
       const q = params.search.toLowerCase();
       list = list.filter((p) => 
@@ -215,6 +216,7 @@ export class AdminApiService {
       } else {
         MOCK_PRODUCTS.unshift(remote);
       }
+      saveStoredProducts(MOCK_PRODUCTS);
       return remote;
     }
 
@@ -257,6 +259,7 @@ export class AdminApiService {
     };
 
     MOCK_PRODUCTS.unshift(newProd);
+    saveStoredProducts(MOCK_PRODUCTS);
     return newProd;
   }
 
@@ -272,12 +275,14 @@ export class AdminApiService {
       } else {
         MOCK_PRODUCTS.unshift(remote);
       }
+      saveStoredProducts(MOCK_PRODUCTS);
       return remote;
     }
 
-    const idx = MOCK_PRODUCTS.findIndex((p) => p.id === id);
+    const idx = MOCK_PRODUCTS.findIndex((p) => String(p.id) === String(id));
     if (idx === -1) return null;
     MOCK_PRODUCTS[idx] = { ...MOCK_PRODUCTS[idx], ...productData };
+    saveStoredProducts(MOCK_PRODUCTS);
     return MOCK_PRODUCTS[idx];
   }
 
