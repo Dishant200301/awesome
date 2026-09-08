@@ -10,7 +10,7 @@ export const config = {
     port: parseInt(process.env.DB_PORT || "3306", 10),
     name: process.env.DB_NAME || "u382338879_awesome_hand",
     user: process.env.DB_USER || "u382338879_dishant1012",
-    password: process.env.DB_PASSWORD || "Dishant@1012",
+    password: process.env.DB_PASSWORD || "Awesomehandmade@123",
   },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || "super_secret_access_key",

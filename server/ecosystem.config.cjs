@@ -16,7 +16,7 @@ module.exports = {
         DB_PORT: 3306,
         DB_NAME: "u382338879_awesome_hand",
         DB_USER: "u382338879_dishant1012",
-        DB_PASSWORD: "Dishant@1012",
+        DB_PASSWORD: "Awesomehandmade@123",
         JWT_ACCESS_SECRET: "super_secret_access_key",
         JWT_REFRESH_SECRET: "super_secret_refresh_key"
       },
