@@ -269,10 +269,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   const [stock, setStock] = useState<string>('25');
 
   // 4. PRODUCT IMAGES (Main + Gallery)
-  const [images, setImages] = useState<string[]>([
-    '/images/category/Latkan.webp'
-  ]);
+  const [images, setImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isVariantDragOver, setIsVariantDragOver] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
 
@@ -481,7 +480,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         let loadedVariants: ProductVariantDetail[] = [];
         if (Array.isArray(prod.variantDetails) && prod.variantDetails.length > 0) {
           loadedVariants = prod.variantDetails.map((v: any, i: number) => {
-            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '/images/category/Latkan.webp';
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '';
             const vGals: string[] = [];
             if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
             if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
@@ -498,13 +497,13 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               colorHex: v.colorHex || findHexByColorName(v.optionValue || v.name || ''),
               mainImage: vMain,
               galleryImages: vGals,
-              images: allVImgs.length > 0 ? allVImgs : [vMain],
+              images: allVImgs.length > 0 ? allVImgs : (vMain ? [vMain] : []),
               status: v.status === 'Inactive' ? 'Inactive' : 'Active'
             };
           });
         } else if (Array.isArray(prod.variants) && prod.variants.length > 0) {
           loadedVariants = prod.variants.map((v: any, i: number) => {
-            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '/images/category/Latkan.webp';
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '';
             const vGals: string[] = [];
             if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
             if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
@@ -521,13 +520,13 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               colorHex: v.colorHex || findHexByColorName(v.colorName || v.title || ''),
               mainImage: vMain,
               galleryImages: vGals,
-              images: allVImgs.length > 0 ? allVImgs : [vMain],
+              images: allVImgs.length > 0 ? allVImgs : (vMain ? [vMain] : []),
               status: v.status === 'Inactive' ? 'Inactive' : 'Active'
             };
           });
         } else if (Array.isArray(prod.variations) && prod.variations.length > 0) {
           loadedVariants = prod.variations.map((v: any, i: number) => {
-            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.displayImage) || extractImageUrl(v.image) || loadedImgs[0] || '/images/category/Latkan.webp';
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.displayImage) || extractImageUrl(v.image) || loadedImgs[0] || '';
             const vGals: string[] = [];
             if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
             const allVImgs = Array.from(new Set([vMain, ...vGals].filter(Boolean)));
@@ -543,7 +542,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               colorHex: v.colorHex || findHexByColorName(v.colorName || ''),
               mainImage: vMain,
               galleryImages: vGals,
-              images: allVImgs.length > 0 ? allVImgs : [vMain],
+              images: allVImgs.length > 0 ? allVImgs : (vMain ? [vMain] : []),
               status: v.status === 'Inactive' ? 'Inactive' : 'Active'
             };
           });
@@ -762,7 +761,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     const baseSelling = Number(sellingPrice) || 399;
     const baseRegular = Number(regularPrice) || 1299;
     const baseStock = Number(stock) || 25;
-    const defaultImage = images[0] || '/images/category/Latkan.webp';
+    const defaultImage = images[0] || '';
 
     const generated: ProductVariantDetail[] = combinations.map((combo, idx) => {
       const comboName = combo.join(' / ');
@@ -789,7 +788,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
           colorHex: colorHex,
           mainImage: defaultImage,
           galleryImages: [],
-          images: [defaultImage],
+          images: defaultImage ? [defaultImage] : [],
           status: 'Active'
         }
       );
@@ -885,7 +884,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
     const effectiveMainImage =
       images[0] ||
-      (productType === 'Variable' && variants[0]?.mainImage ? variants[0].mainImage : '/images/category/Latkan.webp');
+      (productType === 'Variable' && variants[0]?.mainImage ? variants[0].mainImage : '');
     const effectiveGallery = images.slice(1);
 
     const finalSellingPrice =
@@ -1619,15 +1618,54 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                               />
                             </td>
 
-                            {/* Images Button */}
-                            <td className="py-2.5 px-3 text-center">
+                            {/* Images Button & Drag-Drop Target */}
+                            <td
+                              className="py-2.5 px-3 text-center"
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                  const files = Array.from(e.dataTransfer.files);
+                                  const newUrls: string[] = [];
+                                  let processed = 0;
+                                  files.forEach((file) => {
+                                    if (!file.type.startsWith('image/')) {
+                                      processed++;
+                                      return;
+                                    }
+                                    const reader = new FileReader();
+                                    reader.onload = () => {
+                                      if (reader.result) {
+                                        newUrls.push(reader.result as string);
+                                      }
+                                      processed++;
+                                      if (processed === files.length && newUrls.length > 0) {
+                                        handleVariantAddImages(vIdx, newUrls);
+                                        showToast(`Added ${newUrls.length} photo(s) to variant`);
+                                      }
+                                    };
+                                    reader.readAsDataURL(file);
+                                  });
+                                }
+                              }}
+                            >
                               <button
                                 type="button"
                                 onClick={() => setActiveVariantImageModal(vIdx)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium border border-neutral-200 hover:bg-neutral-100 cursor-pointer shadow-2xs"
-                                title="Manage variant photos"
+                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border border-neutral-200 hover:border-black hover:bg-neutral-50 cursor-pointer shadow-2xs transition-all"
+                                title="Click to manage or drag & drop photos here directly"
                               >
-                                <UploadCloud className="w-3.5 h-3.5 text-neutral-600" />
+                                {v.mainImage ? (
+                                  <img
+                                    src={v.mainImage}
+                                    alt="Variant"
+                                    className="w-5 h-5 rounded object-cover border border-neutral-200"
+                                  />
+                                ) : (
+                                  <UploadCloud className="w-3.5 h-3.5 text-neutral-500" />
+                                )}
                                 <span>{variantImgCount}</span>
                               </button>
                             </td>
@@ -1746,7 +1784,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
             )}
 
             {/* Drag & Drop Zone */}
-            <div
+            <label
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDragOver(true);
@@ -1757,8 +1795,8 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 setIsDragOver(false);
                 if (e.dataTransfer.files) handleFileUpload(e.dataTransfer.files);
               }}
-              className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer bg-white ${
-                isDragOver ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200 hover:border-neutral-300'
+              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer block ${
+                isDragOver ? 'border-neutral-900 bg-neutral-100 scale-99' : 'border-neutral-200 hover:border-neutral-400 bg-white'
               }`}
             >
               <UploadCloud className="w-6 h-6 text-neutral-400 mx-auto mb-1.5" />
@@ -1768,7 +1806,14 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               <p className="text-[11px] text-neutral-400 mt-0.5">
                 You can upload multiple images
               </p>
-            </div>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e.target.files)}
+                className="hidden"
+              />
+            </label>
 
             {/* Thumbnails Row */}
             {images.length > 0 && (
@@ -1810,7 +1855,16 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 ))}
 
                 {/* Add More Box */}
-                <label className="w-20 h-20 rounded-xl border-2 border-dashed border-neutral-300 hover:border-neutral-400 bg-neutral-50 flex flex-col items-center justify-center gap-1 cursor-pointer shrink-0 transition-colors">
+                <label
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files) handleFileUpload(e.dataTransfer.files);
+                  }}
+                  className="w-20 h-20 rounded-xl border-2 border-dashed border-neutral-300 hover:border-neutral-400 bg-neutral-50 flex flex-col items-center justify-center gap-1 cursor-pointer shrink-0 transition-colors"
+                >
                   <Plus className="w-4 h-4 text-neutral-500" />
                   <span className="text-[10px] font-semibold text-neutral-600">Add More</span>
                   <input
@@ -1982,22 +2036,75 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
             </div>
 
             {/* Upload Zone */}
-            <label className="border-2 border-dashed border-neutral-200 hover:border-neutral-300 rounded-xl p-5 text-center block cursor-pointer bg-neutral-50/50">
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsVariantDragOver(true);
+              }}
+              onDragLeave={() => setIsVariantDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsVariantDragOver(false);
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  const files = Array.from(e.dataTransfer.files);
+                  const newUrls: string[] = [];
+                  let processed = 0;
+                  files.forEach((file) => {
+                    if (!file.type.startsWith('image/')) {
+                      processed++;
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (reader.result) {
+                        newUrls.push(reader.result as string);
+                      }
+                      processed++;
+                      if (processed === files.length && newUrls.length > 0) {
+                        handleVariantAddImages(activeVariantImageModal, newUrls);
+                        showToast(`Uploaded ${newUrls.length} variant photo(s)`);
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  });
+                }
+              }}
+              className={`border-2 border-dashed rounded-xl p-5 text-center block cursor-pointer transition-all ${
+                isVariantDragOver
+                  ? 'border-neutral-900 bg-neutral-100 scale-99'
+                  : 'border-neutral-200 hover:border-neutral-400 bg-neutral-50/50'
+              }`}
+            >
               <UploadCloud className="w-6 h-6 text-neutral-400 mx-auto mb-1" />
-              <span className="text-xs font-semibold text-neutral-700 block">Click to upload photos</span>
-              <span className="text-[10px] text-neutral-400">or paste from clipboard (Ctrl + V)</span>
+              <span className="text-xs font-semibold text-neutral-700 block">
+                Drag &amp; drop photos here or click to upload
+              </span>
+              <span className="text-[10px] text-neutral-400">
+                You can upload multiple files or paste from clipboard (Ctrl + V)
+              </span>
               <input
                 type="file"
                 multiple
                 accept="image/*"
                 onChange={(e) => {
-                  if (e.target.files) {
-                    Array.from(e.target.files).forEach((file) => {
-                      if (!file.type.startsWith('image/')) return;
+                  if (e.target.files && e.target.files.length > 0) {
+                    const files = Array.from(e.target.files);
+                    const newUrls: string[] = [];
+                    let processed = 0;
+                    files.forEach((file) => {
+                      if (!file.type.startsWith('image/')) {
+                        processed++;
+                        return;
+                      }
                       const reader = new FileReader();
                       reader.onload = () => {
                         if (reader.result) {
-                          handleVariantAddImages(activeVariantImageModal, [reader.result as string]);
+                          newUrls.push(reader.result as string);
+                        }
+                        processed++;
+                        if (processed === files.length && newUrls.length > 0) {
+                          handleVariantAddImages(activeVariantImageModal, newUrls);
+                          showToast(`Uploaded ${newUrls.length} variant photo(s)`);
                         }
                       };
                       reader.readAsDataURL(file);
@@ -2011,7 +2118,19 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
             {/* Photos List */}
             {(() => {
               const v = variants[activeVariantImageModal];
-              const vImages = v.images && v.images.length > 0 ? v.images : [v.mainImage].filter(Boolean);
+              const vImages = (v.images && v.images.length > 0
+                ? v.images
+                : [v.mainImage]
+              ).filter((img): img is string => Boolean(img && img.trim()));
+
+              if (vImages.length === 0) {
+                return (
+                  <div className="py-8 text-center text-xs text-neutral-400 bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
+                    No photos added for this variant yet.
+                    <p className="text-[11px] text-neutral-400 mt-0.5">Drag &amp; drop or click above to upload.</p>
+                  </div>
+                );
+              }
 
               return (
                 <div className="grid grid-cols-4 gap-2.5 max-h-48 overflow-y-auto">

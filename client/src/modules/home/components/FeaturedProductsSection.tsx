@@ -163,14 +163,20 @@ export default function FeaturedProductsSection({ activeTab, setActiveTab }: Fea
         extractUrl(lp.mainImage) ||
         extractUrl(lp.img) ||
         (Array.isArray(lp.images) && extractUrl(lp.images[0])) ||
+        (Array.isArray(lp.galleryImages) && extractUrl(lp.galleryImages[0])) ||
+        (Array.isArray(lp.variants) && (extractUrl(lp.variants[0]?.mainImage) || extractUrl(lp.variants[0]?.image) || extractUrl(lp.variants[0]?.thumbnail))) ||
+        (Array.isArray(lp.variations) && (extractUrl(lp.variations[0]?.thumbnail) || extractUrl(lp.variations[0]?.mainImage) || extractUrl(lp.variations[0]?.image))) ||
         (Array.isArray(lp.colors) && (extractUrl(lp.colors[0]?.mainImage) || extractUrl(lp.colors[0]?.displayImage))) ||
-        "/images/category/Latkan.webp";
+        "";
 
       const hoverImg =
         extractUrl(lp.hoverImage) ||
         extractUrl(lp.hoverImg) ||
-        (Array.isArray(lp.galleryImages) && extractUrl(lp.galleryImages[0])) ||
+        (Array.isArray(lp.galleryImages) && extractUrl(lp.galleryImages[0]) !== primaryImg && extractUrl(lp.galleryImages[0])) ||
         (Array.isArray(lp.images) && lp.images.length > 1 && extractUrl(lp.images[1])) ||
+        (Array.isArray(lp.galleryImages) && lp.galleryImages.length > 1 && extractUrl(lp.galleryImages[1])) ||
+        (Array.isArray(lp.variants) && lp.variants.length > 1 && (extractUrl(lp.variants[1]?.mainImage) || extractUrl(lp.variants[1]?.image))) ||
+        (Array.isArray(lp.colors) && lp.colors.length > 1 && (extractUrl(lp.colors[1]?.mainImage) || extractUrl(lp.colors[1]?.displayImage))) ||
         primaryImg;
 
       return {

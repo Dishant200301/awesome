@@ -99,7 +99,7 @@ export const ProductDescriptionSection: React.FC<ProductDescriptionSectionProps>
         id: `rev-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         productId: String(product?.id || "prod-live"),
         productName: product?.name || "Awesome Handmade Product",
-        productImage: product?.mainImage || (product?.images && product.images[0]?.url) || (product?.variations && product.variations[0]?.thumbnail) || "/images/category/Latkan.webp",
+        productImage: product?.mainImage || (product?.images && (typeof product.images[0] === 'string' ? product.images[0] : product.images[0]?.url)) || (product?.variations && product.variations[0]?.thumbnail) || "",
         author: reviewName.trim().toUpperCase(),
         email: reviewEmail.trim().toLowerCase(),
         date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),

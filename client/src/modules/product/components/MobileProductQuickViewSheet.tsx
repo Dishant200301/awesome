@@ -142,7 +142,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
         return {
           colorName: cColName,
           colorHex: c?.colorHex || c?.hex || "#000000",
-          image: c?.displayImage || c?.mainImage || c?.galleryImages?.[0] || (product as any).image || (product as any).mainImage || "/images/category/Latkan.webp",
+          image: c?.displayImage || c?.mainImage || c?.galleryImages?.[0] || (product as any).image || (product as any).mainImage || "",
           price: matchingVar?.price || (product as any).price || 499,
           originalPrice: matchingVar?.originalPrice || (product as any).originalPrice || 1500,
           stock: matchingVar?.stock || 24,
@@ -159,7 +159,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
         return {
           colorName: String(cName),
           colorHex: (v as any).colorHex || "#000000",
-          image: (v as any).thumbnail || (v as any).image || (product as any).image || (product as any).mainImage || "/images/category/Latkan.webp",
+          image: (v as any).thumbnail || (v as any).image || (product as any).image || (product as any).mainImage || "",
           price: (v as any).price || (product as any).price || 499,
           originalPrice: (v as any).originalPrice || (product as any).originalPrice || 1500,
           stock: (v as any).stock || 24,
@@ -171,7 +171,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
       {
         colorName: selectedColor || "Standard",
         colorHex: "#000000",
-        image: (product as any)?.image || (product as any)?.mainImage || "/images/category/Latkan.webp",
+        image: (product as any)?.image || (product as any)?.mainImage || "",
         price: (product as any)?.price || 499,
         originalPrice: (product as any)?.originalPrice || 1500,
         stock: 24,
@@ -222,7 +222,7 @@ export const MobileProductQuickViewSheet: React.FC = () => {
       colorName: selectedColor || "Standard",
       colorHex: activeColorObj?.colorHex || "#000000",
       size: selectedSize,
-      thumbnail: activeColorObj?.image || (product as any).image || (product as any).mainImage || "/images/category/Latkan.webp",
+      thumbnail: activeColorObj?.image || (product as any).image || (product as any).mainImage || "",
       price: activeColorObj?.price || (product as any).price || 499,
       originalPrice: activeColorObj?.originalPrice || (product as any).originalPrice || 1500,
       discountPercentage: 67,

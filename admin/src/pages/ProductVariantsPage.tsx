@@ -11,7 +11,8 @@ import {
   Check, 
   X, 
   Sparkles,
-  ArrowUpRight
+  ArrowUpRight,
+  UploadCloud
 } from 'lucide-react';
 import { getGlobalVariantsList, getAdminProducts } from '../data/mockAdminData';
 import { Variant } from '../types/admin';
@@ -43,6 +44,7 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
   const [editSku, setEditSku] = useState<string>('');
   const [editBarcode, setEditBarcode] = useState<string>('');
   const [editStatus, setEditStatus] = useState<'Active' | 'Inactive' | 'Out of Stock'>('Active');
+  const [isVariantDragOver, setIsVariantDragOver] = useState(false);
 
   // Filter list
   const filteredVariants = variantsList.filter((v) => {
@@ -246,15 +248,44 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
                 {filteredVariants.map((variant) => (
                   <tr key={variant.id} className="hover:bg-slate-50/80 transition-colors">
                     {/* Variant Thumbnail */}
-                    <td className="py-3.5 px-4">
-                      <img
-                        src={
-                          variant.image ||
-                          'https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=100'
+                    <td
+                      className="py-3.5 px-4"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type.startsWith('image/')) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            const dataUrl = ev.target?.result as string;
+                            if (dataUrl) {
+                              setVariantsList((prev) =>
+                                prev.map((item) =>
+                                  item.id === variant.id ? { ...item, image: dataUrl } : item
+                                )
+                              );
+                            }
+                          };
+                          reader.readAsDataURL(file);
                         }
-                        alt={variant.sku}
-                        className="w-10 h-10 rounded-xl object-cover border border-slate-200 bg-slate-100"
-                      />
+                      }}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-xl border border-slate-200 bg-slate-100 overflow-hidden flex items-center justify-center shrink-0"
+                        title="Drag & drop a new photo here to update"
+                      >
+                        {variant.image ? (
+                          <img
+                            src={variant.image}
+                            alt={variant.sku}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Layers className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
                     </td>
 
                     {/* Parent Product */}
@@ -393,15 +424,68 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
 
               <div>
                 <label className="font-extrabold text-slate-800 uppercase tracking-wider block mb-1">
-                  Variant Image URL
+                  Variant Image
                 </label>
-                <input
-                  type="text"
-                  value={editImage}
-                  onChange={(e) => setEditImage(e.target.value)}
-                  placeholder="https://images.unsplash.com/photo-..."
-                  className="w-full bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-medium text-slate-900"
-                />
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsVariantDragOver(true);
+                  }}
+                  onDragLeave={() => setIsVariantDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsVariantDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.type.startsWith('image/')) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        if (ev.target?.result) setEditImage(ev.target.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                    isVariantDragOver
+                      ? 'border-slate-900 bg-slate-100 scale-99'
+                      : 'border-dashed border-slate-200 bg-slate-50 hover:border-slate-400'
+                  }`}
+                >
+                  <div className="w-14 h-14 rounded-lg bg-white border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                    {editImage ? (
+                      <img src={editImage} alt="Variant Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <UploadCloud className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="text"
+                      value={editImage}
+                      onChange={(e) => setEditImage(e.target.value)}
+                      placeholder="Image URL or drop file here..."
+                      className="w-full bg-white px-2.5 py-1 text-xs rounded-lg border border-slate-200 font-medium text-slate-900"
+                    />
+                    <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-800 text-[10px] font-bold cursor-pointer">
+                      <UploadCloud className="w-3 h-3" />
+                      <span>Upload Local Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              if (ev.target?.result) setEditImage(ev.target.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

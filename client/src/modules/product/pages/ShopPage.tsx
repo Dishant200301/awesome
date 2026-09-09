@@ -264,10 +264,12 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
         const colorKey = pureColor.toLowerCase();
 
         if (!variantCardsMap.has(colorKey)) {
-          const vdMain = extractUrl(vd.mainImage) || extractUrl(vd.image) || (Array.isArray(vd.images) ? extractUrl(vd.images[0]) : "") || extractUrl(vd.thumbnail) || extractUrl(p.image) || "/images/category/Latkan.webp";
+          const vdMain = extractUrl(vd.mainImage) || extractUrl(vd.image) || (Array.isArray(vd.images) ? extractUrl(vd.images[0]) : "") || extractUrl(vd.thumbnail) || extractUrl(p.image) || "";
           const vdGallery: string[] = [vdMain];
           if (Array.isArray(vd.galleryImages)) vd.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
           if (Array.isArray(vd.images)) vd.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
+          if (Array.isArray(p.galleryImages)) p.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
+          if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
 
           const vdPrice = Number(vd.price) || Number(p.price) || 799;
           const vdOrigPrice = Number(vd.originalPrice) || Number(p.originalPrice) || Math.round(vdPrice * 1.5);
@@ -325,9 +327,12 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
         const colorKey = pureColor.toLowerCase();
 
         if (!variantCardsMap.has(colorKey)) {
-          const vMain = extractUrl(v.thumbnail) || extractUrl(v.mainImage) || extractUrl(v.image) || (Array.isArray(v.images) ? extractUrl(v.images[0]) : "") || extractUrl(p.image) || "/images/category/Latkan.webp";
+          const vMain = extractUrl(v.thumbnail) || extractUrl(v.mainImage) || extractUrl(v.image) || (Array.isArray(v.images) ? extractUrl(v.images[0]) : "") || extractUrl(p.image) || "";
           const vGallery: string[] = [vMain];
+          if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
           if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
+          if (Array.isArray(p.galleryImages)) p.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
+          if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
 
           const vPrice = Number(v.price) || Number(p.price) || 799;
           const vOrigPrice = Number(v.originalPrice) || Number(p.originalPrice) || Math.round(vPrice * 1.5);
@@ -385,9 +390,11 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
         const colorKey = pureColor.toLowerCase();
 
         if (!variantCardsMap.has(colorKey)) {
-          const cMain = extractUrl(c.displayImage) || extractUrl(c.mainImage) || extractUrl(c.image) || (Array.isArray(c.galleryImages) ? extractUrl(c.galleryImages[0]) : "") || extractUrl(p.image) || "/images/category/Latkan.webp";
+          const cMain = extractUrl(c.displayImage) || extractUrl(c.mainImage) || extractUrl(c.image) || (Array.isArray(c.galleryImages) ? extractUrl(c.galleryImages[0]) : "") || extractUrl(p.image) || "";
           const cGallery: string[] = [cMain];
           if (Array.isArray(c.galleryImages)) c.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !cGallery.includes(u)) cGallery.push(u); });
+          if (Array.isArray(p.galleryImages)) p.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !cGallery.includes(u)) cGallery.push(u); });
+          if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !cGallery.includes(u)) cGallery.push(u); });
 
           variantCardsMap.set(colorKey, {
             id: `${pId}-${pureColor.replace(/\s+/g, "-")}`,
@@ -434,7 +441,7 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
   }
 
   // Fallback: Simple Product (single card)
-  const defaultImg = extractUrl(p.image) || extractUrl(prodAny.mainImage) || (Array.isArray(p.images) ? extractUrl(p.images[0]) : "") || "/images/category/Latkan.webp";
+  const defaultImg = extractUrl(p.image) || extractUrl(prodAny.mainImage) || (Array.isArray(p.images) ? extractUrl(p.images[0]) : "") || (Array.isArray(prodAny.galleryImages) ? extractUrl(prodAny.galleryImages[0]) : "") || "";
   const defaultGals: string[] = [defaultImg];
   if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !defaultGals.includes(u)) defaultGals.push(u); });
   if (Array.isArray(prodAny.galleryImages)) prodAny.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !defaultGals.includes(u)) defaultGals.push(u); });
@@ -525,7 +532,7 @@ export default function ShopPage() {
           id: c.name,
           name: c.name,
           count: `${realCount} items`,
-          img: c.image || "/images/category/Latkan.webp",
+          img: c.image || "",
         };
       });
   }, [liveCategoriesList, allShopItems]);

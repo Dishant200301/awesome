@@ -867,30 +867,35 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
                       {/* Product Image & Name */}
                       <td className="p-3">
                         <div className="flex items-center gap-3">
-                          <div className="relative group shrink-0">
-                            <img
-                              src={
-                                p.mainImage ||
-                                p.image ||
-                                (p.images && p.images[0]) ||
-                                (p.colors && p.colors[0]?.mainImage) ||
-                                (p.colors && p.colors[0]?.displayImage) ||
-                                (p.variations && p.variations[0]?.thumbnail) ||
-                                (p.variations && p.variations[0]?.images?.[0]?.url) ||
-                                '/images/category/Latkan.webp'
-                              }
-                              alt={p.name}
-                              className="w-10 h-10 rounded-lg object-cover border border-neutral-200 bg-neutral-100 shadow-2xs transition-transform group-hover:scale-105"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/images/category/Latkan.webp';
-                              }}
-                            />
-                            {p.images && p.images.length > 1 && (
-                              <span className="absolute -bottom-1 -right-1 bg-neutral-900 text-white text-[9px] font-bold px-1 rounded-full border border-white">
-                                +{p.images.length - 1}
-                              </span>
-                            )}
-                          </div>
+                          {(() => {
+                            const pImg =
+                              p.mainImage ||
+                              p.image ||
+                              (p.images && p.images[0]) ||
+                              (p.colors && p.colors[0]?.mainImage) ||
+                              (p.colors && p.colors[0]?.displayImage) ||
+                              (p.variations && p.variations[0]?.thumbnail) ||
+                              (p.variations && p.variations[0]?.images?.[0]?.url) ||
+                              '';
+                            return (
+                              <div className="relative group shrink-0 w-10 h-10 rounded-lg border border-neutral-200 bg-neutral-100 shadow-2xs overflow-hidden flex items-center justify-center">
+                                {pImg ? (
+                                  <img
+                                    src={pImg}
+                                    alt={p.name}
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                  />
+                                ) : (
+                                  <Package className="w-4 h-4 text-neutral-400" />
+                                )}
+                                {p.images && p.images.length > 1 && (
+                                  <span className="absolute -bottom-1 -right-1 bg-neutral-900 text-white text-[9px] font-bold px-1 rounded-full border border-white">
+                                    +{p.images.length - 1}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <div className="max-w-[200px] sm:max-w-[260px]">
                             <h4
                               onClick={() => onNavigate ? onNavigate('edit-product', p.id) : null}

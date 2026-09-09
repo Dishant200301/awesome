@@ -41,14 +41,13 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
     });
   }
 
-  const safeImages: ProductImage[] = validImages.length > 0
-    ? validImages
-    : [{ id: "fallback-img", url: "/images/category/Latkan.webp", alt: "Product Preview" }];
+  const safeImages: ProductImage[] = validImages;
 
-  // Keep index in valid range if images array changes
+  const firstImageUrl = safeImages[0]?.url || "";
+  // Always reset to first image (0) when product images or SKU changes
   useEffect(() => {
     setSelectedIndex(0);
-  }, [safeImages.length]);
+  }, [firstImageUrl, sku]);
 
   // Handle keyboard navigation for main preview
   useEffect(() => {
@@ -168,25 +167,34 @@ export const VerticalGallery: React.FC<VerticalGalleryProps> = ({ images, sku })
           onMouseMove={handleMouseMove}
         >
           <AnimatePresence initial={false} mode="wait" custom={direction}>
-            <motion.img
-              key={currentImage?.url}
-              src={currentImage?.url}
-              alt={currentImage?.alt}
-              custom={direction}
-              initial={{
-                x: direction > 0 ? 60 : -60,
-                opacity: 0,
-              }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{
-                x: direction > 0 ? -60 : 60,
-                opacity: 0,
-              }}
-              transition={{ duration: 0.35, ease: [0.25, 1, 0.5, 1] }}
-              className={`w-full h-full object-cover object-center ${
-                isZoomActive ? "opacity-0" : "opacity-100"
-              }`}
-            />
+            {currentImage?.url ? (
+              <motion.img
+                key={currentImage?.url}
+                src={currentImage?.url}
+                alt={currentImage?.alt}
+                custom={direction}
+                initial={{
+                  x: direction > 0 ? 60 : -60,
+                  opacity: 0,
+                }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{
+                  x: direction > 0 ? -60 : 60,
+                  opacity: 0,
+                }}
+                transition={{ duration: 0.35, ease: [0.25, 1, 0.5, 1] }}
+                className={`w-full h-full object-cover object-center ${
+                  isZoomActive ? "opacity-0" : "opacity-100"
+                }`}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400">
+                <svg className="w-16 h-16 stroke-current opacity-40" fill="none" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-xs text-zinc-400 mt-2">No preview image</span>
+              </div>
+            )}
           </AnimatePresence>
 
           {/* Zoom Lens Overlay when hovering */}

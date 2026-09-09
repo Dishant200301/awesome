@@ -68,13 +68,13 @@ export const ProductDetailsPage: React.FC = () => {
         colorName: selectedColor || "Standard",
         colorHex: "#C89B3C",
         size: selectedSize || "Standard Pair",
-        thumbnail: "/images/category/Latkan.webp",
+        thumbnail: "",
         price: 799,
         originalPrice: 1299,
         discountPercentage: 38,
         sku: "AH-STD",
         stock: 50,
-        images: [{ id: "img-0", url: "/images/category/Latkan.webp", alt: "Product" }]
+        images: []
       };
     }
 
@@ -103,13 +103,13 @@ export const ProductDetailsPage: React.FC = () => {
       (cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === (selectedColor || "").toLowerCase()
     );
 
-    // Build color images (Main Image + Gallery Images for selected color)
+    // Build color images (Main Image + Gallery Images for selected color + all Admin uploaded rootGallery images)
     const colorMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || colorObj?.galleryImages?.[0] || "";
     const colorGallery = (colorMedia?.gallery && colorMedia.gallery.length > 0)
       ? colorMedia.gallery
       : (colorObj?.galleryImages && colorObj.galleryImages.length > 0) ? colorObj.galleryImages : [];
     const colorSpecificUrls = Array.from(new Set([colorMain, ...colorGallery].filter(Boolean)));
-    const allUrls = colorSpecificUrls.length > 0 ? colorSpecificUrls : rootGallery;
+    const allUrls = Array.from(new Set([...colorSpecificUrls, ...rootGallery].filter(Boolean)));
     const colorImages = allUrls.map((gUrl, idx) => ({
       id: `img-gal-${idx}`,
       url: gUrl,
@@ -119,13 +119,22 @@ export const ProductDetailsPage: React.FC = () => {
     const dedupeImages = (imgs: any[]): any[] => {
       const seen = new Set<string>();
       const res: any[] = [];
-      (imgs || []).forEach((img, idx) => {
+      const appendImg = (img: any) => {
         const urlStr = typeof img === "string" ? img : img?.url;
         if (urlStr && typeof urlStr === "string" && urlStr.trim() && !seen.has(urlStr.trim())) {
           seen.add(urlStr.trim());
-          res.push(typeof img === "string" ? { id: `img-${idx}`, url: urlStr.trim(), alt: `${product.name} ${idx + 1}` } : { ...img, url: urlStr.trim() });
+          res.push(
+            typeof img === "string"
+              ? { id: `img-${res.length}`, url: urlStr.trim(), alt: `${product.name} View ${res.length + 1}` }
+              : { ...img, url: urlStr.trim() }
+          );
         }
-      });
+      };
+
+      (imgs || []).forEach(appendImg);
+      // Append all rootGallery images so every photo uploaded in Admin shows in the left-side gallery
+      rootGallery.forEach(appendImg);
+
       return res.length > 0 ? res : colorImages;
     };
 
@@ -135,13 +144,13 @@ export const ProductDetailsPage: React.FC = () => {
         colorName: selectedColor || "Standard",
         colorHex: colorObj?.colorHex || colorMedia?.colorCode || "#C89B3C",
         size: selectedSize,
-        thumbnail: colorMain || "/images/category/Latkan.webp",
+        thumbnail: colorMain || rootGallery[0] || "",
         price: prodAny.price || 799,
         originalPrice: prodAny.originalPrice || 1299,
         discountPercentage: 38,
         sku: product.defaultSku || "AWH-SKU-100",
         stock: 50,
-        images: colorImages.length > 0 ? colorImages : [{ id: "img-0", url: "/images/category/Latkan.webp", alt: product.name }]
+        images: colorImages.length > 0 ? colorImages : (rootGallery.length > 0 ? rootGallery.map((u, i) => ({ id: `img-${i}`, url: u, alt: product.name })) : [])
       };
     }
 
@@ -188,13 +197,13 @@ export const ProductDetailsPage: React.FC = () => {
       colorName: selectedColor || "Standard",
       colorHex: colorObj?.colorHex || colorMedia?.colorCode || (firstVar as any).colorHex || "#C89B3C",
       size: selectedSize || (firstVar as any).size || "Standard Pair",
-      thumbnail: colorMain || (firstVar as any).thumbnail || "/images/category/Latkan.webp",
+      thumbnail: colorMain || (firstVar as any).thumbnail || rootGallery[0] || "",
       price: (firstVar as any).price || prodAny.price || 799,
       originalPrice: (firstVar as any).originalPrice || prodAny.originalPrice || 1299,
       discountPercentage: (firstVar as any).discountPercentage || 38,
       sku: (firstVar as any).sku || product.defaultSku || `AH-${(selectedColor || "STD").toUpperCase()}`,
       stock: (firstVar as any).stock !== undefined ? (firstVar as any).stock : 50,
-      images: colorImages.length > 0 ? colorImages : ((firstVar as any).images || [{ id: "img-0", url: "/images/category/Latkan.webp", alt: product.name }])
+      images: colorImages.length > 0 ? colorImages : ((firstVar as any).images && (firstVar as any).images.length > 0 ? (firstVar as any).images : (rootGallery.length > 0 ? rootGallery.map((u, i) => ({ id: `img-${i}`, url: u, alt: product.name })) : []))
     };
   }, [product?.colors, (product as any)?.colorMediaConfigs, product?.variations, selectedColor, selectedSize, prodAny]);
 

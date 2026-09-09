@@ -34,8 +34,25 @@ export const sanitizeClientProducts = (list: any[]): any[] => {
   return list.filter((p) => !isLegacyAaramlyProduct(p));
 };
 
-let liveProducts: any[] = [];
-let isLoaded = false;
+const loadInitialProducts = (): any[] => {
+  try {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("awesome_admin_products") || localStorage.getItem("awesome_cached_products");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return sanitizeClientProducts(parsed).filter(
+            (p: any) => p.isPublished !== false && p.status !== "Draft" && p.status !== "Inactive"
+          );
+        }
+      }
+    }
+  } catch (e) {}
+  return [];
+};
+
+let liveProducts: any[] = loadInitialProducts();
+let isLoaded = liveProducts.length > 0;
 
 export const subscribeToProductStore = (listener: Listener) => {
   listeners.add(listener);
@@ -55,10 +72,15 @@ export const fetchLiveProducts = async (): Promise<any[]> => {
     if (res.ok) {
       const json = await res.json();
       const list = json.data?.items || json.data || json.items || json.products;
-      if (Array.isArray(list)) {
+      if (Array.isArray(list) && list.length > 0) {
         liveProducts = sanitizeClientProducts(list).filter(
           (p: any) => p.isPublished !== false && p.status !== "Draft" && p.status !== "Inactive"
         );
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("awesome_cached_products", JSON.stringify(liveProducts));
+          }
+        } catch (e) {}
         isLoaded = true;
         notifyListeners();
         return liveProducts;
@@ -66,6 +88,15 @@ export const fetchLiveProducts = async (): Promise<any[]> => {
     }
   } catch (e) {
     console.warn("Express MySQL backend offline or unreachable.");
+  }
+
+  // If liveProducts still empty, check localStorage
+  if (liveProducts.length === 0) {
+    const fromStorage = loadInitialProducts();
+    if (fromStorage.length > 0) {
+      liveProducts = fromStorage;
+      notifyListeners();
+    }
   }
 
   return liveProducts;
@@ -101,7 +132,17 @@ let deletedProductIds = new Set<string>();
 
 // Real-Time Sync with Admin Panel via BroadcastChannel
 if (typeof window !== "undefined") {
-  const handleProductMessage = () => {
+  const handleProductMessage = (event?: any) => {
+    const updatedProd = event?.data?.product;
+    if (updatedProd && updatedProd.id) {
+      const idx = liveProducts.findIndex((p) => String(p.id) === String(updatedProd.id));
+      if (idx !== -1) {
+        liveProducts[idx] = updatedProd;
+      } else {
+        liveProducts.unshift(updatedProd);
+      }
+      notifyListeners();
+    }
     fetchLiveProducts();
   };
 
@@ -112,6 +153,16 @@ if (typeof window !== "undefined") {
 
   window.addEventListener("awesome_product_sync", () => {
     fetchLiveProducts();
+  });
+
+  window.addEventListener("storage", (e) => {
+    if (e.key === "awesome_admin_products") {
+      const fromStorage = loadInitialProducts();
+      if (fromStorage.length > 0) {
+        liveProducts = fromStorage;
+        notifyListeners();
+      }
+    }
   });
 }
 
@@ -153,7 +204,7 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
     });
   }
 
-  const fallbackMainImg = parentImages[0] || "/images/category/Latkan.webp";
+  const fallbackMainImg = parentImages[0] || (parentProduct?.mainImage || parentProduct?.image || "");
 
   // 1. Check if the variant itself has explicit images configured in admin
   const variantExplicitImages: string[] = [];
@@ -179,10 +230,15 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
     }
   }
 
-  // 2. If variant has explicit images, use ONLY those images (do NOT bleed root images)
+  // 2. Build full gallery: variant images first, followed by all parent product gallery images added in admin
   let rawUrls: string[] = [];
   if (variantExplicitImages.length > 0) {
-    rawUrls = variantExplicitImages;
+    rawUrls = [...variantExplicitImages];
+    parentImages.forEach((u) => {
+      if (u && !rawUrls.includes(u)) {
+        rawUrls.push(u);
+      }
+    });
   } else {
     // 3. Fallback to color media / color config only if variant has no explicit images
     const cmMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || "";
@@ -199,13 +255,15 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
       }
     });
 
-    // 4. Fallback to parent product root images only if variant and color have no images
-    if (rawUrls.length === 0) {
-      if (Array.isArray(parentImages) && parentImages.length > 0) {
-        rawUrls = [...parentImages];
-      } else {
-        rawUrls = [fallbackMainImg];
+    // 4. Always include parent product images so admin-uploaded gallery is fully visible
+    parentImages.forEach((u) => {
+      if (u && !rawUrls.includes(u)) {
+        rawUrls.push(u);
       }
+    });
+
+    if (rawUrls.length === 0) {
+      rawUrls = [fallbackMainImg];
     }
   }
 
@@ -358,7 +416,7 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails | null => 
         (v) => (v.colorName || "").toLowerCase() === (cm.colorName || "").toLowerCase()
       );
       if (!exists && cm.colorName) {
-        const cMain = cm.mainImage || parentImages[0] || "/images/category/Latkan.webp";
+        const cMain = cm.mainImage || parentImages[0] || (found.mainImage || found.image || "");
         const cGal = (cm.gallery && cm.gallery.length > 0) ? cm.gallery : parentImages;
         const allUrls = Array.from(new Set([cMain, ...cGal])).filter(Boolean);
         mappedVariations.push({
@@ -380,10 +438,10 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails | null => 
   }
 
   if (mappedVariations.length === 0) {
-    const mainImg = parentImages[0] || "/images/category/Latkan.webp";
+    const mainImg = parentImages[0] || (found.mainImage || found.image || "");
     const gallery = parentImages.length > 0
       ? parentImages.map((url, i) => ({ id: `img-def-${i}`, url, alt: `${found.name} View ${i + 1}` }))
-      : [{ id: "img-def-0", url: mainImg, alt: found.name }];
+      : (mainImg ? [{ id: "img-def-0", url: mainImg, alt: found.name }] : []);
 
     const priceNum = Number(found.price) || 799;
     const origPriceNum = Number(found.originalPrice) || Math.round(priceNum * 1.6);
@@ -414,25 +472,25 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails | null => 
           id: "card-1",
           title: found.name || "Authentic Handcrafted Artistry",
           subtitle: found.shortDescription || found.subtitle || "Expertly crafted with traditional techniques in Surat, Gujarat",
-          image: parentImages[0] || "/images/category/Latkan.webp"
+          image: parentImages[0] || ""
         },
         {
           id: "card-2",
           title: "Intricate Mirror & Beadwork",
           subtitle: "Precision glass mirrors framed with golden zari thread and fine embellishments",
-          image: parentImages[1] || parentImages[0] || "/images/category/Latkan.webp"
+          image: parentImages[1] || parentImages[0] || ""
         },
         {
           id: "card-3",
           title: "Festive & Bridal Elegance",
           subtitle: "Perfect statement piece for lehengas, dupattas, blouses and designer wear",
-          image: parentImages[2] || parentImages[0] || "/images/category/Latkan.webp"
+          image: parentImages[2] || parentImages[0] || ""
         },
         {
           id: "card-4",
           title: "Durable & Lightweight",
           subtitle: "Long-lasting anti-tarnish finish with secure hanging tie loops",
-          image: parentImages[3] || parentImages[0] || "/images/category/Latkan.webp"
+          image: parentImages[3] || parentImages[0] || ""
         }
       ];
     } else {
@@ -479,7 +537,7 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails | null => 
     specs: found.specs || {},
     galleryImages: parentImages,
     images: parentImages,
-    mainImage: parentImages[0] || found.image || "/images/category/Latkan.webp",
+    mainImage: parentImages[0] || found.image || found.mainImage || "",
     idealForPills: found.idealForPills || (found.category ? [found.category] : []),
     washingInstructions: found.washingInstructions || [],
     reviews: getLiveReviews(String(found.id)),
@@ -665,7 +723,7 @@ export const addCustomerReview = async (review: Omit<CustomerReviewItem, 'id' | 
     id: review.id || `rev-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     productId: String(review.productId),
     productName: review.productName || 'Handcrafted Product',
-    productImage: review.productImage || '/images/category/Latkan.webp',
+    productImage: review.productImage || '',
     author: (review.author || 'Customer').trim().toUpperCase(),
     email: (review.email || '').trim().toLowerCase(),
     rating: Number(review.rating) || 5,
@@ -1216,7 +1274,7 @@ export const getLiveCategories = () => {
       id: ac.id,
       name: ac.name,
       slug: ac.slug || ac.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      image: ac.image || '/images/category/Latkan.webp',
+      image: ac.image || ac.imageUrl || '',
       subs: ac.subs || [],
     }));
   }

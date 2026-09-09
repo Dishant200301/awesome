@@ -37,7 +37,7 @@ export default function BestSellingSection() {
       extractUrl(p.img) ||
       (Array.isArray(p.images) && extractUrl(p.images[0])) ||
       (Array.isArray(p.colors) && (extractUrl(p.colors[0]?.mainImage) || extractUrl(p.colors[0]?.displayImage))) ||
-      "/images/category/Latkan.webp";
+      "";
 
     return {
       ...p,
@@ -97,18 +97,18 @@ export default function BestSellingSection() {
                     <div className={`relative aspect-square max-w-[340px] sm:max-w-[380px] lg:max-w-[420px] mx-auto overflow-hidden rounded-[24px] md:rounded-[32px] bg-[#EDE5DA] shadow-md transition-all duration-500 origin-center ${
                       isActive ? "scale-100 opacity-100 shadow-2xl group-hover:shadow-3xl" : "scale-[0.88] opacity-[0.45]"
                     }`}>
-                      <img
-                        src={p.img}
-                        alt={p.name}
-                        className="h-full w-full object-cover object-center select-none group-hover:scale-104 transition-transform duration-700 ease-out"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          if (!target.src.includes("Latkan.webp")) {
-                            target.src = "/images/category/Latkan.webp";
-                          }
-                        }}
-                      />
+                      {p.img ? (
+                        <img
+                          src={p.img}
+                          alt={p.name}
+                          className="h-full w-full object-cover object-center select-none group-hover:scale-104 transition-transform duration-700 ease-out"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-linear-to-br from-[#FAF8F5] to-[#EDE5DA] flex items-center justify-center text-brand-maroon font-serif font-bold text-3xl">
+                          {p.name.charAt(0)}
+                        </div>
+                      )}
                     </div>
                   </Link>
                 )}

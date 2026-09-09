@@ -7,14 +7,16 @@ export const StickyCartWidget: React.FC = () => {
   const { totalItemsCount, totalPrice, setIsCartOpen, isCartOpen } = useCart();
   const location = useLocation();
 
-  // Hide on checkout, cart, or order-success pages
-  const isCheckoutOrCartPage =
+  // Hide on home page, checkout, cart, or order-success pages
+  const isExcludedPage =
+    location.pathname === "/" ||
+    location.pathname === "/home" ||
     location.pathname.startsWith("/checkout") ||
     location.pathname.startsWith("/order-success") ||
     location.pathname === "/cart";
 
-  // Hide widget completely when on checkout/cart pages, when cart is empty, or when drawer is open
-  if (totalItemsCount <= 0 || isCartOpen || isCheckoutOrCartPage) return null;
+  // Hide widget completely when on excluded pages, when cart is empty, or when drawer is open
+  if (totalItemsCount <= 0 || isCartOpen || isExcludedPage) return null;
 
   const itemText = totalItemsCount === 1 ? "Item" : "Items";
   const formattedPrice = `₹${totalPrice.toLocaleString("en-IN")}`;

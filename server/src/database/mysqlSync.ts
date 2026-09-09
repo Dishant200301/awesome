@@ -15,8 +15,8 @@ export async function fetchCategoriesFromMySQL(): Promise<{ categories: any[]; s
       name: c.name,
       slug: c.slug,
       description: c.description || "",
-      image: c.image_url || "/images/category/Latkan.webp",
-      imageUrl: c.image_url || "/images/category/Latkan.webp",
+      image: c.image_url || "",
+      imageUrl: c.image_url || "",
       bannerImage: c.banner_image || "",
       metaTitle: c.meta_title || "",
       metaDescription: c.meta_description || "",
@@ -289,9 +289,9 @@ export async function fetchProductsFromMySQL(onlyPublished = false): Promise<Pro
     }
 
     return rows.map((r: any) => {
-      const pImages = imagesMap.get(r.id) || (r.image_url ? [r.image_url] : ["/images/category/Latkan.webp"]);
+      const pImages = imagesMap.get(r.id) || (r.image_url ? [r.image_url] : []);
       const pVariants = variantsMap.get(r.id) || [];
-      const mainImg = r.image_url || pImages[0] || "/images/category/Latkan.webp";
+      const mainImg = r.image_url || pImages[0] || "";
 
       return {
         id: r.id,
@@ -344,7 +344,7 @@ export async function syncProductToMySQL(p: ProductItem): Promise<void> {
   try {
     const rawSlug = (p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).trim();
     const rawSku = (p.defaultSku || p.sku || `SKU-${p.id}`).trim();
-    const mainImg = p.image || p.mainImage || "/images/category/Latkan.webp";
+    const mainImg = p.image || p.mainImage || "";
 
     // 1. Resolve category_id if needed
     let categoryId: string | null = null;

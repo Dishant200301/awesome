@@ -60,13 +60,15 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
   };
 
   const mainImg =
-    extractUrl(p.mainImage) ||
     extractUrl(p.image) ||
+    extractUrl(p.mainImage) ||
     extractUrl(p.img) ||
     (Array.isArray(p.images) && extractUrl(p.images[0])) ||
+    (Array.isArray(p.galleryImages) && extractUrl(p.galleryImages[0])) ||
+    (Array.isArray(p.variants) && (extractUrl(p.variants[0]?.mainImage) || extractUrl(p.variants[0]?.image) || extractUrl(p.variants[0]?.thumbnail))) ||
+    (Array.isArray(p.variations) && (extractUrl(p.variations[0]?.thumbnail) || extractUrl(p.variations[0]?.mainImage) || extractUrl(p.variations[0]?.image))) ||
     (Array.isArray(p.colors) && (extractUrl(p.colors[0]?.mainImage) || extractUrl(p.colors[0]?.displayImage))) ||
-    (Array.isArray(p.variations) && extractUrl(p.variations[0]?.thumbnail)) ||
-    "/images/category/Latkan.webp";
+    "";
 
   const wishlisted = isWishlisted(productId);
 

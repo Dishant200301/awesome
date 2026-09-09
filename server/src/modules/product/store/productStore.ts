@@ -169,10 +169,10 @@ class ProductStore {
       ? Boolean(p.isPublished)
       : (p.status === 'Draft' || p.status === 'Inactive' ? false : true);
 
-    const mainImg = p.mainImage || p.image || (p.images && p.images[0]) || "/images/category/Latkan.webp";
+    const mainImg = p.mainImage || p.image || (p.images && p.images[0]) || "";
     const allImages = Array.isArray(p.images) && p.images.length > 0
       ? p.images
-      : (Array.isArray(p.galleryImages) && p.galleryImages.length > 0 ? [mainImg, ...p.galleryImages] : [mainImg]);
+      : (Array.isArray(p.galleryImages) && p.galleryImages.length > 0 ? [mainImg, ...p.galleryImages].filter(Boolean) : (mainImg ? [mainImg] : []));
 
     const galleryImgs = Array.isArray(p.galleryImages) && p.galleryImages.length > 0
       ? p.galleryImages

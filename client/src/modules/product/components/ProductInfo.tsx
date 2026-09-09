@@ -234,7 +234,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
           (v: any) => v && (v.optionValue || v.name || "").toLowerCase().includes(key)
         );
 
-        const colMainImg = col.displayImage || col.mainImage || (col as any).image || (col.galleryImages && col.galleryImages[0]) || matchingVar?.thumbnail || (product as any).mainImage || (product as any).image || "/images/category/Latkan.webp";
+        const colMainImg = col.displayImage || col.mainImage || (col as any).image || (col.galleryImages && col.galleryImages[0]) || matchingVar?.thumbnail || (product as any).mainImage || (product as any).image || "";
         const colGallery = col.galleryImages || (matchingVar?.images ? matchingVar.images.map((i: any) => typeof i === 'string' ? i : i.url) : []);
 
         const varStockVal = (matchingVar?.stock !== undefined && matchingVar.stock !== null && !isNaN(Number(matchingVar.stock)))
@@ -271,7 +271,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
         const colName = cm.colorName || cm.name || "Default";
         const key = colName.toLowerCase();
         if (!map.has(key)) {
-          const cMainImg = cm.mainImage || (product as any).mainImage || (product as any).image || "/images/category/Latkan.webp";
+          const cMainImg = cm.mainImage || (product as any).mainImage || (product as any).image || "";
           const cGal = (cm.gallery && cm.gallery.length > 0) ? cm.gallery : [];
           map.set(key, {
             id: cm.colorValueId || `col-${key}`,
@@ -304,7 +304,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
 
     // 4. If product is a simple product (0 variants/colors), create a card for it
     if (map.size === 0) {
-      const simpleMainImg = (product as any).mainImage || (product as any).image || activeVariation?.thumbnail || "/images/category/Latkan.webp";
+      const simpleMainImg = (product as any).mainImage || (product as any).image || activeVariation?.thumbnail || "";
       const simpleColName = (product as any).colorName || activeVariation?.colorName || "Standard";
       map.set("default", {
         id: "v-simple",
@@ -535,7 +535,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
                 const isActive = vColName === activeColName || uniqueColorVariations.length === 1;
                 const colorObj = (product.colors || []).find((c) => c && (c.colorName || (c as any).name || (c as any).color || "").toLowerCase() === vColName);
                 const colorMedia = ((product as any).colorMediaConfigs || []).find((cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === vColName);
-                const displayImg = colorMedia?.mainImage || (v as any).displayImage || colorObj?.displayImage || colorObj?.mainImage || (colorObj as any)?.image || v.thumbnail || (v.images && v.images[0] ? v.images[0].url : "") || (product as any).mainImage || (product as any).image || "/images/category/Latkan.webp";
+                const displayImg = colorMedia?.mainImage || (v as any).displayImage || colorObj?.displayImage || colorObj?.mainImage || (colorObj as any)?.image || v.thumbnail || (v.images && v.images[0] ? v.images[0].url : "") || (product as any).mainImage || (product as any).image || "";
 
                 return (
                   <motion.button
@@ -554,15 +554,24 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
                         : "border-zinc-200 hover:border-zinc-400 opacity-85 hover:opacity-100"
                     }`}
                   >
-                    <div className="w-full aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-[#FAF8F5] mb-1 sm:mb-1.5 relative">
-                      <img
-                        src={displayImg || "/images/category/Latkan.webp"}
-                        alt={v.colorName || "Variation"}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/images/category/Latkan.webp";
-                        }}
-                        className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                      />
+                    <div className="w-full aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-[#FAF8F5] mb-1 sm:mb-1.5 relative flex items-center justify-center">
+                      {displayImg ? (
+                        <img
+                          src={displayImg}
+                          alt={v.colorName || "Variation"}
+                          className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center font-bold text-xs"
+                          style={{
+                            backgroundColor: v.colorHex ? `${v.colorHex}22` : '#FAF8F5',
+                            color: v.colorHex || '#1A1A1A'
+                          }}
+                        >
+                          {v.colorName?.slice(0, 2).toUpperCase() || "ST"}
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col justify-between text-[11px] sm:text-xs px-0.5 leading-tight gap-0.5">
                       <span className="font-extrabold text-zinc-900 truncate block text-[11px]">{v.colorName || "Standard"}</span>

@@ -269,28 +269,8 @@ export default function Navbar() {
               </ul>
             </nav>
 
-            {/* RIGHT: Header Actions (Cart Icon & Mobile Menu) */}
+            {/* RIGHT: Header Actions (Mobile Menu) */}
             <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 min-[1024px]:flex xl:flex-1">
-              {/* Shopping Bag Button (Opens Right-Side Cart Drawer) */}
-              <button
-                type="button"
-                onClick={() => setIsCartOpen(true)}
-                aria-label="Open Shopping Bag"
-                className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-brand-cream text-brand-ink transition-colors cursor-pointer group"
-              >
-                <div className="relative flex items-center justify-center">
-                  <ShoppingBag className="h-5 w-5 text-neutral-800 group-hover:text-brand-maroon transition-colors stroke-[1.75]" />
-                  {totalItemsCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2 bg-brand-maroon text-white text-[10px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center shadow-xs">
-                      {totalItemsCount > 9 ? "9+" : totalItemsCount}
-                    </span>
-                  )}
-                </div>
-                <span className="hidden sm:inline-block text-xs font-semibold text-neutral-800 group-hover:text-brand-maroon">
-                  Bag
-                </span>
-              </button>
-
               {/* Mobile Menu Button */}
               <button
                 type="button"
@@ -359,11 +339,17 @@ export default function Navbar() {
                           onClick={() => setOpenMega(null)}
                           className="group relative overflow-hidden rounded-2xl aspect-square block shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-[#EDE5DA]"
                         >
-                          <img
-                            src={cat.image || "/images/category/Latkan.webp"}
-                            alt={cat.name}
-                            className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                          />
+                          {cat.image ? (
+                            <img
+                              src={cat.image}
+                              alt={cat.name}
+                              className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-linear-to-br from-[#FAF8F5] to-[#EDE5DA] flex items-center justify-center text-brand-maroon font-serif font-bold text-2xl">
+                              {cat.name.charAt(0)}
+                            </div>
+                          )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
                           <div className="absolute bottom-2 left-2 right-2">
                             <div className="w-full py-1.5 px-1 bg-white/95 backdrop-blur-xs text-[#1A1A1A] font-bold text-[11px] leading-tight text-center rounded-lg shadow-sm border border-gray-100 group-hover:bg-brand-maroon group-hover:text-white transition-colors truncate">
@@ -395,11 +381,17 @@ export default function Navbar() {
                         onClick={() => setOpenMega(null)}
                         className="group relative overflow-hidden rounded-2xl aspect-[4/3] block shadow-md hover:shadow-xl transition-all duration-300 bg-[#fbf9f6]"
                       >
-                        <img
-                          src={cat.image || "/images/category/Latkan.webp"}
-                          alt={cat.name}
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
+                        {cat.image ? (
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-linear-to-br from-[#FAF8F5] to-[#EDE5DA] flex items-center justify-center text-brand-maroon font-serif font-bold text-3xl">
+                            {cat.name.charAt(0)}
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                         <div className="absolute bottom-3 left-3 right-3 text-white">
                           <span className="font-heading font-bold text-sm block">{cat.name}</span>
@@ -511,11 +503,17 @@ export default function Navbar() {
                               onClick={() => setOpen(false)}
                               className="flex items-center gap-2.5 flex-1 py-1.5 text-left text-xs font-semibold text-brand-ink hover:text-brand-maroon transition-colors"
                             >
-                              <img
-                                src={cat.image || "/images/category/Latkan.webp"}
-                                alt={cat.name}
-                                className="w-7 h-7 rounded-lg object-cover border border-brand-gold/30 shrink-0"
-                              />
+                              {cat.image ? (
+                                <img
+                                  src={cat.image}
+                                  alt={cat.name}
+                                  className="w-7 h-7 rounded-lg object-cover border border-brand-gold/30 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-7 h-7 rounded-lg bg-[#FAF8F5] border border-brand-gold/30 flex items-center justify-center text-[10px] font-bold text-brand-maroon shrink-0">
+                                  {cat.name.charAt(0)}
+                                </div>
+                              )}
                               <span className="truncate">{cat.name}</span>
                             </Link>
                             {cat.subs && cat.subs.length > 0 && (

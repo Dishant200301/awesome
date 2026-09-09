@@ -197,9 +197,9 @@ export class AdminApiService {
       subcategory: p.subcategory || p.subCategory || p.subcategoryName || "",
       brand: p.brand || "",
       sku: p.sku || p.defaultSku || `SKU-${p.id}`,
-      image: p.image || p.mainImage || (Array.isArray(p.images) && p.images[0]) || "/images/category/Latkan.webp",
-      mainImage: p.mainImage || p.image || (Array.isArray(p.images) && p.images[0]) || "/images/category/Latkan.webp",
-      images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : ["/images/category/Latkan.webp"])
+      image: p.image || p.mainImage || (Array.isArray(p.images) && p.images[0]) || "",
+      mainImage: p.mainImage || p.image || (Array.isArray(p.images) && p.images[0]) || "",
+      images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : [])
     }));
 
     return {

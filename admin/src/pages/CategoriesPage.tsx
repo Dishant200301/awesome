@@ -93,7 +93,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [categoryName, setCategoryName] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
-  const [categoryImage, setCategoryImage] = useState<string>('/images/category/Latkan.webp');
+  const [categoryImage, setCategoryImage] = useState<string>('');
   const [categoryBanner, setCategoryBanner] = useState<string>('');
   const [categoryDescription, setCategoryDescription] = useState<string>('');
   const [metaTitle, setMetaTitle] = useState<string>('');
@@ -175,7 +175,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     setSelectedParentId(mainCategoriesList[0]?.id || '');
     setCategoryName('');
     setCategorySlug('');
-    setCategoryImage('/images/category/Latkan.webp');
+    setCategoryImage('');
     setCategoryBanner('');
     setCategoryDescription('');
     setMetaTitle('');
@@ -194,7 +194,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     setSelectedParentId(cat.parentId || mainCategoriesList[0]?.id || '');
     setCategoryName(cat.name);
     setCategorySlug(cat.slug);
-    setCategoryImage(cat.image || '/images/category/Latkan.webp');
+    setCategoryImage(cat.image || (cat as any).imageUrl || '');
     setCategoryBanner(cat.bannerImage || '');
     setCategoryDescription(cat.description || '');
     setMetaTitle(cat.metaTitle || cat.name || '');
@@ -615,13 +615,53 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                       return (
                         <tr key={cat.id} className="hover:bg-neutral-50/80 transition-colors">
                           {/* Image */}
-                          <td className="py-3 px-4">
-                            <div className="w-10 h-10 rounded-lg bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 shadow-2xs">
-                              <img
-                                src={cat.image || '/images/category/Latkan.webp'}
-                                alt={cat.name}
-                                className="w-full h-full object-cover"
-                              />
+                          <td
+                            className="py-3 px-4"
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const file = e.dataTransfer.files?.[0];
+                              if (file && file.type.startsWith('image/')) {
+                                const reader = new FileReader();
+                                reader.onload = async (ev) => {
+                                  const dataUrl = ev.target?.result as string;
+                                  if (dataUrl) {
+                                    try {
+                                      const endpoint =
+                                        cat.type === 'sub'
+                                          ? `${API_BASE}/taxonomies/subcategories/${cat.id}`
+                                          : `${API_BASE}/taxonomies/categories/${cat.id}`;
+                                      await fetch(endpoint, {
+                                        method: 'PUT',
+                                        headers: getAdminAuthHeaders(),
+                                        body: JSON.stringify({ ...cat, image: dataUrl })
+                                      });
+                                      setSuccessToast(`Image updated for ${cat.name}!`);
+                                      loadCategoriesFromServer();
+                                    } catch (err) {
+                                      console.error('Failed to update category image:', err);
+                                    }
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          >
+                            <div
+                              className="w-10 h-10 rounded-lg bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 shadow-2xs flex items-center justify-center cursor-pointer hover:border-neutral-900 transition-colors"
+                              title="Drag & drop a new photo here to update"
+                            >
+                              {cat.image || (cat as any).imageUrl ? (
+                                <img
+                                  src={cat.image || (cat as any).imageUrl}
+                                  alt={cat.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <FolderTree className="w-4 h-4 text-neutral-400" />
+                              )}
                             </div>
                           </td>
 
@@ -928,18 +968,25 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                   isDragOver ? 'border-neutral-900 bg-neutral-100 scale-99' : 'border-dashed border-neutral-200 bg-neutral-50/50 hover:border-neutral-400'
                 }`}
               >
-                <div className="w-20 h-20 rounded-xl bg-white border border-neutral-200 overflow-hidden shrink-0 shadow-2xs">
-                  <img
-                    src={categoryImage || '/images/category/Latkan.webp'}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-20 h-20 rounded-xl bg-white border border-neutral-200 overflow-hidden shrink-0 shadow-2xs flex items-center justify-center">
+                  {categoryImage ? (
+                    <img
+                      src={categoryImage}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-neutral-400 p-2 text-center">
+                      <FolderTree className="w-6 h-6 mb-1 text-neutral-300" />
+                      <span className="text-[9px]">No image</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1 space-y-2 w-full">
                   <Input
                     type="text"
-                    placeholder="Image URL (e.g. /images/category/Latkan.webp or base64)..."
+                    placeholder="Image URL or upload / drop file..."
                     value={categoryImage}
                     onChange={(e) => setCategoryImage(e.target.value)}
                     className="h-8 text-xs bg-white"

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 
 interface ProductHoverSliderProps {
   product: any;
@@ -19,11 +19,12 @@ export const ProductHoverSlider: React.FC<ProductHoverSliderProps> = ({
   const [imgSrc, setImgSrc] = useState<string>("");
   const [hoverSrc, setHoverSrc] = useState<string>("");
 
-  const DEFAULT_FALLBACK = "/images/category/Latkan.webp";
+  const DEFAULT_FALLBACK = "";
 
   const { firstImage, secondImage } = useMemo(() => {
     const p = product || {};
-    
+    const parent = p.parentProduct || {};
+
     const extractUrl = (val: any): string => {
       if (!val) return "";
       if (typeof val === "string") return val.trim();
@@ -36,69 +37,76 @@ export const ProductHoverSlider: React.FC<ProductHoverSliderProps> = ({
     };
 
     // 1. Primary main image (Admin main image, image, or first available image)
-    let primary = 
-      extractUrl(p.mainImage) || 
-      extractUrl(p.image) || 
-      extractUrl(p.img) || 
-      (Array.isArray(p.images) && extractUrl(p.images[0])) || 
-      (Array.isArray(p.colors) && (extractUrl(p.colors[0]?.mainImage) || extractUrl(p.colors[0]?.displayImage) || (Array.isArray(p.colors[0]?.galleryImages) && extractUrl(p.colors[0]?.galleryImages[0])))) ||
-      DEFAULT_FALLBACK;
+    const primary =
+      extractUrl(p.image) ||
+      extractUrl(p.mainImage) ||
+      extractUrl(p.img) ||
+      (Array.isArray(p.images) && extractUrl(p.images[0])) ||
+      (Array.isArray(p.galleryImages) && extractUrl(p.galleryImages[0])) ||
+      (Array.isArray(p.variants) && (extractUrl(p.variants[0]?.mainImage) || extractUrl(p.variants[0]?.image) || extractUrl(p.variants[0]?.thumbnail))) ||
+      (Array.isArray(p.colors) && (extractUrl(p.colors[0]?.mainImage) || extractUrl(p.colors[0]?.displayImage))) ||
+      (Array.isArray(parent.images) && extractUrl(parent.images[0])) ||
+      (Array.isArray(parent.galleryImages) && extractUrl(parent.galleryImages[0])) ||
+      "";
 
-    // 2. Secondary hover image (First gallery image added in Admin, or images[1], or variation gallery)
-    let secondary: string | null = null;
+    // Collect all candidate gallery images in order
+    const allUrls: string[] = [];
+    const addUrl = (val: any) => {
+      const u = extractUrl(val);
+      if (u && !allUrls.includes(u)) {
+        allUrls.push(u);
+      }
+    };
 
-    if (Array.isArray(p.galleryImages) && p.galleryImages.length > 0) {
-      for (const item of p.galleryImages) {
-        const u = extractUrl(item);
-        if (u && u !== primary) {
-          secondary = u;
-          break;
-        }
+    if (Array.isArray(p.galleryImages)) p.galleryImages.forEach(addUrl);
+    if (Array.isArray(p.images)) p.images.forEach(addUrl);
+    if (p.hoverImage) addUrl(p.hoverImage);
+    if (p.hoverImg) addUrl(p.hoverImg);
+
+    if (Array.isArray(p.variants)) {
+      p.variants.forEach((v: any) => {
+        addUrl(v?.mainImage);
+        addUrl(v?.image);
+        if (Array.isArray(v?.galleryImages)) v.galleryImages.forEach(addUrl);
+        if (Array.isArray(v?.images)) v.images.forEach(addUrl);
+      });
+    }
+
+    if (Array.isArray(p.colors)) {
+      p.colors.forEach((c: any) => {
+        addUrl(c?.mainImage);
+        addUrl(c?.displayImage);
+        if (Array.isArray(c?.galleryImages)) c.galleryImages.forEach(addUrl);
+      });
+    }
+
+    // Also check parentProduct (for exploded ShopPage variants)
+    if (parent && typeof parent === "object") {
+      if (Array.isArray(parent.galleryImages)) parent.galleryImages.forEach(addUrl);
+      if (Array.isArray(parent.images)) parent.images.forEach(addUrl);
+      if (parent.hoverImage) addUrl(parent.hoverImage);
+      if (Array.isArray(parent.variants)) {
+        parent.variants.forEach((v: any) => {
+          addUrl(v?.mainImage);
+          addUrl(v?.image);
+        });
       }
     }
 
-    if (!secondary && Array.isArray(p.images) && p.images.length > 1) {
-      for (let i = 1; i < p.images.length; i++) {
-        const u = extractUrl(p.images[i]);
-        if (u && u !== primary) {
-          secondary = u;
-          break;
-        }
-      }
-    }
-
-    if (!secondary && Array.isArray(p.colors) && p.colors.length > 0) {
-      const c0 = p.colors[0];
-      if (Array.isArray(c0?.galleryImages) && c0.galleryImages.length > 0) {
-        for (const item of c0.galleryImages) {
-          const u = extractUrl(item);
-          if (u && u !== primary) {
-            secondary = u;
-            break;
-          }
-        }
-      }
-      if (!secondary && p.colors.length > 1) {
-        const c1 = p.colors[1];
-        const c1Img = extractUrl(c1?.mainImage) || extractUrl(c1?.displayImage) || (Array.isArray(c1?.galleryImages) && extractUrl(c1.galleryImages[0]));
-        if (c1Img && c1Img !== primary) {
-          secondary = c1Img;
-        }
-      }
-    }
-
-    if (!secondary && (p.hoverImage || p.hoverImg)) {
-      const h = extractUrl(p.hoverImage) || extractUrl(p.hoverImg);
-      if (h && h !== primary) {
-        secondary = h;
-      }
-    }
+    // Secondary is the first gallery image distinct from primary
+    const secondary = allUrls.find((u) => u && u !== primary) || null;
 
     return {
       firstImage: primary || DEFAULT_FALLBACK,
       secondImage: secondary || primary || DEFAULT_FALLBACK,
     };
   }, [product]);
+
+  // Reset local state when product changes
+  useEffect(() => {
+    setImgSrc("");
+    setHoverSrc("");
+  }, [firstImage, secondImage]);
 
   const hasSecondImage = Boolean(secondImage && secondImage !== firstImage);
 
@@ -108,29 +116,37 @@ export const ProductHoverSlider: React.FC<ProductHoverSliderProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       className={className}
     >
-      {/* Primary Image (First image from Admin / Product Catalog) */}
-      <img
-        src={imgSrc || firstImage}
-        alt={alt}
-        loading="eager"
-        onError={() => {
-          if (imgSrc !== DEFAULT_FALLBACK) setImgSrc(DEFAULT_FALLBACK);
-        }}
-        className={`absolute inset-0 w-full h-full object-cover object-center transition-all duration-500 ease-out ${
-          isHovered && hasSecondImage ? "opacity-0 scale-105" : isHovered ? "scale-105" : "opacity-100 scale-100"
-        } ${imageClassName}`}
-      />
+      {/* Primary Image (Base image, smoothly zooms subtly on hover) */}
+      {(imgSrc || firstImage) ? (
+        <img
+          src={imgSrc || firstImage}
+          alt={alt}
+          loading="eager"
+          onError={() => {
+            setImgSrc("");
+          }}
+          className={`absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 ease-out ${
+            isHovered ? "scale-105" : "scale-100"
+          } ${imageClassName}`}
+        />
+      ) : (
+        <div className="absolute inset-0 w-full h-full bg-[#FAF8F5] flex items-center justify-center text-neutral-300">
+          <svg className="w-10 h-10 stroke-current opacity-60" fill="none" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
 
-      {/* Secondary Gallery Image (Smooth Fade-in on Hover) */}
-      {hasSecondImage && (
+      {/* Secondary Gallery Image (Smoothly fades in over primary image on hover) */}
+      {hasSecondImage && (hoverSrc || secondImage) && (
         <img
           src={hoverSrc || secondImage}
           alt={`${alt} hover view`}
           loading="lazy"
           onError={() => {
-            if (hoverSrc !== DEFAULT_FALLBACK) setHoverSrc(DEFAULT_FALLBACK);
+            setHoverSrc("");
           }}
-          className={`absolute inset-0 w-full h-full object-cover object-center transition-all duration-500 ease-out ${
+          className={`absolute inset-0 w-full h-full object-cover object-center pointer-events-none transition-all duration-500 ease-in-out ${
             isHovered ? "opacity-100 scale-105" : "opacity-0 scale-100"
           } ${imageClassName}`}
         />

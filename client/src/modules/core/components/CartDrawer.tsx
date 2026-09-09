@@ -75,7 +75,7 @@ export const CartDrawer: React.FC = () => {
       brand: prod.brand || "Awesome Handmade",
       price: prod.price || prod.salePrice || 799,
       originalPrice: prod.originalPrice || prod.regularPrice || 2399,
-      image: prod.image || prod.mainImage || (prod.images && prod.images[0]) || "/images/category/Latkan.webp",
+      image: prod.image || prod.mainImage || (prod.images && prod.images[0]) || "",
       quantity: 1,
       size: prod.size || "Free Size",
       colorName: prod.color || prod.colorName || "Maroon",

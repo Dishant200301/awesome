@@ -30,7 +30,7 @@ export default function PopularCategoriesSection() {
   const popularCats = liveCategories.slice(0, 3).map((c) => ({
     key: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     title: c.name.toUpperCase(),
-    img: c.image || "/images/category/Latkan.webp",
+    img: c.image || "",
   }));
 
   if (popularCats.length === 0) return null;
@@ -45,12 +45,16 @@ export default function PopularCategoriesSection() {
             className="pop-card group relative overflow-hidden rounded-[18px] md:rounded-[20px] aspect-10/14 bg-[#f5f2ee] shadow-sm select-none cursor-pointer block"
           >
             {/* Image zoom on hover */}
-            <img
-              src={c.img}
-              alt={c.title}
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-1200 ease-out group-hover:scale-105"
-              loading="lazy"
-            />
+            {c.img ? (
+              <img
+                src={c.img}
+                alt={c.title}
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-1200 ease-out group-hover:scale-105"
+                loading="lazy"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-linear-to-br from-[#4A1525] to-[#1A0A10]" />
+            )}
             {/* Soft left-to-right shadow overlay to ensure typography legibility */}
             <div className="absolute inset-y-0 left-0 w-1/2 bg-linear-to-r from-black/45 via-black/15 to-transparent pointer-events-none z-10" />
 
