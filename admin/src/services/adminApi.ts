@@ -20,7 +20,14 @@ export class AdminApiService {
   private static async request<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
     const isMutation = options?.method && options.method !== 'GET';
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), isMutation ? 60000 : 25000);
+    const timeoutDuration = isMutation ? 120000 : 35000;
+    const timeoutId = setTimeout(() => {
+      try {
+        controller.abort(new Error(`Request timed out after ${timeoutDuration / 1000} seconds. Please check your internet connection or reduce uploaded image sizes.`));
+      } catch {
+        controller.abort();
+      }
+    }, timeoutDuration);
 
     try {
       const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -60,6 +67,11 @@ export class AdminApiService {
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (isMutation) {
+        if (err?.name === 'AbortError' || (err?.message && err.message.toLowerCase().includes('abort'))) {
+          const reasonMsg = controller.signal?.reason?.message || 'Request timed out or connection was reset. Please ensure images are optimized and try again.';
+          console.error(`[AdminApiService] Aborted mutation for ${endpoint}:`, reasonMsg);
+          throw new Error(reasonMsg);
+        }
         console.error(`[AdminApiService] Mutation failed for ${endpoint}:`, err);
         throw err;
       }

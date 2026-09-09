@@ -253,43 +253,49 @@ export const MobileProductQuickViewSheet: React.FC = () => {
     return cleaned.length > 0 ? cleaned : ["XS", "S", "M", "L", "XL", "XXL"];
   }, [product, selectedColor]);
 
-  // Gallery Images List
+  // Gallery Images List - strictly variant-specific
   const galleryImages = useMemo(() => {
+    const urls: string[] = [];
+    const addUrl = (u: any) => {
+      const str = typeof u === "string" ? u : u?.url;
+      if (str && typeof str === "string" && str.trim() && !urls.includes(str.trim())) {
+        urls.push(str.trim());
+      }
+    };
+
     const activeColorObj = (product?.colors || []).find(
       (c: any) => (c?.colorName || c?.name || c?.color || "").toLowerCase() === (selectedColor || "").toLowerCase()
     );
 
-    if (activeColorObj && activeColorObj.galleryImages && activeColorObj.galleryImages.length > 0) {
-      return activeColorObj.galleryImages.map((gUrl: string, idx: number) => ({
+    // 1. Add variant primary image/thumbnail
+    if (activeVariation.thumbnail) addUrl(activeVariation.thumbnail);
+    if ((activeVariation as any).mainImage) addUrl((activeVariation as any).mainImage);
+    if (activeColorObj?.displayImage) addUrl(activeColorObj.displayImage);
+    if (activeColorObj?.mainImage) addUrl(activeColorObj.mainImage);
+
+    // 2. Add variant specific gallery
+    if (Array.isArray(activeVariation.images)) {
+      activeVariation.images.forEach(addUrl);
+    }
+    if (Array.isArray(activeColorObj?.galleryImages)) {
+      activeColorObj.galleryImages.forEach(addUrl);
+    }
+
+    if (urls.length > 0) {
+      return urls.map((url, idx) => ({
         id: `img-color-${idx}`,
-        url: gUrl,
+        url,
         alt: `${product?.name} - ${selectedColor} View ${idx + 1}`,
       }));
     }
 
-    if (activeVariation.images && activeVariation.images.length > 0) {
-      return activeVariation.images;
+    // Fallback only if this variant has 0 images
+    const fallbackUrl = (product as any)?.mainImage || (product as any)?.image || "";
+    if (fallbackUrl) {
+      return [{ id: "img-default", url: fallbackUrl, alt: product?.name || "Product Image" }];
     }
 
-    if (product && Array.isArray((product as any).images) && (product as any).images.length > 0) {
-      return (product as any).images.map((url: any, i: number) => ({
-        id: `img-fallback-${i}`,
-        url: typeof url === "string" ? url : url?.url || "",
-        alt: product.name,
-      }));
-    }
-
-    return [
-      {
-        id: "img-default",
-        url:
-          activeVariation.thumbnail ||
-          (product as any)?.image ||
-          (product as any)?.mainImage ||
-          "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=800",
-        alt: product?.name || "Product Image",
-      },
-    ];
+    return [];
   }, [product, selectedColor, activeVariation]);
 
   const currentImage = galleryImages[activeImageIndex] || galleryImages[0];

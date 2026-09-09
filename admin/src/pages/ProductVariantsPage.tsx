@@ -18,6 +18,7 @@ import { getGlobalVariantsList, getAdminProducts } from '../data/mockAdminData';
 import { Variant } from '../types/admin';
 import { Select } from '../components/ui/select';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
+import { compressImage } from '../utils/imageCompressor';
 
 interface ProductVariantsPageProps {
   onNavigate: (tab: string, productId?: string) => void;
@@ -253,13 +254,12 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
                       onDragOver={(e) => {
                         e.preventDefault();
                       }}
-                      onDrop={(e) => {
+                      onDrop={async (e) => {
                         e.preventDefault();
                         const file = e.dataTransfer.files?.[0];
                         if (file && file.type.startsWith('image/')) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            const dataUrl = ev.target?.result as string;
+                          try {
+                            const dataUrl = await compressImage(file);
                             if (dataUrl) {
                               setVariantsList((prev) =>
                                 prev.map((item) =>
@@ -267,8 +267,9 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
                                 )
                               );
                             }
-                          };
-                          reader.readAsDataURL(file);
+                          } catch (err) {
+                            console.error('Failed to compress variant image:', err);
+                          }
                         }
                       }}
                     >
@@ -432,16 +433,17 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
                     setIsVariantDragOver(true);
                   }}
                   onDragLeave={() => setIsVariantDragOver(false)}
-                  onDrop={(e) => {
+                  onDrop={async (e) => {
                     e.preventDefault();
                     setIsVariantDragOver(false);
                     const file = e.dataTransfer.files?.[0];
                     if (file && file.type.startsWith('image/')) {
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        if (ev.target?.result) setEditImage(ev.target.result as string);
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const dataUrl = await compressImage(file);
+                        if (dataUrl) setEditImage(dataUrl);
+                      } catch (err) {
+                        console.error('Failed to compress variant image:', err);
+                      }
                     }
                   }}
                   className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
@@ -471,14 +473,15 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => {
-                              if (ev.target?.result) setEditImage(ev.target.result as string);
-                            };
-                            reader.readAsDataURL(file);
+                            try {
+                              const dataUrl = await compressImage(file);
+                              if (dataUrl) setEditImage(dataUrl);
+                            } catch (err) {
+                              console.error('Failed to compress variant image:', err);
+                            }
                           }
                         }}
                         className="hidden"

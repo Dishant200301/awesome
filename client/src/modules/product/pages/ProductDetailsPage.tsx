@@ -78,18 +78,12 @@ export const ProductDetailsPage: React.FC = () => {
       };
     }
 
-    // Gather all root product images
+    // Root product fallback images (used only when a variant has no images or for Simple products)
     const rootGallery: string[] = [];
     if (prodAny.mainImage && typeof prodAny.mainImage === "string") rootGallery.push(prodAny.mainImage);
     if (prodAny.image && typeof prodAny.image === "string" && !rootGallery.includes(prodAny.image)) rootGallery.push(prodAny.image);
     if (Array.isArray(prodAny.galleryImages)) {
       prodAny.galleryImages.forEach((img: any) => {
-        const u = typeof img === "string" ? img : img?.url;
-        if (u && typeof u === "string" && u.trim() && !rootGallery.includes(u.trim())) rootGallery.push(u.trim());
-      });
-    }
-    if (Array.isArray(prodAny.images)) {
-      prodAny.images.forEach((img: any) => {
         const u = typeof img === "string" ? img : img?.url;
         if (u && typeof u === "string" && u.trim() && !rootGallery.includes(u.trim())) rootGallery.push(u.trim());
       });
@@ -103,54 +97,75 @@ export const ProductDetailsPage: React.FC = () => {
       (cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === (selectedColor || "").toLowerCase()
     );
 
-    // Build color images (Main Image + Gallery Images for selected color + all Admin uploaded rootGallery images)
-    const colorMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || colorObj?.galleryImages?.[0] || "";
-    const colorGallery = (colorMedia?.gallery && colorMedia.gallery.length > 0)
-      ? colorMedia.gallery
-      : (colorObj?.galleryImages && colorObj.galleryImages.length > 0) ? colorObj.galleryImages : [];
-    const colorSpecificUrls = Array.from(new Set([colorMain, ...colorGallery].filter(Boolean)));
-    const allUrls = Array.from(new Set([...colorSpecificUrls, ...rootGallery].filter(Boolean)));
-    const colorImages = allUrls.map((gUrl, idx) => ({
-      id: `img-gal-${idx}`,
-      url: gUrl,
-      alt: `${product.name} - ${selectedColor} View ${idx + 1}`
-    }));
-
-    const dedupeImages = (imgs: any[]): any[] => {
-      const seen = new Set<string>();
-      const res: any[] = [];
-      const appendImg = (img: any) => {
-        const urlStr = typeof img === "string" ? img : img?.url;
-        if (urlStr && typeof urlStr === "string" && urlStr.trim() && !seen.has(urlStr.trim())) {
-          seen.add(urlStr.trim());
-          res.push(
-            typeof img === "string"
-              ? { id: `img-${res.length}`, url: urlStr.trim(), alt: `${product.name} View ${res.length + 1}` }
-              : { ...img, url: urlStr.trim() }
-          );
+    // Helper: Build strictly variant-specific images without polluting with other variants' images
+    const buildVariantImages = (vItem?: any): ProductImage[] => {
+      const urls: string[] = [];
+      const addUrl = (u: any) => {
+        const str = typeof u === "string" ? u : u?.url;
+        if (str && typeof str === "string" && str.trim() && !urls.includes(str.trim())) {
+          urls.push(str.trim());
         }
       };
 
-      (imgs || []).forEach(appendImg);
-      // Append all rootGallery images so every photo uploaded in Admin shows in the left-side gallery
-      rootGallery.forEach(appendImg);
+      // 1. Variant primary thumbnail / image
+      if (vItem) {
+        if (vItem.thumbnail) addUrl(vItem.thumbnail);
+        if (vItem.mainImage) addUrl(vItem.mainImage);
+        if (vItem.image) addUrl(vItem.image);
+      }
+      if (colorMedia?.mainImage) addUrl(colorMedia.mainImage);
+      if (colorObj?.displayImage) addUrl(colorObj.displayImage);
+      if (colorObj?.mainImage) addUrl(colorObj.mainImage);
 
-      return res.length > 0 ? res : colorImages;
+      // 2. Variant specific gallery
+      if (vItem && Array.isArray(vItem.images)) {
+        vItem.images.forEach(addUrl);
+      }
+      if (vItem && Array.isArray(vItem.galleryImages)) {
+        vItem.galleryImages.forEach(addUrl);
+      }
+      if (colorMedia && Array.isArray(colorMedia.gallery)) {
+        colorMedia.gallery.forEach(addUrl);
+      }
+      if (colorObj && Array.isArray(colorObj.galleryImages)) {
+        colorObj.galleryImages.forEach(addUrl);
+      }
+
+      // If variant has its own images, return ONLY them!
+      if (urls.length > 0) {
+        return urls.map((u, idx) => ({
+          id: `img-var-${idx}`,
+          url: u,
+          alt: `${product.name} - ${selectedColor || "View"} ${idx + 1}`
+        }));
+      }
+
+      // Fallback only if this variant has 0 images
+      if (rootGallery.length > 0) {
+        return rootGallery.map((u, idx) => ({
+          id: `img-fallback-${idx}`,
+          url: u,
+          alt: `${product.name} View ${idx + 1}`
+        }));
+      }
+
+      return [];
     };
 
     if (!product.variations || product.variations.length === 0) {
+      const simpleImgs = buildVariantImages();
       return {
         id: "v-default",
         colorName: selectedColor || "Standard",
         colorHex: colorObj?.colorHex || colorMedia?.colorCode || "#C89B3C",
         size: selectedSize,
-        thumbnail: colorMain || rootGallery[0] || "",
+        thumbnail: simpleImgs[0]?.url || rootGallery[0] || "",
         price: prodAny.price || 799,
         originalPrice: prodAny.originalPrice || 1299,
         discountPercentage: 38,
         sku: product.defaultSku || "AWH-SKU-100",
         stock: 50,
-        images: colorImages.length > 0 ? colorImages : (rootGallery.length > 0 ? rootGallery.map((u, i) => ({ id: `img-${i}`, url: u, alt: product.name })) : [])
+        images: simpleImgs
       };
     }
 
@@ -164,13 +179,13 @@ export const ProductDetailsPage: React.FC = () => {
     );
 
     if (exactMatch) {
-      const finalImages = dedupeImages(exactMatch.images && exactMatch.images.length > 0 ? exactMatch.images : colorImages);
-
+      const varImages = buildVariantImages(exactMatch);
       return {
         ...exactMatch,
         colorName: selectedColor || exactMatch.colorName,
         size: selectedSize,
-        images: finalImages
+        thumbnail: varImages[0]?.url || exactMatch.thumbnail || "",
+        images: varImages
       };
     }
 
@@ -180,30 +195,31 @@ export const ProductDetailsPage: React.FC = () => {
     );
 
     if (colorMatch) {
-      const finalImages = dedupeImages(colorMatch.images && colorMatch.images.length > 0 ? colorMatch.images : colorImages);
-
+      const varImages = buildVariantImages(colorMatch);
       return {
         ...colorMatch,
         colorName: selectedColor || colorMatch.colorName,
         size: selectedSize,
-        images: finalImages
+        thumbnail: varImages[0]?.url || colorMatch.thumbnail || "",
+        images: varImages
       };
     }
 
     // 3. Synthesize variation matching selectedColor from colorObj/colorMedia/firstVar
     const firstVar = product.variations[0] || {};
+    const synthImages = buildVariantImages(firstVar);
     return {
       id: `v-${(selectedColor || "std").toLowerCase()}`,
       colorName: selectedColor || "Standard",
       colorHex: colorObj?.colorHex || colorMedia?.colorCode || (firstVar as any).colorHex || "#C89B3C",
       size: selectedSize || (firstVar as any).size || "Standard Pair",
-      thumbnail: colorMain || (firstVar as any).thumbnail || rootGallery[0] || "",
+      thumbnail: synthImages[0]?.url || (firstVar as any).thumbnail || rootGallery[0] || "",
       price: (firstVar as any).price || prodAny.price || 799,
       originalPrice: (firstVar as any).originalPrice || prodAny.originalPrice || 1299,
       discountPercentage: (firstVar as any).discountPercentage || 38,
       sku: (firstVar as any).sku || product.defaultSku || `AH-${(selectedColor || "STD").toUpperCase()}`,
       stock: (firstVar as any).stock !== undefined ? (firstVar as any).stock : 50,
-      images: colorImages.length > 0 ? colorImages : ((firstVar as any).images && (firstVar as any).images.length > 0 ? (firstVar as any).images : (rootGallery.length > 0 ? rootGallery.map((u, i) => ({ id: `img-${i}`, url: u, alt: product.name })) : []))
+      images: synthImages
     };
   }, [product?.colors, (product as any)?.colorMediaConfigs, product?.variations, selectedColor, selectedSize, prodAny]);
 
@@ -346,7 +362,7 @@ export const ProductDetailsPage: React.FC = () => {
             <div className="w-full lg:sticky lg:top-24 h-fit">
               <VerticalGallery
                 images={activeVariation.images && activeVariation.images.length > 0 ? activeVariation.images : [
-                  { id: "img-1", url: prodAny.image || "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=800", alt: product.name }
+                  { id: "img-1", url: prodAny.mainImage || prodAny.image || "", alt: product.name }
                 ]}
                 sku={activeVariation.sku}
               />

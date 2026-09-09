@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getAdminApiBase, getAdminAuthHeaders } from '../utils/authHeaders';
+import { compressImage } from '../utils/imageCompressor';
 import { 
   Plus, 
   FolderTree, 
@@ -231,20 +232,21 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
     return () => window.removeEventListener('paste', handlePaste);
   }, [subView]);
 
-  // Process File to Base64 / Data URL
-  const handleFileProcess = (file: File, isBanner = false) => {
+  // Process File with Compression to Data URL
+  const handleFileProcess = async (file: File, isBanner = false) => {
     if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      if (uploadEvent.target?.result) {
+    try {
+      const dataUrl = await compressImage(file);
+      if (dataUrl) {
         if (isBanner) {
-          setCategoryBanner(uploadEvent.target.result as string);
+          setCategoryBanner(dataUrl);
         } else {
-          setCategoryImage(uploadEvent.target.result as string);
+          setCategoryImage(dataUrl);
         }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to compress category image:', err);
+    }
   };
 
   // Handle Name Input Change & Auto-generate Slug
@@ -620,32 +622,28 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
                             onDragOver={(e) => {
                               e.preventDefault();
                             }}
-                            onDrop={(e) => {
+                            onDrop={async (e) => {
                               e.preventDefault();
                               const file = e.dataTransfer.files?.[0];
                               if (file && file.type.startsWith('image/')) {
-                                const reader = new FileReader();
-                                reader.onload = async (ev) => {
-                                  const dataUrl = ev.target?.result as string;
+                                try {
+                                  const dataUrl = await compressImage(file);
                                   if (dataUrl) {
-                                    try {
-                                      const endpoint =
-                                        cat.type === 'sub'
-                                          ? `${API_BASE}/taxonomies/subcategories/${cat.id}`
-                                          : `${API_BASE}/taxonomies/categories/${cat.id}`;
-                                      await fetch(endpoint, {
-                                        method: 'PUT',
-                                        headers: getAdminAuthHeaders(),
-                                        body: JSON.stringify({ ...cat, image: dataUrl })
-                                      });
-                                      setSuccessToast(`Image updated for ${cat.name}!`);
-                                      loadCategoriesFromServer();
-                                    } catch (err) {
-                                      console.error('Failed to update category image:', err);
-                                    }
+                                    const endpoint =
+                                      cat.type === 'sub'
+                                        ? `${API_BASE}/taxonomies/subcategories/${cat.id}`
+                                        : `${API_BASE}/taxonomies/categories/${cat.id}`;
+                                    await fetch(endpoint, {
+                                      method: 'PUT',
+                                      headers: getAdminAuthHeaders(),
+                                      body: JSON.stringify({ ...cat, image: dataUrl })
+                                    });
+                                    setSuccessToast(`Image updated for ${cat.name}!`);
+                                    loadCategoriesFromServer();
                                   }
-                                };
-                                reader.readAsDataURL(file);
+                                } catch (err) {
+                                  console.error('Failed to update category image:', err);
+                                }
                               }
                             }}
                           >

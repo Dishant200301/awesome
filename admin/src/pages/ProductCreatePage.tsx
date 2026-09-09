@@ -35,6 +35,7 @@ import { RichTextEditor } from '../components/RichTextEditor';
 import { Select } from '../components/ui/select';
 import { findHexByColorName } from '../utils/colorMatcher';
 import { generateSmartProductContent } from '../utils/productContentGenerator';
+import { compressImage, compressImages } from '../utils/imageCompressor';
 
 interface ProductCreatePageProps {
   onNavigate?: (tab: string, productId?: string) => void;
@@ -628,24 +629,23 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     showToast('Main display image set');
   };
 
-  const handleFileUpload = (files: FileList | null) => {
+  const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.result) {
-          handleAddImages([reader.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    showToast('Product images uploaded');
+    try {
+      showToast('Optimizing & uploading images...');
+      const compressed = await compressImages(files);
+      if (compressed.length > 0) {
+        handleAddImages(compressed);
+        showToast(`Uploaded ${compressed.length} optimized image(s)`);
+      }
+    } catch (err) {
+      console.error('Failed to compress images:', err);
+    }
   };
 
   // Global Paste Handler for Images
   useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
+    const handlePaste = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items || items.length === 0) return;
 
@@ -655,19 +655,20 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
           const file = item.getAsFile();
           if (file) {
             e.preventDefault();
-            const reader = new FileReader();
-            reader.onload = () => {
-              if (reader.result) {
+            try {
+              const dataUrl = await compressImage(file);
+              if (dataUrl) {
                 if (activeVariantImageModal !== null) {
-                  handleVariantAddImages(activeVariantImageModal, [reader.result as string]);
-                  showToast('Variant image pasted from clipboard!');
+                  handleVariantAddImages(activeVariantImageModal, [dataUrl]);
+                  showToast('Variant image pasted & optimized!');
                 } else {
-                  handleAddImages([reader.result as string]);
-                  showToast('Product photo pasted from clipboard!');
+                  handleAddImages([dataUrl]);
+                  showToast('Product photo pasted & optimized!');
                 }
               }
-            };
-            reader.readAsDataURL(file);
+            } catch (err) {
+              console.error('Failed to process pasted image:', err);
+            }
             break;
           }
         }
@@ -1627,26 +1628,11 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                               onDrop={(e) => {
                                 e.preventDefault();
                                 if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                                  const files = Array.from(e.dataTransfer.files);
-                                  const newUrls: string[] = [];
-                                  let processed = 0;
-                                  files.forEach((file) => {
-                                    if (!file.type.startsWith('image/')) {
-                                      processed++;
-                                      return;
+                                  compressImages(e.dataTransfer.files).then((compressed) => {
+                                    if (compressed.length > 0) {
+                                      handleVariantAddImages(vIdx, compressed);
+                                      showToast(`Added ${compressed.length} optimized photo(s) to variant`);
                                     }
-                                    const reader = new FileReader();
-                                    reader.onload = () => {
-                                      if (reader.result) {
-                                        newUrls.push(reader.result as string);
-                                      }
-                                      processed++;
-                                      if (processed === files.length && newUrls.length > 0) {
-                                        handleVariantAddImages(vIdx, newUrls);
-                                        showToast(`Added ${newUrls.length} photo(s) to variant`);
-                                      }
-                                    };
-                                    reader.readAsDataURL(file);
                                   });
                                 }
                               }}
@@ -2042,31 +2028,16 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 setIsVariantDragOver(true);
               }}
               onDragLeave={() => setIsVariantDragOver(false)}
-              onDrop={(e) => {
+              onDrop={async (e) => {
                 e.preventDefault();
                 setIsVariantDragOver(false);
                 if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                  const files = Array.from(e.dataTransfer.files);
-                  const newUrls: string[] = [];
-                  let processed = 0;
-                  files.forEach((file) => {
-                    if (!file.type.startsWith('image/')) {
-                      processed++;
-                      return;
-                    }
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      if (reader.result) {
-                        newUrls.push(reader.result as string);
-                      }
-                      processed++;
-                      if (processed === files.length && newUrls.length > 0) {
-                        handleVariantAddImages(activeVariantImageModal, newUrls);
-                        showToast(`Uploaded ${newUrls.length} variant photo(s)`);
-                      }
-                    };
-                    reader.readAsDataURL(file);
-                  });
+                  showToast('Optimizing variant photos...');
+                  const compressed = await compressImages(e.dataTransfer.files);
+                  if (compressed.length > 0) {
+                    handleVariantAddImages(activeVariantImageModal, compressed);
+                    showToast(`Uploaded ${compressed.length} optimized variant photo(s)`);
+                  }
                 }
               }}
               className={`border-2 border-dashed rounded-xl p-5 text-center block cursor-pointer transition-all ${
@@ -2086,29 +2057,14 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 type="file"
                 multiple
                 accept="image/*"
-                onChange={(e) => {
+                onChange={async (e) => {
                   if (e.target.files && e.target.files.length > 0) {
-                    const files = Array.from(e.target.files);
-                    const newUrls: string[] = [];
-                    let processed = 0;
-                    files.forEach((file) => {
-                      if (!file.type.startsWith('image/')) {
-                        processed++;
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        if (reader.result) {
-                          newUrls.push(reader.result as string);
-                        }
-                        processed++;
-                        if (processed === files.length && newUrls.length > 0) {
-                          handleVariantAddImages(activeVariantImageModal, newUrls);
-                          showToast(`Uploaded ${newUrls.length} variant photo(s)`);
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    });
+                    showToast('Optimizing variant photos...');
+                    const compressed = await compressImages(e.target.files);
+                    if (compressed.length > 0) {
+                      handleVariantAddImages(activeVariantImageModal, compressed);
+                      showToast(`Uploaded ${compressed.length} optimized variant photo(s)`);
+                    }
                   }
                 }}
                 className="hidden"
