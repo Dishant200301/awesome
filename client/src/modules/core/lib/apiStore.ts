@@ -230,41 +230,34 @@ const formatVariantImages = (v: any, index: number, parentProduct: any): any => 
     }
   }
 
-  // 2. Build full gallery: variant images first, followed by all parent product gallery images added in admin
+  // 2. Color config images for this specific color
+  const colorGalleryUrls = (colorMedia?.gallery && Array.isArray(colorMedia.gallery))
+    ? colorMedia.gallery
+    : (colorObj?.galleryImages && Array.isArray(colorObj.galleryImages))
+    ? colorObj.galleryImages
+    : [];
+  const cmMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || "";
+
   let rawUrls: string[] = [];
   if (variantExplicitImages.length > 0) {
     rawUrls = [...variantExplicitImages];
-    parentImages.forEach((u) => {
-      if (u && !rawUrls.includes(u)) {
-        rawUrls.push(u);
-      }
-    });
-  } else {
-    // 3. Fallback to color media / color config only if variant has no explicit images
-    const cmMain = colorMedia?.mainImage || colorObj?.mainImage || colorObj?.displayImage || "";
-    if (cmMain) rawUrls.push(cmMain);
-    const colorGalleryUrls = (colorMedia?.gallery && Array.isArray(colorMedia.gallery))
-      ? colorMedia.gallery
-      : (colorObj?.galleryImages && Array.isArray(colorObj.galleryImages))
-      ? colorObj.galleryImages
-      : [];
     colorGalleryUrls.forEach((u: any) => {
       const urlStr = typeof u === "string" ? u : u?.url;
       if (urlStr && typeof urlStr === "string" && urlStr.trim() && !rawUrls.includes(urlStr.trim())) {
         rawUrls.push(urlStr.trim());
       }
     });
-
-    // 4. Always include parent product images so admin-uploaded gallery is fully visible
-    parentImages.forEach((u) => {
-      if (u && !rawUrls.includes(u)) {
-        rawUrls.push(u);
+  } else if (cmMain || colorGalleryUrls.length > 0) {
+    if (cmMain) rawUrls.push(cmMain);
+    colorGalleryUrls.forEach((u: any) => {
+      const urlStr = typeof u === "string" ? u : u?.url;
+      if (urlStr && typeof urlStr === "string" && urlStr.trim() && !rawUrls.includes(urlStr.trim())) {
+        rawUrls.push(urlStr.trim());
       }
     });
-
-    if (rawUrls.length === 0) {
-      rawUrls = [fallbackMainImg];
-    }
+  } else {
+    // 3. Fallback only if this variant has 0 specific images: use parent product fallback
+    rawUrls = [fallbackMainImg];
   }
 
   const mainImg = rawUrls[0] || fallbackMainImg;

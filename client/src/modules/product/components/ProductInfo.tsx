@@ -591,44 +591,7 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
             </div>
           </div>
 
-          {/* Size Selector (If Available) */}
-          {availableSizesForColor.length > 0 && availableSizesForColor[0] !== "Standard Pair" && availableSizesForColor[0] !== "Free Size" && (
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold tracking-wider text-zinc-900 uppercase">
-                  Select Size
-                </span>
-                {product.sizeChart && product.sizeChart.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={onOpenSizeChart}
-                    className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 underline cursor-pointer"
-                  >
-                    Size Guide
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {availableSizesForColor.map((sz) => {
-                  const isSelected = sz.toLowerCase() === (selectedSize || "").toLowerCase();
-                  return (
-                    <button
-                      key={sz}
-                      type="button"
-                      onClick={() => onSelectSize(sz)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
-                        isSelected
-                          ? "bg-zinc-900 text-white border-zinc-900"
-                          : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400"
-                      }`}
-                    >
-                      {sz}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* Size selection is hidden on the product detail page. */}
         </div>
       )}
 

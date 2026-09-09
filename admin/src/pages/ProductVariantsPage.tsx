@@ -111,7 +111,7 @@ export const ProductVariantsPage: React.FC<ProductVariantsPageProps> = ({ onNavi
         parentProd.variants = parentProd.variants.map((v) =>
           v.id === editingVariant.id ? updatedVariant : v
         );
-        import('../data/mockAdminData').then((m) => m.broadcastAdminProductChange(parentProd));
+        import('../data/mockAdminData').then((m) => m.broadcastAdminProductChange(parentProd, { persistToBackend: true }));
       }
     }
 

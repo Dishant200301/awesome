@@ -1,52 +1,5 @@
 import { sequelize } from "../../../database/index.js";
-const DEFAULT_SEED_MESSAGES = [
-    {
-        id: "cm-101",
-        name: "Priya Sharma",
-        email: "priya.sharma@example.com",
-        phone: "+91 98251 34098",
-        subject: "Custom Bridal Choli Enquiry",
-        message: "Hi Awesome Handmade team, I love your handcrafted Navratri collection! Can you customize the mirror work on the royal blue Choli with gold Latkans for my wedding function next month?",
-        status: "New",
-        date: new Date().toISOString().split("T")[0],
-        createdAt: new Date(Date.now() - 3600000 * 3).toISOString()
-    },
-    {
-        id: "cm-102",
-        name: "Ananya Patel",
-        email: "ananya.patel@gmail.com",
-        phone: "+91 94260 88123",
-        subject: "Bulk Order for Wedding Tassels & Latkans",
-        message: "Hello! We are looking to order around 50 pairs of Handcrafted Royal Mirror Latkans as wedding favors for our sangeet ceremony. Is there a bulk discount available?",
-        status: "New",
-        date: new Date().toISOString().split("T")[0],
-        createdAt: new Date(Date.now() - 3600000 * 8).toISOString()
-    },
-    {
-        id: "cm-103",
-        name: "Neha Mehta",
-        email: "neha.mehta@yahoo.com",
-        phone: "+91 97245 11980",
-        subject: "Delivery Timeline to Ahmedabad",
-        message: "I want to place an order for the handmade necklace set and latkan pair. Could you please confirm if express delivery to Ahmedabad within 3 days is possible?",
-        status: "Read",
-        date: new Date(Date.now() - 86400000).toISOString().split("T")[0],
-        createdAt: new Date(Date.now() - 86400000).toISOString()
-    },
-    {
-        id: "cm-104",
-        name: "Ritu Verma",
-        email: "ritu.verma@outlook.com",
-        phone: "+91 99099 44321",
-        subject: "Matching Accessories for Choli Set",
-        message: "Thank you for the quick shipping! Just wanted to ask if you have matching hair accessories or tassels available for the maroon designer choli?",
-        status: "Replied",
-        date: new Date(Date.now() - 86400000 * 2).toISOString().split("T")[0],
-        createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-        replyText: "Hi Ritu, yes! We have matching hair tassels and latkans in maroon velvet and mirror work. We have sent the catalog to your email."
-    }
-];
-let cachedContactMessages = [...DEFAULT_SEED_MESSAGES];
+let cachedContactMessages = [];
 let isTableInitialized = false;
 export async function refreshContactMessagesFromMySQL() {
     try {
@@ -68,9 +21,9 @@ export async function refreshContactMessagesFromMySQL() {
       `);
             isTableInitialized = true;
         }
-        // 2. Fetch rows from MySQL
+        // 2. Fetch real dynamic rows from MySQL
         const [rows] = await sequelize.query(`SELECT * FROM contact_messages ORDER BY created_at DESC`);
-        if (Array.isArray(rows) && rows.length > 0) {
+        if (Array.isArray(rows)) {
             cachedContactMessages = rows.map((r) => ({
                 id: String(r.id),
                 name: r.name || "Customer",
@@ -85,34 +38,16 @@ export async function refreshContactMessagesFromMySQL() {
             }));
             return cachedContactMessages;
         }
-        // 3. If MySQL table has 0 rows, seed initial realistic inquiries into MySQL
-        for (const msg of DEFAULT_SEED_MESSAGES) {
-            await sequelize.query(`
-        INSERT INTO contact_messages (id, name, email, phone, subject, message, status, reply_text, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE status = VALUES(status)
-      `, {
-                replacements: [
-                    msg.id,
-                    msg.name,
-                    msg.email,
-                    msg.phone || null,
-                    msg.subject,
-                    msg.message,
-                    msg.status,
-                    msg.replyText || null,
-                    msg.createdAt || new Date().toISOString()
-                ]
-            });
-        }
-        cachedContactMessages = [...DEFAULT_SEED_MESSAGES];
+        cachedContactMessages = [];
         return cachedContactMessages;
     }
     catch (err) {
-        console.warn("[ContactStore] MySQL query failed, using in-memory cache:", err.message);
-        return cachedContactMessages;
+        console.error("[ContactStore] Unable to load contact messages from MySQL:", err.message);
+        throw err;
     }
 }
+// Immediately trigger background refresh
+refreshContactMessagesFromMySQL().catch(() => { });
 export const getContactMessagesStore = async (filterStatus, search) => {
     const all = await refreshContactMessagesFromMySQL();
     let list = [...all];
@@ -145,38 +80,28 @@ export const createContactMessageStore = async (data) => {
         date: new Date().toISOString().split("T")[0],
         createdAt: new Date().toISOString()
     };
-    try {
-        await sequelize.query(`
-      INSERT INTO contact_messages (id, name, email, phone, subject, message, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'New', NOW())
-    `, {
-            replacements: [
-                newMsg.id,
-                newMsg.name,
-                newMsg.email,
-                newMsg.phone || null,
-                newMsg.subject,
-                newMsg.message
-            ]
-        });
-    }
-    catch (err) {
-        console.error("[ContactStore] Failed to insert contact message into MySQL:", err.message);
-    }
+    await sequelize.query(`
+    INSERT INTO contact_messages (id, name, email, phone, subject, message, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'New', NOW())
+  `, {
+        replacements: [
+            newMsg.id,
+            newMsg.name,
+            newMsg.email,
+            newMsg.phone || null,
+            newMsg.subject,
+            newMsg.message
+        ]
+    });
     cachedContactMessages.unshift(newMsg);
     return newMsg;
 };
 export const updateContactMessageStatusStore = async (id, status, replyText) => {
-    try {
-        await sequelize.query(`
-      UPDATE contact_messages SET status = ?, reply_text = ? WHERE id = ?
-    `, {
-            replacements: [status, replyText || null, id]
-        });
-    }
-    catch (err) {
-        console.error(`[ContactStore] Failed to update contact status for '${id}':`, err.message);
-    }
+    await sequelize.query(`
+    UPDATE contact_messages SET status = ?, reply_text = ? WHERE id = ?
+  `, {
+        replacements: [status, replyText || null, id]
+    });
     const msg = cachedContactMessages.find((m) => m.id === id);
     if (msg) {
         msg.status = status;
@@ -187,14 +112,9 @@ export const updateContactMessageStatusStore = async (id, status, replyText) => 
     return msg || null;
 };
 export const deleteContactMessageStore = async (id) => {
-    try {
-        await sequelize.query(`DELETE FROM contact_messages WHERE id = ?`, {
-            replacements: [id]
-        });
-    }
-    catch (err) {
-        console.error(`[ContactStore] Failed to delete contact message '${id}':`, err.message);
-    }
+    await sequelize.query(`DELETE FROM contact_messages WHERE id = ?`, {
+        replacements: [id]
+    });
     const len = cachedContactMessages.length;
     cachedContactMessages = cachedContactMessages.filter((m) => m.id !== id);
     return cachedContactMessages.length < len;

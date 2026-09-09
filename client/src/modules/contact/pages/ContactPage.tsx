@@ -53,34 +53,21 @@ export function ContactPage() {
       message: message.trim(),
     };
 
-    // 1. Send API HTTP POST Request to Express Server Backend
+    // Contact inquiries are stored in MySQL and shown in the admin notifications.
     try {
-      await fetch(`${API_BASE_URL}/contacts`, {
+      const response = await fetch(`${API_BASE_URL}/contacts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (!response.ok) {
+        throw new Error("Unable to save your message. Please try again.");
+      }
     } catch (err) {
-      console.warn("Backend API server offline/unreachable, saving to local store:", err);
+      setIsSubmitting(false);
+      toast.error("We could not send your message. Please try again.");
+      return;
     }
-
-    // 2. Fallback / Synchronize in-memory dataset & trigger cross-tab storage event
-    const newMsg = {
-      ...payload,
-      date: new Date().toISOString().replace("T", " ").substring(0, 16),
-      status: "New" as const,
-    };
-
-    try {
-      const syncData = {
-        timestamp: Date.now(),
-        message: newMsg,
-      };
-      localStorage.setItem("awesome_contact_sync", JSON.stringify(syncData));
-      localStorage.setItem("aaramly_contact_sync", JSON.stringify(syncData));
-      window.dispatchEvent(new Event("awesome_contact_sync"));
-      window.dispatchEvent(new Event("aaramly_contact_sync"));
-    } catch (e) {}
 
     setIsSubmitting(false);
     setIsSubmitted(true);

@@ -14,7 +14,7 @@ import { ProductDescriptionSection } from "../components/ProductDescriptionSecti
 import { ProductVideosSection } from "../components/ProductVideosSection";
 import { CustomerReviewsSection } from "../components/CustomerReviewsSection";
 import { RelatedProductsSection } from "../components/RelatedProductsSection";
-import { ProductColorVariation } from "../types/product";
+import { ProductColorVariation, ProductImage } from "../types/product";
 import { getLiveProductById, fetchLiveProducts, subscribeToProductStore } from "@/modules/core/lib/apiStore";
 import { useRecentlyViewed } from "../context/RecentlyViewedContext";
 
@@ -82,6 +82,12 @@ export const ProductDetailsPage: React.FC = () => {
     const rootGallery: string[] = [];
     if (prodAny.mainImage && typeof prodAny.mainImage === "string") rootGallery.push(prodAny.mainImage);
     if (prodAny.image && typeof prodAny.image === "string" && !rootGallery.includes(prodAny.image)) rootGallery.push(prodAny.image);
+    if (Array.isArray(prodAny.images)) {
+      prodAny.images.forEach((img: any) => {
+        const u = typeof img === "string" ? img : img?.url;
+        if (u && typeof u === "string" && u.trim() && !rootGallery.includes(u.trim())) rootGallery.push(u.trim());
+      });
+    }
     if (Array.isArray(prodAny.galleryImages)) {
       prodAny.galleryImages.forEach((img: any) => {
         const u = typeof img === "string" ? img : img?.url;
@@ -100,10 +106,65 @@ export const ProductDetailsPage: React.FC = () => {
     // Helper: Build strictly variant-specific images without polluting with other variants' images
     const buildVariantImages = (vItem?: any): ProductImage[] => {
       const urls: string[] = [];
+      const currentSelectedCol = (selectedColor || "").trim().toLowerCase();
+
+      // Collect all images that belong to OTHER variants/colors to strictly exclude them
+      const otherVariantsImages = new Set<string>();
+      (product.variations || []).forEach((otherV: any) => {
+        const otherCol = (otherV.colorName || (otherV as any).color || "").trim().toLowerCase();
+        if (otherCol && otherCol !== currentSelectedCol) {
+          if (otherV.thumbnail) otherVariantsImages.add(otherV.thumbnail.trim());
+          if (otherV.mainImage) otherVariantsImages.add(otherV.mainImage.trim());
+          if (otherV.image) otherVariantsImages.add(otherV.image.trim());
+          if (Array.isArray(otherV.images)) {
+            otherV.images.forEach((img: any) => {
+              const u = typeof img === "string" ? img : img?.url;
+              if (u && typeof u === "string" && u.trim()) otherVariantsImages.add(u.trim());
+            });
+          }
+          if (Array.isArray(otherV.galleryImages)) {
+            otherV.galleryImages.forEach((img: any) => {
+              const u = typeof img === "string" ? img : img?.url;
+              if (u && typeof u === "string" && u.trim()) otherVariantsImages.add(u.trim());
+            });
+          }
+        }
+      });
+
+      (product.colors || []).forEach((otherC: any) => {
+        const otherCol = (otherC.colorName || otherC.name || otherC.color || "").trim().toLowerCase();
+        if (otherCol && otherCol !== currentSelectedCol) {
+          if (otherC.displayImage) otherVariantsImages.add(otherC.displayImage.trim());
+          if (otherC.mainImage) otherVariantsImages.add(otherC.mainImage.trim());
+          if (Array.isArray(otherC.galleryImages)) {
+            otherC.galleryImages.forEach((img: any) => {
+              const u = typeof img === "string" ? img : img?.url;
+              if (u && typeof u === "string" && u.trim()) otherVariantsImages.add(u.trim());
+            });
+          }
+        }
+      });
+
+      ((product as any).colorMediaConfigs || []).forEach((otherCM: any) => {
+        const otherCol = (otherCM.colorName || otherCM.name || "").trim().toLowerCase();
+        if (otherCol && otherCol !== currentSelectedCol) {
+          if (otherCM.mainImage) otherVariantsImages.add(otherCM.mainImage.trim());
+          if (Array.isArray(otherCM.gallery)) {
+            otherCM.gallery.forEach((img: any) => {
+              const u = typeof img === "string" ? img : img?.url;
+              if (u && typeof u === "string" && u.trim()) otherVariantsImages.add(u.trim());
+            });
+          }
+        }
+      });
+
       const addUrl = (u: any) => {
         const str = typeof u === "string" ? u : u?.url;
-        if (str && typeof str === "string" && str.trim() && !urls.includes(str.trim())) {
-          urls.push(str.trim());
+        if (str && typeof str === "string" && str.trim()) {
+          const clean = str.trim();
+          if (!urls.includes(clean)) {
+            urls.push(clean);
+          }
         }
       };
 
@@ -131,6 +192,18 @@ export const ProductDetailsPage: React.FC = () => {
         colorObj.galleryImages.forEach(addUrl);
       }
 
+      // Products saved before variant image associations existed still have a
+      // product gallery. Keep the selected variant's main image first, then
+      // show that gallery until the product is edited and re-saved.
+      const hasVariantGallery = Boolean(
+        (vItem && ((Array.isArray(vItem.images) && vItem.images.length > 0) || (Array.isArray(vItem.galleryImages) && vItem.galleryImages.length > 0))) ||
+        (colorMedia && Array.isArray(colorMedia.gallery) && colorMedia.gallery.length > 0) ||
+        (colorObj && Array.isArray(colorObj.galleryImages) && colorObj.galleryImages.length > 0)
+      );
+      if (!hasVariantGallery) {
+        rootGallery.filter((url) => !otherVariantsImages.has(url)).forEach(addUrl);
+      }
+
       // If variant has its own images, return ONLY them!
       if (urls.length > 0) {
         return urls.map((u, idx) => ({
@@ -141,8 +214,9 @@ export const ProductDetailsPage: React.FC = () => {
       }
 
       // Fallback only if this variant has 0 images
-      if (rootGallery.length > 0) {
-        return rootGallery.map((u, idx) => ({
+      const filteredRoot = rootGallery.filter((img) => !otherVariantsImages.has(img));
+      if (filteredRoot.length > 0) {
+        return filteredRoot.map((u, idx) => ({
           id: `img-fallback-${idx}`,
           url: u,
           alt: `${product.name} View ${idx + 1}`

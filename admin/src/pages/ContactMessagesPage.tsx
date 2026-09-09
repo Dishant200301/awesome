@@ -54,12 +54,14 @@ export const ContactMessagesPage: React.FC = () => {
     window.addEventListener("aaramly_contact_sync", handleSync);
     window.addEventListener("storage", handleSync);
     window.addEventListener("focus", handleSync);
+    const refreshInterval = window.setInterval(loadMessages, 15000);
 
     return () => {
       window.removeEventListener("awesome_contact_sync", handleSync);
       window.removeEventListener("aaramly_contact_sync", handleSync);
       window.removeEventListener("storage", handleSync);
       window.removeEventListener("focus", handleSync);
+      window.clearInterval(refreshInterval);
     };
   }, [loadMessages]);
 

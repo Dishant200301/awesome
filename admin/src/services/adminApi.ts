@@ -4,7 +4,6 @@ import {
   MOCK_SUBCATEGORIES,
   MOCK_BRANDS,
   MOCK_ATTRIBUTES,
-  MOCK_CONTACT_MESSAGES,
   getGlobalVariantsList,
   getAdminProducts,
   deleteAdminProduct,
@@ -123,6 +122,8 @@ export class AdminApiService {
     const published = products.filter((p) => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive').length;
     const draft = products.length - published;
     const lowStock = products.filter((p) => (p.stock || 0) <= 20);
+    const messages = await this.getContactMessages();
+    const unreadMessages = messages.filter((m) => m.status === 'New');
 
     return {
       totalProducts: products.length,
@@ -132,10 +133,10 @@ export class AdminApiService {
       totalCategories: 12,
       totalAttributes: 6,
       lowStockCount: lowStock.length,
-      totalMessages: MOCK_CONTACT_MESSAGES.length,
-      unreadMessagesCount: MOCK_CONTACT_MESSAGES.filter((m) => m.status === 'New').length,
+      totalMessages: messages.length,
+      unreadMessagesCount: unreadMessages.length,
       recentProducts: products.slice(0, 5),
-      recentMessages: MOCK_CONTACT_MESSAGES.slice(0, 5),
+      recentMessages: messages.slice(0, 5),
       lowStockProducts: lowStock
     };
   }
@@ -838,9 +839,7 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
     if (params?.search) query.append("search", params.search);
 
     const remote = await this.request<ContactMessage[]>(`/contacts?${query.toString()}`);
-    let list: ContactMessage[] = (Array.isArray(remote) && remote.length > 0)
-      ? remote
-      : [...MOCK_CONTACT_MESSAGES];
+    let list: ContactMessage[] = Array.isArray(remote) ? remote : [];
 
     if (params?.status && params.status.toUpperCase() !== 'ALL') {
       list = list.filter((m) => m.status.toLowerCase() === params.status!.toLowerCase());
@@ -857,24 +856,12 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
       method: "PUT",
       body: JSON.stringify({ status, replyText })
     });
-    if (remote) return remote;
-
-    const msg = MOCK_CONTACT_MESSAGES.find((m) => m.id === id);
-    if (msg) {
-      msg.status = status;
-      if (replyText) msg.replyText = replyText;
-    }
-    return msg || null;
+    return remote || null;
   }
 
   public static async deleteContactMessage(id: string): Promise<boolean> {
-    await this.request<any>(`/contacts/${id}`, { method: "DELETE" });
-    const idx = MOCK_CONTACT_MESSAGES.findIndex((m) => m.id === id);
-    if (idx !== -1) {
-      MOCK_CONTACT_MESSAGES.splice(idx, 1);
-      return true;
-    }
-    return false;
+    const res = await this.request<any>(`/contacts/${id}`, { method: "DELETE" });
+    return Boolean(res?.success !== false);
   }
 
   // Size Guides CRUD

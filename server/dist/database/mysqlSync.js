@@ -226,6 +226,27 @@ export async function fetchProductsFromMySQL(onlyPublished = false) {
                 imagesRows = img;
         }
         catch { }
+        const variantImagesMap = new Map();
+        const imagesMap = new Map();
+        for (const img of imagesRows) {
+            const imageUrl = String(img.image_url || "").trim();
+            if (!imageUrl)
+                continue;
+            if (img.variant_id) {
+                if (!variantImagesMap.has(img.variant_id))
+                    variantImagesMap.set(img.variant_id, []);
+                variantImagesMap.get(img.variant_id).push({
+                    id: String(img.id),
+                    url: imageUrl,
+                    alt: img.alt_text || undefined
+                });
+            }
+            else {
+                if (!imagesMap.has(img.product_id))
+                    imagesMap.set(img.product_id, []);
+                imagesMap.get(img.product_id).push(imageUrl);
+            }
+        }
         const variantsMap = new Map();
         for (const v of variantsRows) {
             if (!variantsMap.has(v.product_id))
@@ -242,14 +263,9 @@ export async function fetchProductsFromMySQL(onlyPublished = false) {
                 costPrice: Number(v.cost_price),
                 stock: Number(v.stock),
                 thumbnail: v.thumbnail_url,
-                status: v.status
+                status: v.status,
+                images: variantImagesMap.get(v.id) || []
             });
-        }
-        const imagesMap = new Map();
-        for (const img of imagesRows) {
-            if (!imagesMap.has(img.product_id))
-                imagesMap.set(img.product_id, []);
-            imagesMap.get(img.product_id).push(img.image_url);
         }
         return rows.map((r) => {
             const pImages = imagesMap.get(r.id) || (r.image_url ? [r.image_url] : []);
@@ -330,89 +346,115 @@ export async function syncProductToMySQL(p) {
             }
             catch { }
         }
-        // 3. Prevent duplicate SKU collision with other products
+        // 3. Ensure finalSku is strictly unique across all other products
         let finalSku = rawSku;
-        try {
-            const [existingSku] = await sequelize.query(`SELECT id FROM products WHERE default_sku = ? AND id != ? LIMIT 1`, { replacements: [rawSku, p.id] });
-            if (Array.isArray(existingSku) && existingSku.length > 0) {
-                finalSku = `${rawSku}-${p.id.slice(-4)}`;
+        let skuAttempts = 0;
+        while (skuAttempts < 10) {
+            const [existingSkuRows] = await sequelize.query(`SELECT id FROM products WHERE default_sku = ? AND id != ? LIMIT 1`, { replacements: [finalSku, p.id] });
+            if (Array.isArray(existingSkuRows) && existingSkuRows.length > 0) {
+                finalSku = `${rawSku}-${Date.now().toString().slice(-4)}${skuAttempts > 0 ? skuAttempts : ''}`;
+                skuAttempts++;
+            }
+            else {
+                break;
             }
         }
-        catch { }
-        // 4. Prevent duplicate slug collision with other products
+        // 4. Ensure finalSlug is strictly unique across all other products
         let finalSlug = rawSlug;
-        try {
-            const [existingSlug] = await sequelize.query(`SELECT id FROM products WHERE slug = ? AND id != ? LIMIT 1`, { replacements: [rawSlug, p.id] });
-            if (Array.isArray(existingSlug) && existingSlug.length > 0) {
-                finalSlug = `${rawSlug}-${p.id.slice(-4)}`;
+        let slugAttempts = 0;
+        while (slugAttempts < 10) {
+            const [existingSlugRows] = await sequelize.query(`SELECT id FROM products WHERE slug = ? AND id != ? LIMIT 1`, { replacements: [finalSlug, p.id] });
+            if (Array.isArray(existingSlugRows) && existingSlugRows.length > 0) {
+                finalSlug = `${rawSlug}-${Date.now().toString().slice(-4)}${slugAttempts > 0 ? slugAttempts : ''}`;
+                slugAttempts++;
+            }
+            else {
+                break;
             }
         }
-        catch { }
-        // 5. Insert or update product
-        await sequelize.query(`INSERT INTO products (
-         id, name, subtitle, slug, product_type,
-         short_description, full_description, price, original_price, cost_price,
-         discount_percentage, rating, review_count, stock, default_sku,
-         barcode, image_url, is_featured, is_trending, is_new_arrival,
-         is_best_seller, is_on_sale, is_published, status, category_id, subcategory_id
-       ) VALUES (
-         ?, ?, ?, ?, ?,
-         ?, ?, ?, ?, ?,
-         ?, ?, ?, ?, ?,
-         ?, ?, ?, ?, ?,
-         ?, ?, ?, ?, ?, ?
-       )
-       ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         subtitle = VALUES(subtitle),
-         slug = VALUES(slug),
-         product_type = VALUES(product_type),
-         short_description = VALUES(short_description),
-         full_description = VALUES(full_description),
-         price = VALUES(price),
-         original_price = VALUES(original_price),
-         cost_price = VALUES(cost_price),
-         discount_percentage = VALUES(discount_percentage),
-         rating = VALUES(rating),
-         review_count = VALUES(review_count),
-         stock = VALUES(stock),
-         default_sku = VALUES(default_sku),
-         barcode = VALUES(barcode),
-         image_url = VALUES(image_url),
-         is_featured = VALUES(is_featured),
-         is_published = VALUES(is_published),
-         status = VALUES(status),
-         category_id = VALUES(category_id),
-         subcategory_id = VALUES(subcategory_id)`, {
-            replacements: [
-                p.id,
-                p.name,
-                p.subtitle || null,
-                finalSlug,
-                p.variations && p.variations.length > 0 ? "variable" : "simple",
-                p.shortDescription || null,
-                p.fullDescription || p.longDescription || null,
-                Number(p.price) || 0,
-                Number(p.originalPrice || p.regularPrice) || Number(p.price) || 0,
-                Number(p.costPrice) || null,
-                Number(p.discountPercentage) || 0,
-                p.rating !== undefined && p.rating !== null ? Number(p.rating) : 0,
-                p.reviewCount !== undefined && p.reviewCount !== null ? Math.floor(Number(p.reviewCount)) : 0,
-                Number(p.stock) || 0,
-                finalSku,
-                p.barcode || null,
-                mainImg,
-                p.isFeatured ? 1 : 0,
-                0,
-                1,
-                0,
-                0,
-                p.isPublished !== false ? 1 : 0,
-                p.status || "Published",
-                categoryId,
-                subcategoryId
-            ]
-        });
+        // 5. Check if product already exists by ID
+        const [existingProdRows] = await sequelize.query(`SELECT id FROM products WHERE id = ? LIMIT 1`, { replacements: [p.id] });
+        const productExists = Array.isArray(existingProdRows) && existingProdRows.length > 0;
+        if (productExists) {
+            // Direct UPDATE to ensure row with p.id is updated and not another row with duplicate key
+            await sequelize.query(`UPDATE products SET
+           name = ?, subtitle = ?, slug = ?, product_type = ?,
+           short_description = ?, full_description = ?, price = ?, original_price = ?,
+           cost_price = ?, discount_percentage = ?, rating = ?, review_count = ?,
+           stock = ?, default_sku = ?, barcode = ?, image_url = ?, is_featured = ?,
+           is_published = ?, status = ?, category_id = ?, subcategory_id = ?
+         WHERE id = ?`, {
+                replacements: [
+                    p.name,
+                    p.subtitle || null,
+                    finalSlug,
+                    p.variations && p.variations.length > 0 ? "variable" : "simple",
+                    p.shortDescription || null,
+                    p.fullDescription || p.longDescription || null,
+                    Number(p.price) || 0,
+                    Number(p.originalPrice || p.regularPrice) || Number(p.price) || 0,
+                    Number(p.costPrice) || null,
+                    Number(p.discountPercentage) || 0,
+                    p.rating !== undefined && p.rating !== null ? Number(p.rating) : 0,
+                    p.reviewCount !== undefined && p.reviewCount !== null ? Math.floor(Number(p.reviewCount)) : 0,
+                    Number(p.stock) || 0,
+                    finalSku,
+                    p.barcode || null,
+                    mainImg,
+                    p.isFeatured ? 1 : 0,
+                    p.isPublished !== false ? 1 : 0,
+                    p.status || "Published",
+                    categoryId,
+                    subcategoryId,
+                    p.id
+                ]
+            });
+        }
+        else {
+            // Direct INSERT guaranteeing p.id is inserted as the primary key
+            await sequelize.query(`INSERT INTO products (
+           id, name, subtitle, slug, product_type,
+           short_description, full_description, price, original_price, cost_price,
+           discount_percentage, rating, review_count, stock, default_sku,
+           barcode, image_url, is_featured, is_trending, is_new_arrival,
+           is_best_seller, is_on_sale, is_published, status, category_id, subcategory_id
+         ) VALUES (
+           ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?, ?
+         )`, {
+                replacements: [
+                    p.id,
+                    p.name,
+                    p.subtitle || null,
+                    finalSlug,
+                    p.variations && p.variations.length > 0 ? "variable" : "simple",
+                    p.shortDescription || null,
+                    p.fullDescription || p.longDescription || null,
+                    Number(p.price) || 0,
+                    Number(p.originalPrice || p.regularPrice) || Number(p.price) || 0,
+                    Number(p.costPrice) || null,
+                    Number(p.discountPercentage) || 0,
+                    p.rating !== undefined && p.rating !== null ? Number(p.rating) : 0,
+                    p.reviewCount !== undefined && p.reviewCount !== null ? Math.floor(Number(p.reviewCount)) : 0,
+                    Number(p.stock) || 0,
+                    finalSku,
+                    p.barcode || null,
+                    mainImg,
+                    p.isFeatured ? 1 : 0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    p.isPublished !== false ? 1 : 0,
+                    p.status || "Published",
+                    categoryId,
+                    subcategoryId
+                ]
+            });
+        }
         // 6. Sync Variants if variable
         const variations = Array.isArray(p.variations) && p.variations.length > 0
             ? p.variations
@@ -489,6 +531,42 @@ export async function syncProductToMySQL(p) {
            display_order = VALUES(display_order)`, {
                 replacements: [imgId, p.id, null, url, safeAlt, i]
             });
+        }
+        // Store each variant's ordered image gallery separately. The storefront
+        // uses this to show the selected colour's main image and thumbnails.
+        for (let variantIndex = 0; variantIndex < variations.length; variantIndex++) {
+            const variant = variations[variantIndex];
+            const variantId = (variant.id && !variant.id.match(/^var-\d+$/))
+                ? variant.id
+                : `var-${p.id}-${variantIndex}`;
+            const rawVariantImages = Array.isArray(variant.images) ? variant.images : [];
+            const variantUrls = Array.from(new Set([
+                variant.thumbnail,
+                variant.mainImage,
+                variant.image,
+                ...rawVariantImages.map((image) => typeof image === "string" ? image : image?.url)
+            ].filter((image) => Boolean(image && image.trim()))));
+            for (let imageIndex = 0; imageIndex < variantUrls.length; imageIndex++) {
+                const imageUrl = variantUrls[imageIndex];
+                const imageId = `img-${p.id}-var-${variantIndex}-${imageIndex}`;
+                activeImgIds.push(imageId);
+                await sequelize.query(`INSERT INTO product_images (id, product_id, variant_id, image_url, alt_text, display_order)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             variant_id = VALUES(variant_id),
+             image_url = VALUES(image_url),
+             alt_text = VALUES(alt_text),
+             display_order = VALUES(display_order)`, {
+                    replacements: [
+                        imageId,
+                        p.id,
+                        variantId,
+                        imageUrl,
+                        `${(p.name || '').slice(0, 140)} variant ${variantIndex + 1} image ${imageIndex + 1}`,
+                        imageIndex
+                    ]
+                });
+            }
         }
         if (activeImgIds.length > 0) {
             try {

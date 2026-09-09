@@ -43,7 +43,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
-import { MOCK_ORDERS, MOCK_CONTACT_MESSAGES } from '../data/mockAdminData';
+import { MOCK_ORDERS } from '../data/mockAdminData';
 import { Order } from '../types/admin';
 
 interface DashboardPageProps {

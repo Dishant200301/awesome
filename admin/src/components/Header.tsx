@@ -72,6 +72,10 @@ export const Header: React.FC<HeaderProps> = ({
     };
     fetchUnread();
 
+    // The storefront and admin run in different browser origins, so storage
+    // events cannot be relied on for new customer inquiries. Poll the API.
+    const refreshInterval = window.setInterval(fetchUnread, 15000);
+
     const handleSync = () => fetchUnread();
     window.addEventListener("awesome_contact_sync", handleSync);
     window.addEventListener("aaramly_contact_sync", handleSync);
@@ -82,6 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
       window.removeEventListener("aaramly_contact_sync", handleSync);
       window.removeEventListener("storage", handleSync);
       window.removeEventListener("focus", handleSync);
+      window.clearInterval(refreshInterval);
     };
   }, []);
 

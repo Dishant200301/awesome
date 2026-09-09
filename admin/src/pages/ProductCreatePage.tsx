@@ -35,7 +35,7 @@ import { RichTextEditor } from '../components/RichTextEditor';
 import { Select } from '../components/ui/select';
 import { findHexByColorName } from '../utils/colorMatcher';
 import { generateSmartProductContent } from '../utils/productContentGenerator';
-import { compressImage, compressImages } from '../utils/imageCompressor';
+import { compressImages } from '../utils/imageCompressor';
 
 interface ProductCreatePageProps {
   onNavigate?: (tab: string, productId?: string) => void;
@@ -273,6 +273,8 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   const [images, setImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isVariantDragOver, setIsVariantDragOver] = useState(false);
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [draggedVariantImageIndex, setDraggedVariantImageIndex] = useState<number | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
 
@@ -317,7 +319,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   // Auto-generate Short & Full Descriptions when Name, Category, or Subcategory changes
   useEffect(() => {
     if (!name || name.trim().length < 2) return;
-    if (isEditMode && description && shortDescription) return;
+    if (isEditMode) return;
 
     const generated = generateSmartProductContent({
       title: name.trim(),
@@ -437,9 +439,13 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
         addImg(prod.mainImage);
         addImg(prod.image);
+        addImg((prod as any).imageUrl);
         addImg((prod as any).thumbnail);
         if (Array.isArray(prod.galleryImages)) prod.galleryImages.forEach(addImg);
         if (Array.isArray(prod.images)) prod.images.forEach(addImg);
+        if (Array.isArray((prod as any).imageUrls)) (prod as any).imageUrls.forEach(addImg);
+        if (Array.isArray((prod as any).productImages)) (prod as any).productImages.forEach(addImg);
+        if (Array.isArray((prod as any).media)) (prod as any).media.forEach(addImg);
         if (Array.isArray(prod.variations)) {
           prod.variations.forEach((v: any) => {
             addImg(v.mainImage || v.thumbnail || v.image);
@@ -455,9 +461,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
           });
         }
 
-        if (loadedImgs.length > 0) {
-          setImages(loadedImgs);
-        }
+        // Reset first so a previously edited product can never leave stale
+        // photos behind when this record has no images.
+        setImages(loadedImgs);
 
         // 1. Parse Attributes / Options
         let loadedAttributes: ProductOptionItem[] = [];
@@ -481,7 +487,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         let loadedVariants: ProductVariantDetail[] = [];
         if (Array.isArray(prod.variantDetails) && prod.variantDetails.length > 0) {
           loadedVariants = prod.variantDetails.map((v: any, i: number) => {
-            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '';
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.thumbnail) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '';
             const vGals: string[] = [];
             if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
             if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
@@ -504,7 +510,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
           });
         } else if (Array.isArray(prod.variants) && prod.variants.length > 0) {
           loadedVariants = prod.variants.map((v: any, i: number) => {
-            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '';
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.thumbnail) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '';
             const vGals: string[] = [];
             if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
             if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
@@ -527,8 +533,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
           });
         } else if (Array.isArray(prod.variations) && prod.variations.length > 0) {
           loadedVariants = prod.variations.map((v: any, i: number) => {
-            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.displayImage) || extractImageUrl(v.image) || loadedImgs[0] || '';
+            const vMain = extractImageUrl(v.mainImage) || extractImageUrl(v.thumbnail) || extractImageUrl(v.displayImage) || extractImageUrl(v.image) || (Array.isArray(v.images) ? extractImageUrl(v.images[0]) : '') || loadedImgs[0] || '';
             const vGals: string[] = [];
+            if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
             if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractImageUrl(g); if (u && !vGals.includes(u)) vGals.push(u); });
             const allVImgs = Array.from(new Set([vMain, ...vGals].filter(Boolean)));
 
@@ -580,12 +587,8 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
           }
         }
 
-        if (loadedAttributes.length > 0) {
-          setAttributes(loadedAttributes);
-        }
-        if (loadedVariants.length > 0) {
-          setVariants(loadedVariants);
-        }
+        setAttributes(loadedAttributes);
+        setVariants(loadedVariants);
       } catch (err) {
         console.error('Failed to load product:', err);
       } finally {
@@ -609,8 +612,8 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
   // Image Upload Handlers
   const handleAddImages = (newUrls: string[]) => {
-    const combined = Array.from(new Set([...images, ...newUrls].filter(Boolean)));
-    setImages(combined);
+    // Newly added photos lead the gallery, so the first new image is the main image.
+    setImages((previous) => Array.from(new Set([...newUrls, ...previous].filter(Boolean))));
     setIsDirty(true);
   };
 
@@ -627,6 +630,18 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     setImages([item, ...remaining]);
     setIsDirty(true);
     showToast('Main display image set');
+  };
+
+  const handleReorderImages = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    setImages((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setIsDirty(true);
+    showToast(toIndex === 0 ? 'Main display image set' : 'Image position updated');
   };
 
   const handleFileUpload = async (files: FileList | null) => {
@@ -649,29 +664,27 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       const items = e.clipboardData?.items;
       if (!items || items.length === 0) return;
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.indexOf('image') !== -1) {
-          const file = item.getAsFile();
-          if (file) {
-            e.preventDefault();
-            try {
-              const dataUrl = await compressImage(file);
-              if (dataUrl) {
-                if (activeVariantImageModal !== null) {
-                  handleVariantAddImages(activeVariantImageModal, [dataUrl]);
-                  showToast('Variant image pasted & optimized!');
-                } else {
-                  handleAddImages([dataUrl]);
-                  showToast('Product photo pasted & optimized!');
-                }
-              }
-            } catch (err) {
-              console.error('Failed to process pasted image:', err);
-            }
-            break;
+      const files = Array.from(items)
+        .filter((item) => item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+
+      if (files.length === 0) return;
+
+      e.preventDefault();
+      try {
+        const compressed = await compressImages(files);
+        if (compressed.length > 0) {
+          if (activeVariantImageModal !== null) {
+            handleVariantAddImages(activeVariantImageModal, compressed);
+            showToast(`${compressed.length} variant photo(s) pasted & optimized!`);
+          } else {
+            handleAddImages(compressed);
+            showToast(`${compressed.length} product photo(s) pasted & optimized!`);
           }
         }
+      } catch (err) {
+        console.error('Failed to process pasted image:', err);
       }
     };
 
@@ -823,8 +836,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     setVariants((prev) => {
       const next = [...prev];
       const target = next[variantIndex];
-      const existing = target.images && target.images.length > 0 ? target.images : [target.mainImage].filter(Boolean);
-      const combined = Array.from(new Set([...existing, ...newImgs].filter(Boolean))) as string[];
+      const existing = (target.images && target.images.length > 0 ? target.images : [target.mainImage].filter(Boolean)) as string[];
+      // The first new photo is always this variant's main/cover image.
+      const combined = Array.from(new Set([...newImgs, ...existing].filter(Boolean))) as string[];
       next[variantIndex] = {
         ...target,
         mainImage: combined[0] || '',
@@ -853,6 +867,27 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
     setIsDirty(true);
   };
 
+  const handleReorderVariantImages = (variantIndex: number, fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    setVariants((prev) => {
+      const next = [...prev];
+      const target = next[variantIndex];
+      const existing = (target.images && target.images.length > 0 ? target.images : [target.mainImage].filter(Boolean)) as string[];
+      const reordered = [...existing];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
+      next[variantIndex] = {
+        ...target,
+        mainImage: reordered[0] || '',
+        galleryImages: reordered.slice(1),
+        images: reordered
+      };
+      return next;
+    });
+    setIsDirty(true);
+    showToast(toIndex === 0 ? 'Variant cover image set' : 'Variant image position updated');
+  };
+
   // Form Validation
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
@@ -874,6 +909,10 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
   // Save / Publish
   const handleSaveProduct = async (statusOverride?: 'Draft' | 'Active') => {
+    if (isInitialLoading || (isEditMode && !rawExistingProduct)) {
+      alert('Please reload this product before saving. Its existing data could not be loaded.');
+      return;
+    }
     if (!validateForm()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -949,7 +988,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       mainImage: effectiveMainImage,
       galleryImages: effectiveGallery,
       images: effectiveAllImages.length > 0 ? effectiveAllImages : images,
-      specifications: [],
+      // These fields are not edited on this screen. Keep their existing
+      // values instead of replacing product content with empty arrays.
+      specifications: Array.isArray(rawExistingProduct?.specifications) ? rawExistingProduct.specifications : [],
       productOptions: productType === 'Variable' ? attributes : [],
       attributes: productType === 'Variable' ? attributes.map((a) => ({ name: a.name, values: a.values })) : [],
       variantDetails: productType === 'Variable' ? variants : [],
@@ -1790,7 +1831,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 Drag &amp; drop images here or click to upload
               </p>
               <p className="text-[11px] text-neutral-400 mt-0.5">
-                You can upload multiple images
+                Upload multiple images or paste with Ctrl + V. New images become the main image.
               </p>
               <input
                 type="file"
@@ -1807,7 +1848,25 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 {images.map((img, i) => (
                   <div
                     key={i}
-                    className={`relative w-20 h-20 rounded-xl border-2 overflow-hidden bg-neutral-100 shrink-0 group shadow-2xs ${
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedImageIndex(i);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedImageIndex !== null) handleReorderImages(draggedImageIndex, i);
+                      setDraggedImageIndex(null);
+                    }}
+                    onDragEnd={() => setDraggedImageIndex(null)}
+                    title="Drag to change image position. Drop on the first image to make it the main image."
+                    className={`relative w-20 h-20 rounded-xl border-2 overflow-hidden bg-neutral-100 shrink-0 group shadow-2xs cursor-grab active:cursor-grabbing ${
+                      draggedImageIndex === i ? 'opacity-40' : ''
+                    } ${
                       i === 0 ? 'border-neutral-950 ring-2 ring-neutral-950/10' : 'border-neutral-200'
                     }`}
                   >
@@ -2051,7 +2110,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                 Drag &amp; drop photos here or click to upload
               </span>
               <span className="text-[10px] text-neutral-400">
-                You can upload multiple files or paste from clipboard (Ctrl + V)
+                Upload multiple files or paste from clipboard (Ctrl + V). New images become the cover.
               </span>
               <input
                 type="file"
@@ -2089,9 +2148,32 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               }
 
               return (
-                <div className="grid grid-cols-4 gap-2.5 max-h-48 overflow-y-auto">
+                <>
+                  <p className="text-[10px] text-neutral-400 -mt-1">Drag a photo onto another photo to change its position. The first photo is the cover.</p>
+                  <div className="grid grid-cols-4 gap-2.5 max-h-48 overflow-y-auto">
                   {vImages.map((img, imgIdx) => (
-                    <div key={imgIdx} className="relative aspect-square rounded-lg border border-neutral-200 overflow-hidden group">
+                    <div
+                      key={imgIdx}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedVariantImageIndex(imgIdx);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedVariantImageIndex !== null) {
+                          handleReorderVariantImages(activeVariantImageModal, draggedVariantImageIndex, imgIdx);
+                        }
+                        setDraggedVariantImageIndex(null);
+                      }}
+                      onDragEnd={() => setDraggedVariantImageIndex(null)}
+                      title="Drag to change position. Drop here as the first image to set the cover."
+                      className={`relative aspect-square rounded-lg border border-neutral-200 overflow-hidden group cursor-grab active:cursor-grabbing ${draggedVariantImageIndex === imgIdx ? 'opacity-40' : ''}`}
+                    >
                       <img src={img} alt="Variant" className="w-full h-full object-cover" />
                       {imgIdx === 0 && (
                         <span className="absolute top-1 left-1 bg-black text-white text-[8px] font-bold px-1 rounded">
@@ -2107,7 +2189,8 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
                       </button>
                     </div>
                   ))}
-                </div>
+                  </div>
+                </>
               );
             })()}
 
