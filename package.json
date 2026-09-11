@@ -17,7 +17,9 @@
     "build:server": "npm --prefix server run build",
     "build:admin": "npm --prefix admin run build",
     "build:all": "npm run build:client && npm run build:admin && npm run build:server",
-    "build": "npm run build:all"
+    "build": "npm run build:all",
+    "start": "npm --prefix server start",
+    "start:server": "npm --prefix server start"
   },
   "engines": {
     "node": ">=22.0.0"

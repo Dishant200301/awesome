@@ -1,8 +1,18 @@
+import "./processHandler.js";
 import app from "./app.js";
 import { config } from "./config/index.js";
 import { sequelize } from "./database/index.js";
 const PORT = Number(process.env.PORT) || config.port || 5000;
 const HOST = process.env.HOST || "0.0.0.0";
+console.log("==========================================");
+console.log("🚀 Starting Awesome Handwork API");
+console.log("Node version   :", process.version);
+console.log("Environment    :", config.env);
+console.log("Configured Port:", PORT);
+console.log("Configured Host:", HOST);
+console.log("Database Name  :", config.db.name);
+console.log("Database Host  :", `${config.db.host}:${config.db.port}`);
+console.log("==========================================");
 const server = app.listen(PORT, HOST, () => {
     console.log(`🚀 AwesomeHandwork API running on http://${HOST}:${PORT} [${config.env}]`);
 });

@@ -8,7 +8,7 @@
     "dev": "npx tsx watch src/server.ts",
     "db:init": "npx tsx src/database/init_db.ts",
     "db:sync": "npx tsx src/database/sync_json_to_mysql.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"import('node:fs').then(fs => { fs.mkdirSync('dist/database', { recursive: true }); fs.copyFileSync('src/database/schema.sql', 'dist/database/schema.sql'); })\"",
     "start": "node dist/server.js"
   },
   "dependencies": {

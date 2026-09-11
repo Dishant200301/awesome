@@ -15,7 +15,7 @@ import cartRoutes from "./modules/cart/routes/cart.routes.js";
 import wishlistRoutes from "./modules/wishlist/routes/wishlist.routes.js";
 import contentRoutes from "./modules/product/routes/content.routes.js";
 import reviewRoutes from "./modules/product/routes/review.routes.js";
-import { connectDB } from "./database/index.js";
+import { connectDB, isMySQLConnected } from "./database/index.js";
 import { config } from "./config/index.js";
 const app = express();
 connectDB();
@@ -77,9 +77,11 @@ app.get("/", (_req, res) => {
 // Health Check Endpoint (Safe: no secrets, credentials, or DB passwords exposed)
 app.get("/health", (_req, res) => {
     res.status(200).json({
+        success: true,
+        service: "api",
         status: "ok",
-        service: "awesome-api",
-        uptime: Math.floor(process.uptime())
+        uptime: Math.floor(process.uptime()),
+        database: isMySQLConnected ? "connected" : "disconnected"
     });
 });
 // Browser Extension Fallback

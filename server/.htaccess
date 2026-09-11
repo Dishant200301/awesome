@@ -1,3 +1,9 @@
+# Security: Block direct access to environment and sensitive config files
+<FilesMatch "(^\.|\.env|ecosystem\.config|package(-lock)?\.json|tsconfig\.json)">
+  Order allow,deny
+  Deny from all
+</FilesMatch>
+
 # Hostinger PHP Proxy Bridge for Node.js (Port 5000)
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -6,7 +12,7 @@
   RewriteCond %{HTTP:Authorization} .
   RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-  # If a real file exists, serve it directly
+  # If a real file exists (and is not blocked), serve it directly
   RewriteCond %{REQUEST_FILENAME} -f
   RewriteRule ^ - [L]
 

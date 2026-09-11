@@ -11,7 +11,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 5000,
-        HOST: "127.0.0.1",
+        HOST: "0.0.0.0",
         DB_HOST: "localhost",
         DB_PORT: 3306,
         DB_NAME: "u382338879_awesome_hand",
