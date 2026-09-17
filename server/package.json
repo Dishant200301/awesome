@@ -8,7 +8,7 @@
     "dev": "npx tsx watch src/server.ts",
     "db:init": "npx tsx src/database/init_db.ts",
     "db:sync": "npx tsx src/database/sync_json_to_mysql.ts",
-    "build": "tsc && node -e \"import('node:fs').then(fs => { fs.mkdirSync('dist/database', { recursive: true }); fs.copyFileSync('src/database/schema.sql', 'dist/database/schema.sql'); })\"",
+    "build": "tsc && node -e \"import('node:fs').then(fs => { fs.mkdirSync('dist/database', { recursive: true }); fs.copyFileSync('src/database/schema.sql', 'dist/database/schema.sql'); if (fs.existsSync('../node_modules') && !fs.existsSync('node_modules/express')) { console.log('Syncing hoisted node_modules into server...'); fs.cpSync('../node_modules', 'node_modules', { recursive: true }); } })\"",
     "start": "node dist/server.js"
   },
   "dependencies": {
