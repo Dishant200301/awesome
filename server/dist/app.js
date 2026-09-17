@@ -27,9 +27,11 @@ app.use(helmet({
 }));
 // Production and Development CORS Configuration
 const allowedProductionOrigins = [
-    "https://awesomehandwork.com",
-    "https://www.awesomehandwork.com",
-    "https://admin.awesomehandwork.com"
+    "https://awesomehandmade.com",
+    "https://www.awesomehandmade.com",
+    "https://admin.awesomehandmade.com",
+    "http://awesomehandmade.com",
+    "http://www.awesomehandmade.com",
 ];
 const devOrigins = [
     "http://localhost:5173",
@@ -52,7 +54,8 @@ app.use(cors({
             }
         }
         const validOrigins = [...allowedProductionOrigins, ...devOrigins];
-        if (validOrigins.includes(origin) || /^https?:\/\/([a-z0-9-]+\.)*awesomehandwork\.com$/.test(origin)) {
+        if (validOrigins.includes(origin) ||
+            /^https?:\/\/([a-z0-9-]+\.)*awesomehandmade\.com$/.test(origin)) {
             return callback(null, true);
         }
         return callback(null, false);

@@ -7,11 +7,13 @@ npm-debug.log*
 node_modules/
 
 # Production Build Output
-dist/
 dist-ssr/
 .output/
+!admin/dist/
 !admin/dist/**
+!server/dist/
 !server/dist/**
+!client/dist/
 !client/dist/**
 
 # IDEs / Editors

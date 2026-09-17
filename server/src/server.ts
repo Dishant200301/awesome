@@ -1,7 +1,17 @@
-import "./processHandler.js";
 import app from "./app.js";
 import { config } from "./config/index.js";
 import { sequelize } from "./database/index.js";
+
+// Process lifecycle & crash handlers
+process.on("uncaughtException", (error: Error) => {
+  console.error("[CRITICAL] UNCAUGHT_EXCEPTION:", error);
+});
+
+process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
+  console.error("[CRITICAL] UNHANDLED_REJECTION at:", promise, "reason:", reason);
+});
+
+console.log("[Bootstrap] Process crash and unhandled rejection listeners registered.");
 
 const PORT = Number(process.env.PORT) || config.port || 5000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -17,7 +27,7 @@ console.log("Database Host  :", `${config.db.host}:${config.db.port}`);
 console.log("==========================================");
 
 const server = app.listen(PORT, HOST, () => {
-  console.log(`🚀 AwesomeHandwork API running on http://${HOST}:${PORT} [${config.env}]`);
+  console.log(`🚀 AwesomeHandmade API running on http://${HOST}:${PORT} [${config.env}]`);
 });
 
 // Graceful Shutdown Handling (SIGTERM & SIGINT)

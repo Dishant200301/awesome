@@ -6,9 +6,12 @@ $backendPort = 5000;
 // Handle CORS allowlist and Preflight OPTIONS
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowedOrigins = [
-    'https://awesomehandwork.com',
-    'https://www.awesomehandwork.com',
-    'https://admin.awesomehandwork.com',
+    'https://awesomehandmade.com',
+    'https://www.awesomehandmade.com',
+    'https://admin.awesomehandmade.com',
+    'http://awesomehandmade.com',
+    'http://www.awesomehandmade.com',
+    'http://admin.awesomehandmade.com',
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:3000',

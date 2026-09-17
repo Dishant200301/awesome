@@ -3,7 +3,7 @@
  */
 
 export const getAdminApiBase = (): string => {
-  const raw = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandwork.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
+  const raw = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandmade.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
   return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
 };
 

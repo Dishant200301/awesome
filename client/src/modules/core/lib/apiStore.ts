@@ -1,6 +1,6 @@
 import { ProductDetails, ProductColorVariation } from "@/modules/product/types/product";
 
-const rawApiUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandwork.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
+const rawApiUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandmade.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
 export const API_BASE_URL = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
 // Live Product Store state listeners

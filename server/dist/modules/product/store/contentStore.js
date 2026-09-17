@@ -22,7 +22,7 @@ let blogPosts = [];
 let faqItems = [];
 let storeSettings = {
     storeName: "Awesome Handmade",
-    supportEmail: "contact@awesomehandwork.com",
+    supportEmail: "contact@awesomehandmade.com",
     supportPhone: "+91 98765 43210",
     address: "Surat, Gujarat, India",
     currency: "INR",
