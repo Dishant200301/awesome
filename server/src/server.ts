@@ -35,7 +35,7 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`\n[Server] Received ${signal}. Initiating graceful shutdown...`);
 
   // Stop accepting new connections
-  server.close(async (err) => {
+  server.close(async (err?: any) => {
     if (err) {
       console.error("[Server] Error while closing HTTP server:", err);
       process.exit(1);

@@ -52,7 +52,7 @@ const devOrigins = [
 ];
 
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: (origin: any, callback: any) => {
     // Allow non-browser requests (server-to-server, curl, mobile clients)
     if (!origin) return callback(null, true);
 
