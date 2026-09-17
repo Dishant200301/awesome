@@ -9,7 +9,7 @@ process.on("unhandledRejection", (reason, promise) => {
     console.error("[CRITICAL] UNHANDLED_REJECTION at:", promise, "reason:", reason);
 });
 console.log("[Bootstrap] Process crash and unhandled rejection listeners registered.");
-const PORT = Number(process.env.PORT) || config.port || 5000;
+const PORT = process.env.PORT || config.port || 5000;
 const HOST = process.env.HOST || "0.0.0.0";
 console.log("==========================================");
 console.log("🚀 Starting Awesome Handwork API");
@@ -20,8 +20,8 @@ console.log("Configured Host:", HOST);
 console.log("Database Name  :", config.db.name);
 console.log("Database Host  :", `${config.db.host}:${config.db.port}`);
 console.log("==========================================");
-const server = app.listen(PORT, HOST, () => {
-    console.log(`🚀 AwesomeHandmade API running on http://${HOST}:${PORT} [${config.env}]`);
+const server = app.listen(PORT, () => {
+    console.log(`🚀 AwesomeHandmade API running on port ${PORT} [${config.env}]`);
 });
 // Graceful Shutdown Handling (SIGTERM & SIGINT)
 const gracefulShutdown = async (signal) => {

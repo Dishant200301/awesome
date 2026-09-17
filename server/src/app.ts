@@ -34,8 +34,11 @@ const allowedProductionOrigins = [
   "https://awesomehandmade.com",
   "https://www.awesomehandmade.com",
   "https://admin.awesomehandmade.com",
+  "https://api.awesomehandmade.com",
   "http://awesomehandmade.com",
   "http://www.awesomehandmade.com",
+  "http://admin.awesomehandmade.com",
+  "http://api.awesomehandmade.com"
 ];
 
 const devOrigins = [
@@ -138,5 +141,10 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     message
   });
 });
+
+// Fallback: If Hostinger or any runner executes app.js directly as the startup file, boot the HTTP listener
+if (process.argv[1] && (process.argv[1].endsWith("app.js") || process.argv[1].endsWith("app.ts"))) {
+  import("./server.js");
+}
 
 export default app;
