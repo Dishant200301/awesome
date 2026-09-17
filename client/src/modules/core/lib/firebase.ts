@@ -25,13 +25,21 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Analytics conditionally for browser safety
+// Initialize Analytics deferred during idle time to avoid blocking initial paint
 if (typeof window !== "undefined") {
-  isSupported().then((supported) => {
-    if (supported) {
-      getAnalytics(app);
-    }
-  });
+  const initAnalytics = () => {
+    isSupported().then((supported) => {
+      if (supported) {
+        getAnalytics(app);
+      }
+    });
+  };
+
+  if ("requestIdleCallback" in window) {
+    (window as any).requestIdleCallback(initAnalytics, { timeout: 3000 });
+  } else {
+    setTimeout(initAnalytics, 2000);
+  }
 }
 
 const auth = getAuth(app);

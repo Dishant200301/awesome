@@ -130,10 +130,13 @@ export default function ReelCard({ r }: { r: ReelItem }) {
               src={r.video}
               loop
               playsInline
+              aria-label={r.title || "Handmade craft demonstration reel"}
               className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 z-10 ${
                 isPlaying ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-            />
+            >
+              <track kind="captions" src="data:text/vtt;charset=utf-8,WEBVTT" label="English" default />
+            </video>
           ) : null}
         </>
       )}

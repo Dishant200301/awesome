@@ -32,6 +32,17 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-icons': ['lucide-react', 'react-icons'],
+          'vendor-motion': ['framer-motion', 'gsap', 'lenis'],
+          'vendor-swiper': ['swiper'],
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/analytics'],
+        },
+      },
+    },
   },
   plugins: [
     react(),

@@ -1,11 +1,57 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # 1. Allow existing files, directories, or assets (JS, CSS, images)
+  # 1. Allow existing files, directories, or assets
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
   # 2. Support React Router SPA fallback on refresh
   RewriteRule . index.html [L]
+</IfModule>
+
+# Prevent Hostinger Default Error Pages
+ErrorDocument 404 /index.html
+ErrorDocument 403 /index.html
+
+# Disable directory listing
+Options -Indexes
+
+# Enable Gzip / Deflate Compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript application/json application/xml image/svg+xml
+</IfModule>
+
+# Browser Caching Rules for Production Performance
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault "access plus 1 month"
+
+  # Static Assets (Vite hashes file names: safe to cache for 1 year)
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType font/woff "access plus 1 year"
+
+  # HTML & Manifest (Never cache so user gets updates immediately)
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType application/manifest+json "access plus 0 seconds"
+</IfModule>
+
+<IfModule mod_headers.c>
+  # 1-year immutable cache for hashed Vite assets
+  <FilesMatch "\.(css|js|webp|png|jpe?g|svg|woff2?)$">
+    Header set Cache-Control "max-age=31536000, public, immutable"
+  </FilesMatch>
+
+  # HTML must revalidate to avoid showing stale code
+  <FilesMatch "\.(html|htm)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
 </IfModule>

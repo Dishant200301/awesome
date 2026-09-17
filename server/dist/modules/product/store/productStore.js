@@ -1,20 +1,81 @@
 import { syncProductToMySQL, deleteProductFromMySQL, fetchProductsFromMySQL } from "../../../database/mysqlSync.js";
 class ProductStore {
     products = [];
+    lastRefreshTime = 0;
+    isRefreshing = false;
+    refreshPromise = null;
+    CACHE_TTL_MS = 300000; // 5-minute memory cache TTL
     constructor() {
         this.refreshFromMySQL();
     }
-    async refreshFromMySQL() {
-        try {
-            const mysqlProducts = await fetchProductsFromMySQL(false);
-            if (Array.isArray(mysqlProducts)) {
-                this.products = mysqlProducts.map((p) => this.normalizeProduct(p));
+    async ensureLoaded(force = false) {
+        const isStale = Date.now() - this.lastRefreshTime > this.CACHE_TTL_MS;
+        if (force || this.products.length === 0 || isStale) {
+            if (this.refreshPromise) {
+                return this.refreshPromise;
             }
-        }
-        catch (e) {
-            console.warn("[ProductStore] Error loading products from MySQL:", e.message);
+            return this.refreshFromMySQL();
         }
         return this.products;
+    }
+    async refreshFromMySQL() {
+        if (this.isRefreshing && this.refreshPromise) {
+            return this.refreshPromise;
+        }
+        this.isRefreshing = true;
+        this.refreshPromise = (async () => {
+            try {
+                const mysqlProducts = await fetchProductsFromMySQL(false);
+                if (Array.isArray(mysqlProducts)) {
+                    this.products = mysqlProducts.map((p) => this.normalizeProduct(p));
+                    this.lastRefreshTime = Date.now();
+                }
+            }
+            catch (e) {
+                console.warn("[ProductStore] Error loading products from MySQL:", e.message);
+            }
+            finally {
+                this.isRefreshing = false;
+                this.refreshPromise = null;
+            }
+            return this.products;
+        })();
+        return this.refreshPromise;
+    }
+    toSummary(p) {
+        return {
+            id: p.id,
+            name: p.name,
+            subtitle: p.subtitle || "",
+            brand: p.brand || "Awesome Handmade",
+            category: p.category,
+            subcategory: p.subcategory || p.subCategory || "",
+            subCategory: p.subcategory || p.subCategory || "",
+            categories: p.categories || [p.category],
+            slug: p.slug,
+            sku: p.sku || p.defaultSku,
+            defaultSku: p.defaultSku,
+            barcode: p.barcode || "",
+            regularPrice: p.regularPrice,
+            originalPrice: p.originalPrice,
+            price: p.price,
+            discountPercentage: p.discountPercentage,
+            stock: p.stock,
+            stockQuantity: p.stockQuantity,
+            stockStatus: p.stockStatus,
+            mainImage: p.mainImage,
+            image: p.image,
+            hoverImage: p.hoverImage || "",
+            images: Array.isArray(p.images) ? p.images.slice(0, 3) : [],
+            colors: p.colors || [],
+            rating: p.rating,
+            reviewCount: p.reviewCount,
+            isFeatured: p.isFeatured,
+            isPublished: p.isPublished,
+            status: p.status,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt
+        };
     }
     normalizeProduct(p) {
         const regularPrice = Number(p.regularPrice || p.originalPrice || p.price || 999);
@@ -117,11 +178,15 @@ class ProductStore {
             updatedAt: p.updatedAt || new Date().toISOString()
         };
     }
-    getAll(onlyPublished = false) {
+    getAll(onlyPublished = false, lean = false) {
+        let result = this.products;
         if (onlyPublished) {
-            return this.products.filter(p => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive');
+            result = this.products.filter(p => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive');
         }
-        return this.products;
+        if (lean) {
+            return result.map(p => this.toSummary(p));
+        }
+        return result;
     }
     getByIdOrSlug(query) {
         return this.products.find((p) => p.id === query || p.slug === query || (p.sku && p.sku === query) || (p.defaultSku && p.defaultSku === query));
@@ -360,7 +425,8 @@ class ProductStore {
         const total = list.length;
         const totalPages = Math.ceil(total / limit) || 1;
         const startIndex = (page - 1) * limit;
-        const items = list.slice(startIndex, startIndex + limit);
+        const rawItems = list.slice(startIndex, startIndex + limit);
+        const items = params.lean !== false ? rawItems.map((p) => this.toSummary(p)) : rawItems;
         return {
             items,
             data: items,

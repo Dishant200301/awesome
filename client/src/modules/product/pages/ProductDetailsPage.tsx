@@ -9,19 +9,19 @@ import { ProductInfo } from "../components/ProductInfo";
 import { ProductBreadcrumb } from "../components/ProductBreadcrumb";
 import { SizeChartModal } from "../components/SizeChartModal";
 import { MobileStickyBottomBar } from "../components/MobileStickyBottomBar";
-import { BenefitsSection } from "../components/BenefitsSection";
 import { ProductDescriptionSection } from "../components/ProductDescriptionSection";
-import { ProductVideosSection } from "../components/ProductVideosSection";
 import { CustomerReviewsSection } from "../components/CustomerReviewsSection";
 import { RelatedProductsSection } from "../components/RelatedProductsSection";
 import { ProductColorVariation, ProductImage } from "../types/product";
-import { getLiveProductById, fetchLiveProducts, subscribeToProductStore } from "@/modules/core/lib/apiStore";
+import { getLiveProductById, fetchSingleProduct, subscribeToProductStore } from "@/modules/core/lib/apiStore";
+import { ProductDetailsSkeleton } from "@/modules/core/components/ClientSkeletons";
 import { useRecentlyViewed } from "../context/RecentlyViewedContext";
 
 export const ProductDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const [product, setProduct] = useState(() => getLiveProductById(id));
+  const [isLoading, setIsLoading] = useState(() => !getLiveProductById(id));
   const { addRecentlyViewed } = useRecentlyViewed();
 
   const prodAny = product as any;
@@ -304,22 +304,31 @@ export const ProductDetailsPage: React.FC = () => {
     let isMounted = true;
 
     const loadLiveProduct = async () => {
-      // 1. Initial synchronous lookup
+      if (!id) {
+        setIsLoading(false);
+        return;
+      }
+      // 1. Initial synchronous lookup from cache
       const local = getLiveProductById(id);
-      if (isMounted) setProduct(local);
+      if (local) {
+        if (isMounted) setProduct(local);
+      } else {
+        if (isMounted) setIsLoading(true);
+      }
 
-      // 2. Fresh fetch from backend API
+      // 2. Fetch only this single product from backend API
       try {
-        await fetchLiveProducts();
-        if (isMounted) {
-          const fresh = getLiveProductById(id);
+        const fresh = await fetchSingleProduct(id);
+        if (isMounted && fresh) {
           setProduct(fresh);
-          if (fresh && fresh.id) {
+          if (fresh.id) {
             addRecentlyViewed(fresh);
           }
         }
       } catch (e) {
         console.error("Failed to load fresh product:", e);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     };
 
@@ -384,6 +393,16 @@ export const ProductDetailsPage: React.FC = () => {
       lenis.destroy();
     };
   }, []);
+
+  if (isLoading && !product) {
+    return (
+      <div className="min-h-screen bg-white text-neutral-900 font-sans flex flex-col justify-between">
+        <Navbar />
+        <ProductDetailsSkeleton />
+        <Footer />
+      </div>
+    );
+  }
 
   if (!product || !product.id) {
     return (
@@ -495,9 +514,6 @@ export const ProductDetailsPage: React.FC = () => {
           careInstructions={product.extendedDetails?.careInstructions || (product as any).careInstructions}
           reviewCount={currentReviewCount}
         />
-        {/* BENEFITS SECTION */}
-        {/* <BenefitsSection /> */}
-
        
         {/* RELATED PRODUCTS SECTION (Strictly matching current product's category/subcategory) */}
         <RelatedProductsSection currentProduct={product} />

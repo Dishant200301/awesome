@@ -19,6 +19,7 @@ import {
 import Navbar from "@/modules/core/components/Navbar";
 import Footer from "@/modules/core/components/Footer";
 import { PaginationDots } from "@/modules/core/components/PaginationDots";
+import { ShopProductCardSkeleton, ShopCategoryItemSkeleton } from "@/modules/core/components/ClientSkeletons";
 import {
   Select,
   SelectContent,
@@ -513,9 +514,12 @@ export default function ShopPage() {
     };
   }, []);
 
-  // Products State
-  const [products, setProducts] = useState<ClientShopProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Products State - initialize from cached live products for instant paint
+  const [products, setProducts] = useState<ClientShopProduct[]>(() => {
+    const list = getLiveProductsList();
+    return list.filter((p: any) => p.isPublished !== false && p.status !== "Draft");
+  });
+  const [loading, setLoading] = useState(() => getLiveProductsList().length === 0);
 
   // Explode products into variant display items for Shop Page
   const allShopItems = useMemo(() => {
@@ -669,7 +673,7 @@ export default function ShopPage() {
   useEffect(() => {
     async function loadProducts() {
       try {
-        setLoading(true);
+        if (products.length === 0) setLoading(true);
         await fetchLiveProducts();
         const stored = getLiveProductsList();
         const published = stored.filter(
@@ -1135,9 +1139,17 @@ export default function ShopPage() {
                   ({allShopItems.length})
                 </span>
               </button>
-            </li>            {(liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || []))
-              .filter((c: any) => c && c.name && c.isActive !== false)
-              .map((cat: any) => {
+            </li>
+            {((liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || [])).filter((c: any) => c && c.name && c.isActive !== false)).length === 0 ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <li key={`cat-filter-skel-${i}`} className="py-1">
+                  <div className="h-4 bg-zinc-200/70 rounded w-3/4 animate-pulse" />
+                </li>
+              ))
+            ) : (
+              (liveCategoriesList.length > 0 ? liveCategoriesList : (filterConfig?.categories || []))
+                .filter((c: any) => c && c.name && c.isActive !== false)
+                .map((cat: any) => {
                 const catKey = cat.name;
                 const catName = cat.name;
                 const isActive = (selectedCategory || "").toLowerCase() === catKey.toLowerCase();
@@ -1170,7 +1182,8 @@ export default function ShopPage() {
                     </button>
                   </li>
                 );
-              })}
+              })
+            )}
           </ul>
         )}
       </div>
@@ -1496,7 +1509,12 @@ export default function ShopPage() {
               }`}
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
-              {dynamicShopCategories.map((cat) => {
+              {dynamicShopCategories.length === 0 ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <ShopCategoryItemSkeleton key={`shop-cat-skel-${i}`} />
+                ))
+              ) : (
+                dynamicShopCategories.map((cat) => {
                 const active = cat.id === "all"
                   ? (!selectedCategory || selectedCategory.toLowerCase() === "all")
                   : (selectedCategory?.toLowerCase() === cat.id.toLowerCase());
@@ -1537,7 +1555,8 @@ export default function ShopPage() {
                     </button>
                   </div>
                 );
-              })}
+              })
+            )}
             </div>
 
             {/* PAGINATION DOTS (Adapts dynamically to Mobile, Tablet, Laptop, Desktop) */}
@@ -1698,13 +1717,8 @@ export default function ShopPage() {
           <section>
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-zinc-200/80 p-2.5 space-y-3 animate-pulse">
-                    <div className="aspect-[3/3.5] bg-zinc-100 rounded-xl" />
-                    <div className="h-4 bg-zinc-100 rounded w-3/4" />
-                    <div className="h-3 bg-zinc-100 rounded w-1/2" />
-                    <div className="h-9 bg-zinc-100 rounded-xl w-full" />
-                  </div>
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <ShopProductCardSkeleton key={`shop-prod-skel-${i}`} />
                 ))}
               </div>
             ) : displayedProducts.length === 0 ? (

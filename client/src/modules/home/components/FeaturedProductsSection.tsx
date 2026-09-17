@@ -4,6 +4,7 @@ import { gsap } from "gsap";
 import { motion } from "framer-motion";
 import { FiChevronLeft, FiChevronRight, FiArrowRight } from "react-icons/fi";
 import ProductCard from "./ProductCard";
+import { ProductCardSkeleton } from "@/modules/core/components/ClientSkeletons";
 import { subscribeToProductStore, getLiveProductsList, getLiveCategories, subscribeToCategoriesStore } from "@/modules/core/lib/apiStore";
 
 interface FeaturedProps {
@@ -252,7 +253,13 @@ export default function FeaturedProductsSection({ activeTab, setActiveTab }: Fea
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           <div className="flex gap-4 sm:gap-5 md:gap-6 flex-nowrap w-max px-4 sm:px-6">
-            {filteredProducts.length === 0 ? (
+            {liveList.length === 0 ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="shrink-0 w-[82vw] min-w-[280px] max-w-[330px] sm:w-[280px] lg:w-[310px] xl:w-[335px]">
+                  <ProductCardSkeleton />
+                </div>
+              ))
+            ) : filteredProducts.length === 0 ? (
               <div className="py-12 px-6 text-center text-zinc-500 font-medium w-full">
                 No products available in this category.
               </div>

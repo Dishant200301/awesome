@@ -43,8 +43,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
-import { MOCK_ORDERS } from '../data/mockAdminData';
 import { Order } from '../types/admin';
+import { AdminDashboardSkeleton } from '../components/skeletons/AdminSkeletons';
 
 interface DashboardPageProps {
   onNavigate: (tab: string, productId?: string) => void;
@@ -66,49 +66,42 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [reviewsCount, setReviewsCount] = useState<number>(0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const loadStats = React.useCallback(async () => {
-    setLoading(true);
-    const res = await AdminApiService.getDashboardStats();
-    setStats(res);
+  const loadStats = React.useCallback(async (showSkeleton = true) => {
+    if (showSkeleton) setLoading(true);
     try {
+      const res = await AdminApiService.getDashboardStats();
+      if (res) setStats(res);
       const revs = await AdminApiService.getReviews();
       if (Array.isArray(revs)) {
         setReviewsCount(revs.length);
       }
-    } catch (e) {}
-    setLoading(false);
+    } catch (e) {
+      console.warn("Failed to load dashboard stats:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    loadStats();
+    loadStats(true);
 
-    // Listen to real-time events across the admin panel
+    // Listen only to explicit real-time mutation events across the admin panel
     const handleRealtimeSync = () => {
-      loadStats();
+      loadStats(false);
     };
 
-    window.addEventListener('awesome_category_sync', handleRealtimeSync);
     window.addEventListener('awesome_product_sync', handleRealtimeSync);
-    window.addEventListener('awesome_review_sync', handleRealtimeSync);
-    window.addEventListener('aaramly_review_sync', handleRealtimeSync);
-    window.addEventListener('awesome_inventory_sync', handleRealtimeSync);
-    window.addEventListener('awesome_attribute_sync', handleRealtimeSync);
-    window.addEventListener('aaramly_attribute_sync', handleRealtimeSync);
-    window.addEventListener('storage', handleRealtimeSync);
-    window.addEventListener('focus', handleRealtimeSync);
+    window.addEventListener('awesome_category_sync', handleRealtimeSync);
 
     return () => {
-      window.removeEventListener('awesome_category_sync', handleRealtimeSync);
       window.removeEventListener('awesome_product_sync', handleRealtimeSync);
-      window.removeEventListener('awesome_review_sync', handleRealtimeSync);
-      window.removeEventListener('aaramly_review_sync', handleRealtimeSync);
-      window.removeEventListener('awesome_inventory_sync', handleRealtimeSync);
-      window.removeEventListener('awesome_attribute_sync', handleRealtimeSync);
-      window.removeEventListener('aaramly_attribute_sync', handleRealtimeSync);
-      window.removeEventListener('storage', handleRealtimeSync);
-      window.removeEventListener('focus', handleRealtimeSync);
+      window.removeEventListener('awesome_category_sync', handleRealtimeSync);
     };
   }, [loadStats]);
+
+  if (loading && !stats) {
+    return <AdminDashboardSkeleton />;
+  }
 
   const totalProducts = stats?.totalProducts ?? 0;
   const publishedProducts = stats?.publishedProducts ?? 0;
@@ -116,22 +109,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const totalVariants = stats?.totalVariants ?? 0;
   const totalAttributes = stats?.totalAttributes ?? 0;
   const totalCategories = stats?.totalCategories ?? 0;
+  const totalSubcategories = stats?.totalSubcategories ?? 0;
   const totalMessages = stats?.totalMessages ?? 0;
   const lowStockCount = stats?.lowStockCount ?? 0;
 
-  const recentProducts = stats?.recentProducts || [
-    {
-      id: 'prod-1',
-      name: 'Wirefree Padded Soft touch Microfibe',
-      sku: '',
-      price: 799,
-      stock: 100,
-      status: 'Published',
-      isPublished: true,
-      image: 'https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?q=80&w=200'
-    }
-  ];
-
+  const recentProducts = stats?.recentProducts || [];
   const recentMessages = stats?.recentMessages || [];
 
   return (
@@ -271,7 +253,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 </div>
               </div>
               <CardTitle className="text-2xl font-semibold mt-1">{totalCategories}</CardTitle>
-              <CardDescription className="text-[11px] text-neutral-400">Active taxonomy groups</CardDescription>
+              <CardDescription className="text-[11px] text-neutral-400">
+                {totalSubcategories > 0 ? `${totalSubcategories} subcategories active` : 'Active taxonomy groups'}
+              </CardDescription>
             </CardHeader>
           </Card>
         </motion.div>

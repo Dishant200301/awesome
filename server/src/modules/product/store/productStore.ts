@@ -137,21 +137,83 @@ import { syncProductToMySQL, deleteProductFromMySQL, fetchProductsFromMySQL } fr
 
 class ProductStore {
   private products: ProductItem[] = [];
+  private lastRefreshTime: number = 0;
+  private isRefreshing: boolean = false;
+  private refreshPromise: Promise<ProductItem[]> | null = null;
+  private readonly CACHE_TTL_MS: number = 300000; // 5-minute memory cache TTL
 
   constructor() {
     this.refreshFromMySQL();
   }
 
-  public async refreshFromMySQL(): Promise<ProductItem[]> {
-    try {
-      const mysqlProducts = await fetchProductsFromMySQL(false);
-      if (Array.isArray(mysqlProducts)) {
-        this.products = mysqlProducts.map((p) => this.normalizeProduct(p));
+  public async ensureLoaded(force = false): Promise<ProductItem[]> {
+    const isStale = Date.now() - this.lastRefreshTime > this.CACHE_TTL_MS;
+    if (force || this.products.length === 0 || isStale) {
+      if (this.refreshPromise) {
+        return this.refreshPromise;
       }
-    } catch (e) {
-      console.warn("[ProductStore] Error loading products from MySQL:", (e as Error).message);
+      return this.refreshFromMySQL();
     }
     return this.products;
+  }
+
+  public async refreshFromMySQL(): Promise<ProductItem[]> {
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const mysqlProducts = await fetchProductsFromMySQL(false);
+        if (Array.isArray(mysqlProducts)) {
+          this.products = mysqlProducts.map((p) => this.normalizeProduct(p));
+          this.lastRefreshTime = Date.now();
+        }
+      } catch (e) {
+        console.warn("[ProductStore] Error loading products from MySQL:", (e as Error).message);
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+      return this.products;
+    })();
+    return this.refreshPromise;
+  }
+
+  public toSummary(p: ProductItem): any {
+    return {
+      id: p.id,
+      name: p.name,
+      subtitle: p.subtitle || "",
+      brand: p.brand || "Awesome Handmade",
+      category: p.category,
+      subcategory: p.subcategory || p.subCategory || "",
+      subCategory: p.subcategory || p.subCategory || "",
+      categories: p.categories || [p.category],
+      slug: p.slug,
+      sku: p.sku || p.defaultSku,
+      defaultSku: p.defaultSku,
+      barcode: p.barcode || "",
+      regularPrice: p.regularPrice,
+      originalPrice: p.originalPrice,
+      price: p.price,
+      discountPercentage: p.discountPercentage,
+      stock: p.stock,
+      stockQuantity: p.stockQuantity,
+      stockStatus: p.stockStatus,
+      mainImage: p.mainImage,
+      image: p.image,
+      hoverImage: p.hoverImage || "",
+      images: Array.isArray(p.images) ? p.images.slice(0, 3) : [],
+      colors: p.colors || [],
+      rating: p.rating,
+      reviewCount: p.reviewCount,
+      isFeatured: p.isFeatured,
+      isPublished: p.isPublished,
+      status: p.status,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt
+    };
   }
 
   private normalizeProduct(p: any): ProductItem {
@@ -268,11 +330,15 @@ class ProductStore {
     };
   }
 
-  public getAll(onlyPublished = false): ProductItem[] {
+  public getAll(onlyPublished = false, lean = false): ProductItem[] | any[] {
+    let result = this.products;
     if (onlyPublished) {
-      return this.products.filter(p => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive');
+      result = this.products.filter(p => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive');
     }
-    return this.products;
+    if (lean) {
+      return result.map(p => this.toSummary(p));
+    }
+    return result;
   }
 
   public getByIdOrSlug(query: string): ProductItem | undefined {
@@ -425,6 +491,7 @@ class ProductStore {
     maxPrice?: number;
     dateFilter?: string;
     sort?: string;
+    lean?: boolean;
   }) {
     let list = [...this.products];
     const page = Math.max(1, Number(params.page) || 1);
@@ -549,7 +616,8 @@ class ProductStore {
     const total = list.length;
     const totalPages = Math.ceil(total / limit) || 1;
     const startIndex = (page - 1) * limit;
-    const items = list.slice(startIndex, startIndex + limit);
+    const rawItems = list.slice(startIndex, startIndex + limit);
+    const items = params.lean !== false ? rawItems.map((p) => this.toSummary(p)) : rawItems;
 
     return {
       items,

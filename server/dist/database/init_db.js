@@ -100,6 +100,30 @@ export async function initializeMySQLDatabase() {
                 // Safe to ignore if already altered
             }
         }
+        // 5. Ensure high-performance indexes exist for fast queries
+        const indexChecks = [
+            { table: "products", index: "idx_products_cat", cols: "`category_id`" },
+            { table: "products", index: "idx_products_subcat", cols: "`subcategory_id`" },
+            { table: "products", index: "idx_products_pub_status", cols: "`is_published`, `status`" },
+            { table: "products", index: "idx_products_created", cols: "`created_at`" },
+            { table: "products", index: "idx_products_price", cols: "`price`" },
+            { table: "product_variants", index: "idx_variants_prod_id", cols: "`product_id`" },
+            { table: "product_variants", index: "idx_variants_sku", cols: "`sku`" },
+            { table: "product_images", index: "idx_images_prod_id", cols: "`product_id`" },
+            { table: "product_images", index: "idx_images_var_id", cols: "`variant_id`" },
+            { table: "sub_categories", index: "idx_subcats_cat_id", cols: "`category_id`" }
+        ];
+        for (const idx of indexChecks) {
+            try {
+                const [rows] = await connection.query(`SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?`, [config.db.name, idx.table, idx.index]);
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    await connection.query(`CREATE INDEX \`${idx.index}\` ON \`${idx.table}\` (${idx.cols})`);
+                }
+            }
+            catch {
+                // Safe to ignore if index exists or table not ready
+            }
+        }
         console.log(`✅ MySQL Database '${config.db.name}' & all tables successfully initialized!`);
         await connection.end();
         return true;

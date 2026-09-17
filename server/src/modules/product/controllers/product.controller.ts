@@ -27,12 +27,12 @@ export class ProductController {
       req.query.sort
     );
 
-    await productStore.refreshFromMySQL();
+    await productStore.ensureLoaded();
 
     if (hasFilterParams) {
       const result = productStore.queryProducts({
         page: req.query.page ? Number(req.query.page) : 1,
-        limit: req.query.limit ? Number(req.query.limit) : 10,
+        limit: req.query.limit ? Number(req.query.limit) : 20,
         search: req.query.search as string,
         category: req.query.category as string,
         subcategory: req.query.subcategory as string,
@@ -42,7 +42,8 @@ export class ProductController {
         minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
         maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
         dateFilter: req.query.dateFilter as string,
-        sort: req.query.sort as string
+        sort: req.query.sort as string,
+        lean: req.query.full !== "true"
       });
       res.status(200).json({
         success: true,
@@ -52,7 +53,8 @@ export class ProductController {
     }
 
     const isWebsiteClient = req.query.admin !== "true";
-    const products = productStore.getAll(isWebsiteClient);
+    const lean = req.query.full !== "true";
+    const products = productStore.getAll(isWebsiteClient, lean);
     res.status(200).json({
       success: true,
       count: products.length,
@@ -121,7 +123,7 @@ export class ProductController {
 
   // GET /api/v1/products/export
   public static async exportProducts(_req: Request, res: Response): Promise<void> {
-    await productStore.refreshFromMySQL();
+    await productStore.ensureLoaded();
     const products = productStore.getAll(false);
     res.status(200).json({ success: true, data: products });
   }
@@ -129,7 +131,7 @@ export class ProductController {
   // GET /api/v1/products/:query
   public static async getProductByIdOrSlug(req: Request, res: Response): Promise<void> {
     const { query } = req.params;
-    await productStore.refreshFromMySQL();
+    await productStore.ensureLoaded();
     const product = productStore.getByIdOrSlug(query);
 
     if (!product) {

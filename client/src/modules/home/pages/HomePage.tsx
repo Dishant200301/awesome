@@ -4,13 +4,10 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navbar from "@/modules/core/components/Navbar";
 import Footer from "@/modules/core/components/Footer";
 import HeroSection from "../components/HeroSection";
-import CuratedEditSection from "../components/CuratedEditSection";
 import FeaturedCategoriesSection from "../components/FeaturedCategoriesSection";
-import ExplainerSection from "../components/ExplainerSection";
 import FeaturedProductsSection from "../components/FeaturedProductsSection";
 import PromoBannerSection from "../components/PromoBannerSection";
 import BestSellingSection from "../components/BestSellingSection";
-import PopularCategoriesSection from "../components/PopularCategoriesSection";
 import BentoGridSection from "../components/BentoGridSection";
 import WatchShopSection from "../components/WatchShopSection";
 import WhyChooseUsSection from "../components/WhyChooseUsSection";
@@ -49,13 +46,11 @@ export default function HomePage() {
     <main className="bg-white text-black">
       <Navbar />
       <HeroSection />
-      {/* <CuratedEditSection /> */}
       <FeaturedCategoriesSection onSelectCategory={(cat) => setActiveTab(cat)} />
       <BentoGridSection />
       <FeaturedProductsSection activeTab={activeTab} setActiveTab={setActiveTab} />
       <PromoBannerSection />
       <BestSellingSection />
-      {/* <PopularCategoriesSection /> */}
       <WatchShopSection />
       <WhyChooseUsSection />
       <Footer />

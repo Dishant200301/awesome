@@ -164,16 +164,18 @@ export const HeroSection: React.FC = () => {
 
     const btnClass = customClass || (isMobile ? defaultMobileClass : defaultDesktopClass);
 
+    const accessibleLabel = slide.title ? `${buttonText} - ${slide.title}` : `${buttonText} - Collection ${index + 1}`;
+
     if (isExternal) {
       return (
-        <a href={targetLink} target="_blank" rel="noopener noreferrer" className={btnClass}>
+        <a href={targetLink} target="_blank" rel="noopener noreferrer" className={btnClass} aria-label={accessibleLabel}>
           {buttonText}
         </a>
       );
     }
 
     return (
-      <Link to={targetLink} className={btnClass}>
+      <Link to={targetLink} className={btnClass} aria-label={accessibleLabel}>
         {buttonText}
       </Link>
     );
@@ -613,28 +615,27 @@ export const HeroSection: React.FC = () => {
             return (
               <div key={slide.id || index} className="w-full h-full shrink-0 relative">
                 <div className="w-full h-full relative">
-                  {/* Mobile View (< 768px) */}
-                  <div className="md:hidden relative w-full h-full overflow-hidden">
-                    <img
-                      src={mobileBg}
-                      alt={slide.title || `Hero Slide ${index + 1}`}
-                      className="w-full h-full object-cover object-center pointer-events-none"
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                      draggable={false}
-                    />
-                    {renderSlideOverlay(slide, index, true)}
-                  </div>
-
-                  {/* Desktop, Laptop & Tablet View (>= 768px) */}
-                  <div className="hidden md:block relative w-full h-full overflow-hidden">
-                    <img
-                      src={desktopBg}
-                      alt={slide.title || `Hero Slide ${index + 1}`}
-                      className="w-full h-full object-cover md:object-right lg:object-center pointer-events-none"
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                      draggable={false}
-                    />
-                    {renderSlideOverlay(slide, index, false)}
+                  {/* Responsive Picture Element (Downloads only the device-appropriate image) */}
+                  <div className="relative w-full h-full overflow-hidden">
+                    <picture className="w-full h-full block">
+                      <source media="(max-width: 767px)" srcSet={mobileBg} />
+                      <source media="(min-width: 768px)" srcSet={desktopBg} />
+                      <img
+                        src={desktopBg}
+                        alt={slide.title || `Hero Slide ${index + 1}`}
+                        className="w-full h-full object-cover object-center md:object-right lg:object-center pointer-events-none"
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={index === 0 ? 'high' : 'auto'}
+                        decoding={index === 0 ? 'sync' : 'async'}
+                        draggable={false}
+                      />
+                    </picture>
+                    <div className="md:hidden">
+                      {renderSlideOverlay(slide, index, true)}
+                    </div>
+                    <div className="hidden md:block">
+                      {renderSlideOverlay(slide, index, false)}
+                    </div>
                   </div>
                 </div>
               </div>

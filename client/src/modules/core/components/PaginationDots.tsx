@@ -47,21 +47,21 @@ export const PaginationDots: React.FC<PaginationDotsProps> = ({
               e.stopPropagation();
               onChange(index);
             }}
-            className="relative flex items-center justify-center focus:outline-none transition-all duration-300 cursor-pointer"
+            className="relative flex items-center justify-center focus:outline-none cursor-pointer"
             aria-label={`Go to slide ${index + 1}`}
           >
             {isActive ? (
               <div
-                className={`flex ${sizeClasses.wrapper} items-center justify-center rounded-full border border-[#D8B458] transition-all duration-300`}
+                className={`flex ${sizeClasses.wrapper} items-center justify-center rounded-full border border-[#D8B458]`}
               >
                 <span
-                  className={`${sizeClasses.activeDot} rounded-full bg-gradient-to-r from-[#F7E7B4] via-[#D8B458] to-[#B38728] shadow-xs`}
+                  className={`${sizeClasses.activeDot} rounded-full bg-[#D8B458] shadow-xs`}
                 />
               </div>
             ) : (
               <div className={`flex ${sizeClasses.wrapper} items-center justify-center`}>
                 <span
-                  className={`${sizeClasses.inactiveDot} rounded-full bg-zinc-400/80 hover:bg-zinc-600 transition-colors`}
+                  className={`${sizeClasses.inactiveDot} rounded-full bg-zinc-400/80 hover:bg-zinc-600 transition-opacity`}
                 />
               </div>
             )}

@@ -1,6 +1,404 @@
 {
-  "categories": [],
-  "subcategories": [],
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "Gift Hamper",
+      "slug": "gift-hamper",
+      "key": "Gift Hamper",
+      "subcategories": [
+        {
+          "id": "sub-1",
+          "categoryId": "cat-1",
+          "categoryName": "Gift Hamper",
+          "name": "Keychain",
+          "slug": "keychain"
+        }
+      ]
+    },
+    {
+      "id": "cat-2",
+      "name": "Choli",
+      "slug": "choli",
+      "key": "Choli",
+      "subcategories": [
+        {
+          "id": "sub-2",
+          "categoryId": "cat-2",
+          "categoryName": "Choli",
+          "name": "Kids Choli",
+          "slug": "kids-choli"
+        },
+        {
+          "id": "sub-3",
+          "categoryId": "cat-2",
+          "categoryName": "Choli",
+          "name": "Adult Choli",
+          "slug": "adult-choli"
+        }
+      ]
+    },
+    {
+      "id": "cat-3",
+      "name": "Krishna Outfit",
+      "slug": "krishna-outfit",
+      "key": "Krishna Outfit",
+      "subcategories": [
+        {
+          "id": "sub-5",
+          "categoryId": "cat-3",
+          "categoryName": "Krishna Outfit",
+          "name": "Mirror Latkan",
+          "slug": "mirror-latkan"
+        }
+      ]
+    },
+    {
+      "id": "cat-1788347632497",
+      "name": "efef",
+      "slug": "efef",
+      "key": "efef",
+      "subcategories": [
+        {
+          "id": "sub-1788347656976",
+          "categoryId": "cat-1788347632497",
+          "categoryName": "efef",
+          "name": "fefe",
+          "slug": "fefe"
+        }
+      ]
+    },
+    {
+      "id": "cat-10",
+      "name": "Waist Belt",
+      "slug": "waist-belt",
+      "key": "Waist Belt",
+      "subcategories": [
+        {
+          "id": "sub-17",
+          "categoryId": "cat-10",
+          "categoryName": "Waist Belt",
+          "name": "Mirror Waist Belt",
+          "slug": "mirror-waist-belt"
+        }
+      ]
+    },
+    {
+      "id": "cat-11",
+      "name": "Earrings",
+      "slug": "earrings",
+      "key": "Earrings",
+      "subcategories": [
+        {
+          "id": "sub-18",
+          "categoryId": "cat-11",
+          "categoryName": "Earrings",
+          "name": "Mirror Earrings",
+          "slug": "mirror-earrings"
+        },
+        {
+          "id": "sub-19",
+          "categoryId": "cat-11",
+          "categoryName": "Earrings",
+          "name": "Hoop Earrings",
+          "slug": "hoop-earrings"
+        }
+      ]
+    },
+    {
+      "id": "cat-12",
+      "name": "Anklet",
+      "slug": "anklet",
+      "key": "Anklet",
+      "subcategories": []
+    },
+    {
+      "id": "cat-4",
+      "name": "Necklace",
+      "slug": "necklace",
+      "key": "Necklace",
+      "subcategories": [
+        {
+          "id": "sub-4",
+          "categoryId": "cat-4",
+          "categoryName": "Necklace",
+          "name": "Mirror Necklace",
+          "slug": "mirror-necklace"
+        }
+      ]
+    },
+    {
+      "id": "cat-5",
+      "name": "Latkan",
+      "slug": "latkan",
+      "key": "Latkan",
+      "subcategories": [
+        {
+          "id": "sub-10",
+          "categoryId": "cat-5",
+          "categoryName": "Latkan",
+          "name": "Crochet Latkan",
+          "slug": "crochet-latkan"
+        },
+        {
+          "id": "sub-6",
+          "categoryId": "cat-5",
+          "categoryName": "Latkan",
+          "name": "Blouse Latkan",
+          "slug": "blouse-latkan"
+        },
+        {
+          "id": "sub-7",
+          "categoryId": "cat-5",
+          "categoryName": "Latkan",
+          "name": "Mirror Wall Decor",
+          "slug": "mirror-wall-decor"
+        },
+        {
+          "id": "sub-8",
+          "categoryId": "cat-5",
+          "categoryName": "Latkan",
+          "name": "Fabric Latkan",
+          "slug": "fabric-latkan"
+        },
+        {
+          "id": "sub-9",
+          "categoryId": "cat-5",
+          "categoryName": "Latkan",
+          "name": "Golden Latkan",
+          "slug": "golden-latkan"
+        }
+      ]
+    },
+    {
+      "id": "cat-6",
+      "name": "Tassel",
+      "slug": "tassel",
+      "key": "Tassel",
+      "subcategories": [
+        {
+          "id": "sub-11",
+          "categoryId": "cat-6",
+          "categoryName": "Tassel",
+          "name": "Long Tassels",
+          "slug": "long-tassels"
+        }
+      ]
+    },
+    {
+      "id": "cat-7",
+      "name": "Hair Accessories",
+      "slug": "hair-accessories",
+      "key": "Hair Accessories",
+      "subcategories": [
+        {
+          "id": "sub-12",
+          "categoryId": "cat-7",
+          "categoryName": "Hair Accessories",
+          "name": "Hair Bow",
+          "slug": "hair-bow"
+        },
+        {
+          "id": "sub-13",
+          "categoryId": "cat-7",
+          "categoryName": "Hair Accessories",
+          "name": "Hair Clip",
+          "slug": "hair-clip"
+        },
+        {
+          "id": "sub-14",
+          "categoryId": "cat-7",
+          "categoryName": "Hair Accessories",
+          "name": "Hair Band",
+          "slug": "hair-band"
+        }
+      ]
+    },
+    {
+      "id": "cat-8",
+      "name": "Watch",
+      "slug": "watch",
+      "key": "Watch",
+      "subcategories": [
+        {
+          "id": "sub-15",
+          "categoryId": "cat-8",
+          "categoryName": "Watch",
+          "name": "Kids Watch",
+          "slug": "kids-watch"
+        },
+        {
+          "id": "sub-16",
+          "categoryId": "cat-8",
+          "categoryName": "Watch",
+          "name": "Traditional Watch",
+          "slug": "traditional-watch"
+        }
+      ]
+    },
+    {
+      "id": "cat-9",
+      "name": "Bracelet",
+      "slug": "bracelet",
+      "key": "Bracelet",
+      "subcategories": []
+    },
+    {
+      "id": "cat-1788775635865",
+      "name": "grrr",
+      "slug": "grrr",
+      "key": "grrr",
+      "subcategories": []
+    },
+    {
+      "id": "cat-1788779401372",
+      "name": "u99",
+      "slug": "u99",
+      "key": "u99",
+      "subcategories": []
+    }
+  ],
+  "subcategories": [
+    {
+      "id": "sub-1788347656976",
+      "categoryId": "cat-1788347632497",
+      "categoryName": "efef",
+      "name": "fefe",
+      "slug": "fefe"
+    },
+    {
+      "id": "sub-1",
+      "categoryId": "cat-1",
+      "categoryName": "Gift Hamper",
+      "name": "Keychain",
+      "slug": "keychain"
+    },
+    {
+      "id": "sub-10",
+      "categoryId": "cat-5",
+      "categoryName": "Latkan",
+      "name": "Crochet Latkan",
+      "slug": "crochet-latkan"
+    },
+    {
+      "id": "sub-11",
+      "categoryId": "cat-6",
+      "categoryName": "Tassel",
+      "name": "Long Tassels",
+      "slug": "long-tassels"
+    },
+    {
+      "id": "sub-12",
+      "categoryId": "cat-7",
+      "categoryName": "Hair Accessories",
+      "name": "Hair Bow",
+      "slug": "hair-bow"
+    },
+    {
+      "id": "sub-13",
+      "categoryId": "cat-7",
+      "categoryName": "Hair Accessories",
+      "name": "Hair Clip",
+      "slug": "hair-clip"
+    },
+    {
+      "id": "sub-14",
+      "categoryId": "cat-7",
+      "categoryName": "Hair Accessories",
+      "name": "Hair Band",
+      "slug": "hair-band"
+    },
+    {
+      "id": "sub-15",
+      "categoryId": "cat-8",
+      "categoryName": "Watch",
+      "name": "Kids Watch",
+      "slug": "kids-watch"
+    },
+    {
+      "id": "sub-16",
+      "categoryId": "cat-8",
+      "categoryName": "Watch",
+      "name": "Traditional Watch",
+      "slug": "traditional-watch"
+    },
+    {
+      "id": "sub-17",
+      "categoryId": "cat-10",
+      "categoryName": "Waist Belt",
+      "name": "Mirror Waist Belt",
+      "slug": "mirror-waist-belt"
+    },
+    {
+      "id": "sub-18",
+      "categoryId": "cat-11",
+      "categoryName": "Earrings",
+      "name": "Mirror Earrings",
+      "slug": "mirror-earrings"
+    },
+    {
+      "id": "sub-19",
+      "categoryId": "cat-11",
+      "categoryName": "Earrings",
+      "name": "Hoop Earrings",
+      "slug": "hoop-earrings"
+    },
+    {
+      "id": "sub-2",
+      "categoryId": "cat-2",
+      "categoryName": "Choli",
+      "name": "Kids Choli",
+      "slug": "kids-choli"
+    },
+    {
+      "id": "sub-3",
+      "categoryId": "cat-2",
+      "categoryName": "Choli",
+      "name": "Adult Choli",
+      "slug": "adult-choli"
+    },
+    {
+      "id": "sub-4",
+      "categoryId": "cat-4",
+      "categoryName": "Necklace",
+      "name": "Mirror Necklace",
+      "slug": "mirror-necklace"
+    },
+    {
+      "id": "sub-5",
+      "categoryId": "cat-3",
+      "categoryName": "Krishna Outfit",
+      "name": "Mirror Latkan",
+      "slug": "mirror-latkan"
+    },
+    {
+      "id": "sub-6",
+      "categoryId": "cat-5",
+      "categoryName": "Latkan",
+      "name": "Blouse Latkan",
+      "slug": "blouse-latkan"
+    },
+    {
+      "id": "sub-7",
+      "categoryId": "cat-5",
+      "categoryName": "Latkan",
+      "name": "Mirror Wall Decor",
+      "slug": "mirror-wall-decor"
+    },
+    {
+      "id": "sub-8",
+      "categoryId": "cat-5",
+      "categoryName": "Latkan",
+      "name": "Fabric Latkan",
+      "slug": "fabric-latkan"
+    },
+    {
+      "id": "sub-9",
+      "categoryId": "cat-5",
+      "categoryName": "Latkan",
+      "name": "Golden Latkan",
+      "slug": "golden-latkan"
+    }
+  ],
   "colors": [
     {
       "name": "Maroon",

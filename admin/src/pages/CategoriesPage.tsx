@@ -32,6 +32,8 @@ import { Button } from '../components/ui/button';
 import { Switch } from '../components/ui/switch';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { AdminApiService } from '../services/adminApi';
+import { AdminTableSkeleton } from '../components/skeletons/AdminSkeletons';
 
 export interface EnhancedCategory extends Category {
   image?: string;
@@ -121,18 +123,14 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
   const loadCategoriesFromServer = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/taxonomies/categories`, {
-        cache: 'no-store',
-        headers: getAdminAuthHeaders()
-      });
-      const json = await res.json();
-      if (json?.data && Array.isArray(json.data.categories)) {
-        const parents = json.data.categories.map((c: any) => ({
+      const data = await AdminApiService.getCategories();
+      if (data && Array.isArray(data.categories)) {
+        const parents = data.categories.map((c: any) => ({
           ...c,
           type: 'parent' as const,
           createdAt: c.createdAt || '2026-01-15'
         }));
-        const subs = (json.data.subcategories || []).map((s: any) => ({
+        const subs = (data.subcategories || []).map((s: any) => ({
           ...s,
           type: 'sub' as const,
           createdAt: s.createdAt || '2026-01-20'
@@ -570,8 +568,10 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ initialTab = 'al
             </div>
           </div>
 
-          {/* EMPTY STATE */}
-          {filteredCategories.length === 0 ? (
+          {/* SKELETON / EMPTY / DATA TABLE */}
+          {isLoading ? (
+            <AdminTableSkeleton rows={6} />
+          ) : filteredCategories.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-3">
               <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
                 <FolderTree className="w-6 h-6" />

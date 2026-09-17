@@ -1,15 +1,18 @@
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
-import ProductDetailsPage from "@/modules/product/pages/ProductDetailsPage";
-import ShopPage from "@/modules/product/pages/ShopPage";
 import HomePage from "@/modules/home/pages/HomePage";
-import WishlistPage from "@/modules/product/pages/WishlistPage";
-import CartPage from "@/modules/product/pages/CartPage";
-import CheckoutPage from "@/modules/checkout/pages/CheckoutPage";
-import OrderSuccessPage from "@/modules/checkout/pages/OrderSuccessPage";
-import AccountPage from "@/modules/user/pages/AccountPage";
-import ContactPage from "@/modules/contact/pages/ContactPage";
-import NotFound from "@/modules/core/components/NotFound";
+
+const ProductDetailsPage = lazy(() => import("@/modules/product/pages/ProductDetailsPage"));
+const ShopPage = lazy(() => import("@/modules/product/pages/ShopPage"));
+const WishlistPage = lazy(() => import("@/modules/product/pages/WishlistPage"));
+const CartPage = lazy(() => import("@/modules/product/pages/CartPage"));
+const CheckoutPage = lazy(() => import("@/modules/checkout/pages/CheckoutPage"));
+const OrderSuccessPage = lazy(() => import("@/modules/checkout/pages/OrderSuccessPage"));
+const AccountPage = lazy(() => import("@/modules/user/pages/AccountPage"));
+const ContactPage = lazy(() => import("@/modules/contact/pages/ContactPage"));
+const NotFound = lazy(() => import("@/modules/core/components/NotFound"));
+
 import ScrollToTop from "@/modules/core/components/ScrollToTop";
 import CartDrawer from "@/modules/core/components/CartDrawer";
 import StickyCartWidget from "@/modules/core/components/StickyCartWidget";
@@ -17,11 +20,9 @@ import AuthModal from "@/modules/core/components/AuthModal";
 import { CartProvider } from "@/modules/product/context/CartContext";
 import { WishlistProvider } from "@/modules/product/context/WishlistContext";
 import { RecentlyViewedProvider } from "@/modules/product/context/RecentlyViewedContext";
-import { CompareProvider } from "@/modules/product/context/CompareContext";
 import { AuthProvider } from "@/modules/core/context/AuthContext";
 import { QuickViewProvider } from "@/modules/product/context/QuickViewContext";
 import MobileProductQuickViewSheet from "@/modules/product/components/MobileProductQuickViewSheet";
-import DesktopProductQuickViewModal from "@/modules/product/components/DesktopProductQuickViewModal";
 
 export default function App() {
   return (
@@ -29,16 +30,15 @@ export default function App() {
       <CartProvider>
         <WishlistProvider>
           <RecentlyViewedProvider>
-            <CompareProvider>
-              <QuickViewProvider>
-                <BrowserRouter>
-                  <ScrollToTop />
-                  <Toaster position="top-center" richColors />
-                  <CartDrawer />
-                  <StickyCartWidget />
-                  <AuthModal />
-                  <MobileProductQuickViewSheet />
-                  <DesktopProductQuickViewModal />
+            <QuickViewProvider>
+              <BrowserRouter>
+                <ScrollToTop />
+                <Toaster position="top-center" richColors />
+                <CartDrawer />
+                <StickyCartWidget />
+                <AuthModal />
+                <MobileProductQuickViewSheet />
+                <Suspense fallback={<div className="min-h-screen bg-white" />}>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/home" element={<HomePage />} />
@@ -61,9 +61,9 @@ export default function App() {
                     <Route path="/product/:id" element={<ProductDetailsPage />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
-                </BrowserRouter>
-              </QuickViewProvider>
-            </CompareProvider>
+                </Suspense>
+              </BrowserRouter>
+            </QuickViewProvider>
           </RecentlyViewedProvider>
         </WishlistProvider>
       </CartProvider>

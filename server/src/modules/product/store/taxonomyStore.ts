@@ -46,6 +46,16 @@ const DEFAULT_SUBCATEGORIES: Subcategory[] = [
 
 let categories: Category[] = [];
 let subcategories: Subcategory[] = [];
+let lastTaxonomyRefresh = 0;
+const TAXONOMY_CACHE_TTL_MS = 300000; // 5 minutes
+
+export const ensureTaxonomiesLoaded = async (force = false): Promise<{ categories: Category[]; subcategories: Subcategory[] }> => {
+  const isStale = Date.now() - lastTaxonomyRefresh > TAXONOMY_CACHE_TTL_MS;
+  if (force || categories.length === 0 || isStale) {
+    return refreshTaxonomiesFromMySQL();
+  }
+  return { categories, subcategories };
+};
 
 export const refreshTaxonomiesFromMySQL = async (): Promise<{ categories: Category[]; subcategories: Subcategory[] }> => {
   try {
@@ -53,6 +63,7 @@ export const refreshTaxonomiesFromMySQL = async (): Promise<{ categories: Catego
     if (data && Array.isArray(data.categories)) {
       categories = data.categories;
       subcategories = data.subcategories || [];
+      lastTaxonomyRefresh = Date.now();
     }
   } catch (err) {
     console.warn("[TaxonomyStore] MySQL read error:", (err as Error).message);

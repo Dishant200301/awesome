@@ -33,12 +33,22 @@ const DEFAULT_SUBCATEGORIES = [
 ];
 let categories = [];
 let subcategories = [];
+let lastTaxonomyRefresh = 0;
+const TAXONOMY_CACHE_TTL_MS = 300000; // 5 minutes
+export const ensureTaxonomiesLoaded = async (force = false) => {
+    const isStale = Date.now() - lastTaxonomyRefresh > TAXONOMY_CACHE_TTL_MS;
+    if (force || categories.length === 0 || isStale) {
+        return refreshTaxonomiesFromMySQL();
+    }
+    return { categories, subcategories };
+};
 export const refreshTaxonomiesFromMySQL = async () => {
     try {
         const data = await fetchCategoriesFromMySQL();
         if (data && Array.isArray(data.categories)) {
             categories = data.categories;
             subcategories = data.subcategories || [];
+            lastTaxonomyRefresh = Date.now();
         }
     }
     catch (err) {

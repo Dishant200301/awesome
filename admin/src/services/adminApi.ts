@@ -1,21 +1,27 @@
-import {
-  MOCK_PRODUCTS,
-  MOCK_CATEGORIES,
-  MOCK_SUBCATEGORIES,
-  MOCK_BRANDS,
-  MOCK_ATTRIBUTES,
-  getGlobalVariantsList,
-  getAdminProducts,
-  deleteAdminProduct,
-  saveStoredProducts
-} from "../data/mockAdminData";
 import { Product, Category, Subcategory, Brand, Attribute, ContactMessage, SizeGuide, HeroSlide, HomepageBanner, AdminReviewItem } from "../types/admin";
-
 import { getAdminApiBase, getAdminAuthHeaders } from "../utils/authHeaders";
 
 const API_BASE = getAdminApiBase();
 
 export class AdminApiService {
+  private static categoriesPromise: Promise<{ categories: Category[]; subcategories: Subcategory[] }> | null = null;
+  private static categoriesCache: { categories: Category[]; subcategories: Subcategory[] } | null = null;
+  private static categoriesCacheTime: number = 0;
+
+  private static dashboardStatsPromise: Promise<any> | null = null;
+  private static dashboardStatsCache: any = null;
+  private static dashboardStatsCacheTime: number = 0;
+
+  private static brandsPromise: Promise<Brand[]> | null = null;
+  private static brandsCache: Brand[] | null = null;
+  private static brandsCacheTime: number = 0;
+
+  public static clearCache() {
+    this.categoriesCache = null;
+    this.dashboardStatsCache = null;
+    this.brandsCache = null;
+  }
+
   private static async request<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
     const isMutation = options?.method && options.method !== 'GET';
     const controller = new AbortController();
@@ -109,36 +115,47 @@ export class AdminApiService {
   }
 
   // Dashboard Stats
-  public static async getDashboardStats() {
-    // Try remote API first directly from database
-    const remote = await this.request<any>("/analytics/dashboard");
-    if (remote) {
-      return remote;
+  public static async getDashboardStats(force = false) {
+    const now = Date.now();
+    if (!force && this.dashboardStatsCache && now - this.dashboardStatsCacheTime < 15000) {
+      return this.dashboardStatsCache;
+    }
+    if (this.dashboardStatsPromise) {
+      return this.dashboardStatsPromise;
     }
 
-    // Fallback sync with products
-    const liveVariants = getGlobalVariantsList();
-    const products = getAdminProducts();
-    const published = products.filter((p) => p.isPublished !== false && p.status !== 'Draft' && p.status !== 'Inactive').length;
-    const draft = products.length - published;
-    const lowStock = products.filter((p) => (p.stock || 0) <= 20);
-    const messages = await this.getContactMessages();
-    const unreadMessages = messages.filter((m) => m.status === 'New');
+    this.dashboardStatsPromise = (async () => {
+      try {
+        const remote = await this.request<any>("/analytics/dashboard");
+        if (remote) {
+          this.dashboardStatsCache = remote;
+          this.dashboardStatsCacheTime = Date.now();
+          return remote;
+        }
+      } catch (err) {
+        console.warn("[AdminApiService] Error fetching dashboard stats:", err);
+      } finally {
+        this.dashboardStatsPromise = null;
+      }
 
-    return {
-      totalProducts: products.length,
-      publishedProducts: published,
-      draftProducts: draft,
-      totalVariants: liveVariants.length,
-      totalCategories: 12,
-      totalAttributes: 6,
-      lowStockCount: lowStock.length,
-      totalMessages: messages.length,
-      unreadMessagesCount: unreadMessages.length,
-      recentProducts: products.slice(0, 5),
-      recentMessages: messages.slice(0, 5),
-      lowStockProducts: lowStock
-    };
+      return {
+        totalProducts: 0,
+        publishedProducts: 0,
+        draftProducts: 0,
+        totalVariants: 0,
+        totalCategories: 0,
+        totalSubcategories: 0,
+        totalAttributes: 0,
+        lowStockCount: 0,
+        totalMessages: 0,
+        unreadMessagesCount: 0,
+        recentProducts: [],
+        recentMessages: [],
+        lowStockProducts: []
+      };
+    })();
+
+    return this.dashboardStatsPromise;
   }
 
   // Product CRUD
@@ -753,14 +770,38 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
   }
 
   // Taxonomies CRUD
-  public static async getCategories(): Promise<{ categories: Category[]; subcategories: Subcategory[] }> {
-    const remote = await this.request<any>("/taxonomies/categories");
-    if (remote?.categories) return remote;
-    if (remote?.data?.categories) return remote.data;
-    return { categories: [], subcategories: [] };
+  public static async getCategories(force = false): Promise<{ categories: Category[]; subcategories: Subcategory[] }> {
+    const now = Date.now();
+    if (!force && this.categoriesCache && now - this.categoriesCacheTime < 30000) {
+      return this.categoriesCache;
+    }
+    if (this.categoriesPromise) {
+      return this.categoriesPromise;
+    }
+
+    this.categoriesPromise = (async () => {
+      try {
+        const remote = await this.request<any>("/taxonomies/categories");
+        let result = { categories: [] as Category[], subcategories: [] as Subcategory[] };
+        if (remote?.categories) result = remote;
+        else if (remote?.data?.categories) result = remote.data;
+        this.categoriesCache = result;
+        this.categoriesCacheTime = Date.now();
+        return result;
+      } catch (e) {
+        console.warn("[AdminApiService] Error fetching categories:", e);
+        return { categories: [], subcategories: [] };
+      } finally {
+        this.categoriesPromise = null;
+      }
+    })();
+
+    return this.categoriesPromise;
   }
 
   public static async createCategory(data: Partial<Category>): Promise<Category> {
+    this.categoriesCache = null;
+    this.dashboardStatsCache = null;
     const remote = await this.request<any>("/taxonomies/categories", {
       method: "POST",
       body: JSON.stringify(data)
@@ -778,6 +819,8 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
   }
 
   public static async deleteCategory(id: string): Promise<boolean> {
+    this.categoriesCache = null;
+    this.dashboardStatsCache = null;
     const res = await this.request<any>(`/taxonomies/categories/${id}`, {
       method: "DELETE"
     });
@@ -785,6 +828,8 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
   }
 
   public static async updateCategory(id: string, data: Partial<Category>): Promise<Category | null> {
+    this.categoriesCache = null;
+    this.dashboardStatsCache = null;
     const remote = await this.request<any>(`/taxonomies/categories/${id}`, {
       method: "PUT",
       body: JSON.stringify(data)
@@ -794,6 +839,8 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
   }
 
   public static async createSubcategory(data: Partial<Subcategory>): Promise<Subcategory | null> {
+    this.categoriesCache = null;
+    this.dashboardStatsCache = null;
     const remote = await this.request<any>("/taxonomies/subcategories", {
       method: "POST",
       body: JSON.stringify(data)
@@ -803,6 +850,8 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
   }
 
   public static async updateSubcategory(id: string, data: Partial<Subcategory>): Promise<Subcategory | null> {
+    this.categoriesCache = null;
+    this.dashboardStatsCache = null;
     const remote = await this.request<any>(`/taxonomies/subcategories/${id}`, {
       method: "PUT",
       body: JSON.stringify(data)
@@ -812,17 +861,40 @@ Return ONLY a single raw valid JSON object with this exact schema (no markdown t
   }
 
   public static async deleteSubcategory(id: string): Promise<boolean> {
+    this.categoriesCache = null;
+    this.dashboardStatsCache = null;
     const res = await this.request<any>(`/taxonomies/subcategories/${id}`, {
       method: "DELETE"
     });
     return !!res;
   }
 
-  public static async getBrands(): Promise<Brand[]> {
-    const remote = await this.request<any>("/taxonomies/brands");
-    if (Array.isArray(remote)) return remote;
-    if (Array.isArray(remote?.data)) return remote.data;
-    return [];
+  public static async getBrands(force = false): Promise<Brand[]> {
+    const now = Date.now();
+    if (!force && this.brandsCache && now - this.brandsCacheTime < 60000) {
+      return this.brandsCache;
+    }
+    if (this.brandsPromise) {
+      return this.brandsPromise;
+    }
+
+    this.brandsPromise = (async () => {
+      try {
+        const remote = await this.request<any>("/taxonomies/brands");
+        let result: Brand[] = [];
+        if (Array.isArray(remote)) result = remote;
+        else if (Array.isArray(remote?.data)) result = remote.data;
+        this.brandsCache = result;
+        this.brandsCacheTime = Date.now();
+        return result;
+      } catch (e) {
+        return [];
+      } finally {
+        this.brandsPromise = null;
+      }
+    })();
+
+    return this.brandsPromise;
   }
 
   public static async getAttributes(): Promise<Attribute[]> {

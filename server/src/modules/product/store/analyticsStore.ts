@@ -1,5 +1,5 @@
 import { productStore } from "./productStore.js";
-import { getCategoriesStore, getAttributesStore } from "./taxonomyStore.js";
+import { getCategoriesStore, getSubcategoriesStore, getAttributesStore } from "./taxonomyStore.js";
 import { getContactMessagesSync } from "./contactStore.js";
 
 export interface DashboardAnalytics {
@@ -8,6 +8,7 @@ export interface DashboardAnalytics {
   draftProducts: number;
   totalVariants: number;
   totalCategories: number;
+  totalSubcategories: number;
   totalAttributes: number;
   lowStockCount: number;
   totalMessages: number;
@@ -20,6 +21,7 @@ export interface DashboardAnalytics {
 export const getDashboardAnalyticsStore = (): DashboardAnalytics => {
   const products = productStore.getAll(false);
   const categories = getCategoriesStore();
+  const subcategories = getSubcategoriesStore();
   const attributes = getAttributesStore();
   const messages = getContactMessagesSync();
 
@@ -51,9 +53,9 @@ export const getDashboardAnalyticsStore = (): DashboardAnalytics => {
     name: p.name,
     category: p.category,
     price: p.price,
-    stock: p.stock !== undefined ? p.stock : 100,
+    stock: p.stock !== undefined ? p.stock : 0,
     status: p.isPublished || p.status === 'Published' ? 'Published' : 'Draft',
-    image: p.image || p.images?.[0]?.url || p.images?.[0] || 'https://images.unsplash.com/photo-1596484552834-6a58f850e0a1'
+    image: p.image || p.mainImage || (Array.isArray(p.images) ? p.images[0] : '') || ''
   }));
 
   const recentMessages = messages.slice(0, 5);
@@ -65,6 +67,7 @@ export const getDashboardAnalyticsStore = (): DashboardAnalytics => {
     draftProducts,
     totalVariants,
     totalCategories: categories.length,
+    totalSubcategories: subcategories.length,
     totalAttributes: attributes.length,
     lowStockCount: lowStockProducts.length,
     totalMessages: messages.length,

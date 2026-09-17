@@ -15,7 +15,6 @@ import { ProductColorVariation, ProductDetails } from "../types/product";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import { ShareModal } from "./ShareModal";
-import { DynamicLucideIcon } from "../../core/components/DynamicLucideIcon";
 
 
 interface ProductInfoProps {

@@ -70,7 +70,8 @@ export function AwesomeLogo({ className = "h-9 w-9" }: { className?: string }) {
     >
       <img
         src={LOGO}
-        alt="Awesome Handmade"
+        alt=""
+        aria-hidden="true"
         className={`${className} rounded-full object-cover shadow-sm border border-brand-gold/30 group-hover:scale-105 transition-transform shrink-0`}
       />
       <div className="leading-none text-left">
@@ -81,8 +82,6 @@ export function AwesomeLogo({ className = "h-9 w-9" }: { className?: string }) {
     </Link>
   );
 }
-
-export const AaramlyLogo = AwesomeLogo;
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -223,7 +222,8 @@ export default function Navbar() {
               >
                 <img
                   src={LOGO}
-                  alt="Awesome Handmade"
+                  alt=""
+                  aria-hidden="true"
                   className="h-9 w-9 sm:h-10 sm:w-10 min-[1024px]:h-11 min-[1024px]:w-11 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform border border-brand-gold/30 shrink-0"
                 />
                 <div className="leading-none text-left">
@@ -424,7 +424,7 @@ export default function Navbar() {
               }}
               className="flex items-center gap-2 cursor-pointer"
             >
-              <img src={LOGO} alt="Awesome Handmade" className="h-9 w-9 rounded-full object-cover shadow-sm border border-brand-gold/30" />
+              <img src={LOGO} alt="" aria-hidden="true" className="h-9 w-9 rounded-full object-cover shadow-sm border border-brand-gold/30" />
               <span className="font-heading text-base font-bold text-brand-ink">Awesome <span className="text-brand-maroon">Handmade</span></span>
             </Link>
             <button onClick={() => setOpen(false)} aria-label="Close menu" className="grid h-9 w-9 place-items-center rounded-full hover:bg-gray-200 cursor-pointer">

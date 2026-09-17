@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getLiveCategories, subscribeToProductStore, subscribeToFilterStore, subscribeToCategoriesStore } from '@/modules/core/lib/apiStore';
+import { getLiveCategories, fetchLiveCategories, subscribeToProductStore, subscribeToFilterStore, subscribeToCategoriesStore } from '@/modules/core/lib/apiStore';
+import { FeaturedCategoriesSkeleton } from '@/modules/core/components/ClientSkeletons';
 
 interface FeaturedCategoriesProps {
   onSelectCategory?: (key: string) => void;
@@ -20,6 +21,13 @@ export const FeaturedCategoriesSection: React.FC<FeaturedCategoriesProps> = ({ o
     const updateCategories = () => {
       setLiveCategories(getLiveCategories());
     };
+
+    // If categories are empty on initial mount, trigger fetch
+    if (getLiveCategories().length === 0) {
+      fetchLiveCategories().then(() => {
+        setLiveCategories(getLiveCategories());
+      });
+    }
 
     const unsubProd = subscribeToProductStore(updateCategories);
     const unsubFilter = subscribeToFilterStore(updateCategories);
@@ -79,36 +87,6 @@ export const FeaturedCategoriesSection: React.FC<FeaturedCategoriesProps> = ({ o
     }
   };
 
-  const renderCategoryCard = (cat: any, index: number) => (
-    <div
-      key={cat.slug || index}
-      className="shrink-0 w-[calc((100vw-32px)/3.5)] sm:w-[calc((100vw-48px)/4.5)] lg:w-[calc((min(1500px,100vw)-48px)/5.5)]"
-    >
-      <Link
-        to={`/shop?category=${encodeURIComponent(cat.slug)}`}
-        onClick={(e) => handleCategoryClick(e, cat.slug)}
-        className="group flex flex-col items-center text-center cursor-pointer block"
-        draggable={false}
-      >
-        {/* Square Image Box */}
-        <div className="relative aspect-square w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-white shadow-xs border border-[#EDE5DA] group-hover:shadow-md transition-all duration-300">
-          <img
-            src={cat.image}
-            alt={cat.name}
-            className="w-full h-full object-cover object-center group-hover:scale-108 transition-transform duration-500 pointer-events-none"
-            loading="lazy"
-            draggable={false}
-          />
-        </div>
-
-        {/* Clean Category Title below the square image */}
-        <h3 className="mt-2 sm:mt-2.5 text-[11px] sm:text-xs md:text-sm font-heading font-bold text-brand-ink group-hover:text-brand-maroon transition-colors text-center leading-tight line-clamp-1 uppercase tracking-wide">
-          {cat.name}
-        </h3>
-      </Link>
-    </div>
-  );
-
   return (
     <section id="categories" className="scroll-mt-20 md:scroll-mt-24 py-8 sm:py-12 md:py-16 overflow-hidden pr-0 mr-0">
       {/* Section Heading aligned with Navbar */}
@@ -129,18 +107,79 @@ export const FeaturedCategoriesSection: React.FC<FeaturedCategoriesProps> = ({ o
           className={`overflow-x-auto no-scrollbar scroll-smooth space-y-3.5 sm:space-y-5 md:space-y-6 pb-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'
             }`}
         >
-          {/* Row 1 (6 categories) */}
-          <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max px-4 sm:px-6">
-            {topRowCategories.map((cat, idx) => renderCategoryCard(cat, idx))}
-          </div>
+          {liveCategories.length === 0 ? (
+            <FeaturedCategoriesSkeleton itemsPerRow={6} />
+          ) : (
+            <>
+              {/* Row 1 */}
+              <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max px-4 sm:px-6">
+                {topRowCategories.map((cat, idx) => (
+                  <CategoryCardItem
+                    key={cat.slug || idx}
+                    cat={cat}
+                    onClick={handleCategoryClick}
+                  />
+                ))}
+              </div>
 
-          {/* Row 2 (6 categories) */}
-          <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max px-4 sm:px-6">
-            {bottomRowCategories.map((cat, idx) => renderCategoryCard(cat, idx + 6))}
-          </div>
+              {/* Row 2 */}
+              <div className="flex gap-2.5 sm:gap-4 md:gap-5 flex-nowrap w-max px-4 sm:px-6">
+                {bottomRowCategories.map((cat, idx) => (
+                  <CategoryCardItem
+                    key={cat.slug || (idx + midIndex)}
+                    cat={cat}
+                    onClick={handleCategoryClick}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </section>
+  );
+};
+
+interface CategoryCardItemProps {
+  cat: any;
+  onClick: (e: React.MouseEvent, catSlug: string) => void;
+}
+
+const CategoryCardItem: React.FC<CategoryCardItemProps> = ({ cat, onClick }) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  return (
+    <div className="shrink-0 w-[calc((100vw-32px)/3.5)] sm:w-[calc((100vw-48px)/4.5)] lg:w-[calc((min(1500px,100vw)-48px)/5.5)]">
+      <Link
+        to={`/shop?category=${encodeURIComponent(cat.slug)}`}
+        onClick={(e) => onClick(e, cat.slug)}
+        className="group flex flex-col items-center text-center cursor-pointer block"
+        draggable={false}
+      >
+        {/* Square Image Box with subtle loading skeleton */}
+        <div className="relative aspect-square w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-neutral-100 shadow-xs border border-[#EDE5DA] group-hover:shadow-md transition-all duration-300">
+          {!imageLoaded && (
+            <div className="absolute inset-0 bg-neutral-200/70 animate-pulse" />
+          )}
+          <img
+            src={cat.image}
+            alt=""
+            aria-hidden="true"
+            onLoad={() => setImageLoaded(true)}
+            className={`w-full h-full object-cover object-center group-hover:scale-108 transition-transform duration-500 pointer-events-none ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            loading="lazy"
+            draggable={false}
+          />
+        </div>
+
+        {/* Clean Category Title below the square image */}
+        <h3 className="mt-2 sm:mt-2.5 text-[11px] sm:text-xs md:text-sm font-heading font-bold text-brand-ink group-hover:text-brand-maroon transition-colors text-center leading-tight line-clamp-1 uppercase tracking-wide">
+          {cat.name}
+        </h3>
+      </Link>
+    </div>
   );
 };
 

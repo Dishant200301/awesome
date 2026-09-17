@@ -1,4 +1,4 @@
-import { refreshTaxonomiesFromMySQL, getBrandsStore, getCollectionsStore, getAttributesStore, createCategoryStore, updateCategoryStore, deleteCategoryStore, createSubcategoryStore, updateSubcategoryStore, deleteSubcategoryStore, createBrandStore, createAttributeStore, addAttributeValueStore, syncAllCategoriesStore } from "../store/taxonomyStore.js";
+import { ensureTaxonomiesLoaded, getBrandsStore, getCollectionsStore, getAttributesStore, createCategoryStore, updateCategoryStore, deleteCategoryStore, createSubcategoryStore, updateSubcategoryStore, deleteSubcategoryStore, createBrandStore, createAttributeStore, addAttributeValueStore, syncAllCategoriesStore } from "../store/taxonomyStore.js";
 const setNoCache = (res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.setHeader("Pragma", "no-cache");
@@ -7,7 +7,7 @@ const setNoCache = (res) => {
 export const getCategories = async (_req, res) => {
     setNoCache(res);
     try {
-        const { categories, subcategories } = await refreshTaxonomiesFromMySQL();
+        const { categories, subcategories } = await ensureTaxonomiesLoaded();
         res.json({ success: true, data: { categories, subcategories } });
     }
     catch (error) {

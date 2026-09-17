@@ -31,6 +31,7 @@ import {
 import { AttributeMaster } from '../types/attribute.types';
 import { AttributeService } from '../services/attributeService';
 import { AdminApiService } from '../services/adminApi';
+import { AdminFormSkeleton } from '../components/skeletons/AdminSkeletons';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { Select } from '../components/ui/select';
 import { findHexByColorName } from '../utils/colorMatcher';
@@ -1093,14 +1094,7 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   };
 
   if (isInitialLoading) {
-    return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <RefreshCw className="w-8 h-8 animate-spin text-neutral-800 mx-auto" />
-          <p className="text-xs text-neutral-500 font-medium">Loading product details...</p>
-        </div>
-      </div>
-    );
+    return <AdminFormSkeleton />;
   }
 
   return (

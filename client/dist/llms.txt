@@ -1,0 +1,13 @@
+# Awesome Handmade
+
+> 100% Handcrafted Indian Heritage Craft, Traditional Jewellery, Bridal Latkans, and Cholis from Surat, Gujarat.
+
+Awesome Handmade is an Indian artisanal storefront offering genuine handcrafted bridal latkans, Gujarati cholis, traditional jewellery, hair accessories, and custom festival hampers.
+
+## Primary Sections & Collections
+- [Shop Catalog](https://www.awesomehandmade.com/shop): Browse all handcrafted products
+- [Bridal Latkans](https://www.awesomehandmade.com/shop?category=Latkan): Traditional Gujarati wedding latkans and tassels
+- [Handmade Cholis](https://www.awesomehandmade.com/shop?category=Choli): Authentic Navratri and wedding designer wear
+- [Heritage Jewellery](https://www.awesomehandmade.com/shop?category=Jewellery): Handcrafted necklaces, earrings, and bangles
+- [Hair Accessories](https://www.awesomehandmade.com/shop?category=Hair_Accessories): Handcrafted clips, scrunchies, and bands
+- [Contact & Bespoke Orders](https://www.awesomehandmade.com/contact): Reach out for personalized craftsmanship

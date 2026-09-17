@@ -3,6 +3,21 @@ import { ProductDetails, ProductColorVariation } from "@/modules/product/types/p
 const rawApiUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandmade.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
 export const API_BASE_URL = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
+// Resilient fetch wrapper with strict timeout to prevent slow network hanging
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 3500): Promise<Response> => {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller ? controller.signal : undefined,
+    });
+    return res;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 // Live Product Store state listeners
 type Listener = () => void;
 const listeners: Set<Listener> = new Set();
@@ -65,41 +80,116 @@ const notifyListeners = () => {
   listeners.forEach((fn) => fn());
 };
 
-// Fetch live products dynamically from MySQL Express backend
-export const fetchLiveProducts = async (): Promise<any[]> => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/products`, { cache: 'no-store' });
-    if (res.ok) {
-      const json = await res.json();
-      const list = json.data?.items || json.data || json.items || json.products;
-      if (Array.isArray(list) && list.length > 0) {
-        liveProducts = sanitizeClientProducts(list).filter(
-          (p: any) => p.isPublished !== false && p.status !== "Draft" && p.status !== "Inactive"
-        );
-        try {
-          if (typeof window !== "undefined") {
-            localStorage.setItem("awesome_cached_products", JSON.stringify(liveProducts));
-          }
-        } catch (e) {}
-        isLoaded = true;
+// Deduplication and memory caching for live products
+let inflightProductsPromise: Promise<any[]> | null = null;
+let lastProductsFetchTime = 0;
+const PRODUCTS_CACHE_TTL = 180_000; // 3 minutes
+
+// Single product in-memory cache & inflight tracker
+const singleProductCache = new Map<string, { product: any; timestamp: number }>();
+const inflightSingleProduct = new Map<string, Promise<any>>();
+
+// Fetch live products dynamically from MySQL Express backend with request deduplication
+export const fetchLiveProducts = async (forceRefresh = false): Promise<any[]> => {
+  const now = Date.now();
+  if (!forceRefresh && liveProducts.length > 0 && (now - lastProductsFetchTime < PRODUCTS_CACHE_TTL)) {
+    return liveProducts;
+  }
+  if (inflightProductsPromise) {
+    return inflightProductsPromise;
+  }
+
+  inflightProductsPromise = (async () => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/products`, {}, 4000);
+      if (res.ok) {
+        const json = await res.json();
+        const list = json.data?.items || json.data || json.items || json.products;
+        if (Array.isArray(list) && list.length > 0) {
+          liveProducts = sanitizeClientProducts(list).filter(
+            (p: any) => p.isPublished !== false && p.status !== "Draft" && p.status !== "Inactive"
+          );
+          lastProductsFetchTime = Date.now();
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("awesome_cached_products", JSON.stringify(liveProducts));
+            }
+          } catch (e) {}
+          isLoaded = true;
+          notifyListeners();
+          return liveProducts;
+        }
+      }
+    } catch (e) {
+      console.warn("Express MySQL backend offline or unreachable.");
+    } finally {
+      inflightProductsPromise = null;
+    }
+
+    // If liveProducts still empty, check localStorage
+    if (liveProducts.length === 0) {
+      const fromStorage = loadInitialProducts();
+      if (fromStorage.length > 0) {
+        liveProducts = fromStorage;
         notifyListeners();
-        return liveProducts;
       }
     }
-  } catch (e) {
-    console.warn("Express MySQL backend offline or unreachable.");
+
+    return liveProducts;
+  })();
+
+  return inflightProductsPromise;
+};
+
+// Fetch single product by id or slug (only requests the needed item)
+export const fetchSingleProduct = async (idOrSlug: string): Promise<any> => {
+  if (!idOrSlug) return null;
+  const now = Date.now();
+  const cached = singleProductCache.get(idOrSlug);
+  if (cached && now - cached.timestamp < PRODUCTS_CACHE_TTL) {
+    return cached.product;
   }
 
-  // If liveProducts still empty, check localStorage
-  if (liveProducts.length === 0) {
-    const fromStorage = loadInitialProducts();
-    if (fromStorage.length > 0) {
-      liveProducts = fromStorage;
-      notifyListeners();
+  // Check if existing in liveProducts and has full rich data
+  const existing = liveProducts.find(p => p.id === idOrSlug || p.slug === idOrSlug);
+  if (existing && existing.descriptionCards && existing.specifications) {
+    singleProductCache.set(idOrSlug, { product: existing, timestamp: now });
+    return existing;
+  }
+
+  if (inflightSingleProduct.has(idOrSlug)) {
+    return inflightSingleProduct.get(idOrSlug)!;
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/products/${encodeURIComponent(idOrSlug)}`, {}, 4000);
+      if (res.ok) {
+        const json = await res.json();
+        const p = json.data?.product || json.data;
+        if (p && !isLegacyAaramlyProduct(p)) {
+          singleProductCache.set(idOrSlug, { product: p, timestamp: Date.now() });
+          if (p.id) singleProductCache.set(p.id, { product: p, timestamp: Date.now() });
+          if (p.slug) singleProductCache.set(p.slug, { product: p, timestamp: Date.now() });
+          
+          // Merge rich details into existing liveProducts entry if present
+          const idx = liveProducts.findIndex(x => x.id === p.id);
+          if (idx >= 0) {
+            liveProducts[idx] = { ...liveProducts[idx], ...p };
+          }
+          return p;
+        }
+      }
+    } catch (e) {
+      console.warn(`Failed to fetch single product ${idOrSlug}:`, e);
+    } finally {
+      inflightSingleProduct.delete(idOrSlug);
     }
-  }
+    return existing || null;
+  })();
 
-  return liveProducts;
+  inflightSingleProduct.set(idOrSlug, promise);
+  return promise;
 };
 
 // Add product from Admin Panel to live store & post to API
@@ -546,9 +636,9 @@ export const getLiveProductById = (idOrSlug?: string): ProductDetails | null => 
       manufacturedBy: 'Awesome Handmade Surat',
       marketdBy: 'Awesome Handmade Surat',
       customerCare: {
-        email: 'support@awesomehandmade.com',
-        phone: '+91 98765 43210',
-        address: 'Surat, Gujarat, India'
+        email: 'pinkallakhani123@gmail.com',
+        phone: '+91 70166 64034',
+        address: '429, Ajanta Shopping Complex, Near Kinari Cinema, Ring Road, Surat, Gujarat 395002'
       }
     },
     relatedProducts: found.relatedProducts || []
@@ -672,7 +762,7 @@ const notifyReviewListeners = () => {
 export const fetchLiveReviews = async (productId?: string): Promise<CustomerReviewItem[]> => {
   try {
     const url = productId ? `${API_BASE_URL}/reviews?productId=${productId}` : `${API_BASE_URL}/reviews`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 3500);
     if (res.ok) {
       const json = await res.json();
       const list = json.data || json;
@@ -886,7 +976,7 @@ let liveFilterData: any = { ...DEFAULT_FILTER_CONFIG };
 
 export const fetchLiveFilters = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/filters`, { cache: 'no-store' });
+    const res = await fetchWithTimeout(`${API_BASE_URL}/filters`, { cache: 'no-store' }, 3500);
     if (res.ok) {
       const json = await res.json();
       if (json.data) {
@@ -1213,47 +1303,66 @@ export const subscribeToCategoriesStore = (listener: () => void) => {
   };
 };
 
-export const fetchLiveCategories = async (): Promise<any[]> => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/taxonomies/categories`, { cache: 'no-store' });
-    if (res.ok) {
-      const json = await res.json();
-      if (json?.data && Array.isArray(json.data.categories)) {
-        allRawCategories = json.data.categories;
-        allRawSubcategories = json.data.subcategories || [];
+let inflightCategoriesPromise: Promise<any[]> | null = null;
+let lastCategoriesFetchTime = 0;
+const CATEGORIES_CACHE_TTL = 180_000; // 3 minutes
 
-        try {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('awesome_cached_categories', JSON.stringify(json.data));
-          }
-        } catch {}
-
-        const activeCategories = json.data.categories.filter((c: any) => c.isActive !== false);
-        const subs = (Array.isArray(json.data.subcategories) ? json.data.subcategories : []).filter((s: any) => s.isActive !== false);
-        liveCategoryData = activeCategories.map((cat: any) => {
-          const parentSubs = subs.filter((s: any) => 
-            s.categoryId === cat.id || s.parentId === cat.id || 
-            (s.categoryName && cat.name && s.categoryName.toLowerCase() === cat.name.toLowerCase()) ||
-            (s.parentName && cat.name && s.parentName.toLowerCase() === cat.name.toLowerCase())
-          );
-          return {
-            ...cat,
-            subs: parentSubs.map((s: any) => ({
-              id: s.id,
-              name: s.name,
-              slug: s.slug || s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-            }))
-          };
-        });
-        categoryListeners.forEach((fn) => fn());
-        notifyListeners();
-        return getLiveCategories();
-      }
-    }
-  } catch (e) {
-    // Express server taxonomy API offline
+export const fetchLiveCategories = async (forceRefresh = false): Promise<any[]> => {
+  const now = Date.now();
+  if (!forceRefresh && liveCategoryData.length > 0 && (now - lastCategoriesFetchTime < CATEGORIES_CACHE_TTL)) {
+    return getLiveCategories();
   }
-  return getLiveCategories();
+  if (inflightCategoriesPromise) {
+    return inflightCategoriesPromise;
+  }
+
+  inflightCategoriesPromise = (async () => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/taxonomies/categories`, {}, 3500);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data && Array.isArray(json.data.categories)) {
+          allRawCategories = json.data.categories;
+          allRawSubcategories = json.data.subcategories || [];
+          lastCategoriesFetchTime = Date.now();
+
+          try {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('awesome_cached_categories', JSON.stringify(json.data));
+            }
+          } catch {}
+
+          const activeCategories = json.data.categories.filter((c: any) => c.isActive !== false);
+          const subs = (Array.isArray(json.data.subcategories) ? json.data.subcategories : []).filter((s: any) => s.isActive !== false);
+          liveCategoryData = activeCategories.map((cat: any) => {
+            const parentSubs = subs.filter((s: any) => 
+              s.categoryId === cat.id || s.parentId === cat.id || 
+              (s.categoryName && cat.name && s.categoryName.toLowerCase() === cat.name.toLowerCase()) ||
+              (s.parentName && cat.name && s.parentName.toLowerCase() === cat.name.toLowerCase())
+            );
+            return {
+              ...cat,
+              subs: parentSubs.map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                slug: s.slug || s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+              }))
+            };
+          });
+          categoryListeners.forEach((fn) => fn());
+          notifyListeners();
+          return getLiveCategories();
+        }
+      }
+    } catch (e) {
+      // Express server taxonomy API offline
+    } finally {
+      inflightCategoriesPromise = null;
+    }
+    return getLiveCategories();
+  })();
+
+  return inflightCategoriesPromise;
 };
 
 export const getLiveCategories = () => {
@@ -1438,7 +1547,7 @@ export const subscribeToPromoBanner = (listener: () => void) => {
 
 export const fetchLiveHeroSlides = async (): Promise<LiveHeroSlide[]> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/content/hero-slides`, { cache: 'no-store' });
+    const res = await fetchWithTimeout(`${API_BASE_URL}/content/hero-slides`, { cache: 'no-store' }, 3500);
     if (res.ok) {
       const json = await res.json();
       if (Array.isArray(json.data) && json.data.length > 0) {
@@ -1457,7 +1566,7 @@ export const getLiveHeroSlides = (): LiveHeroSlide[] => {
 
 export const fetchLivePromoBanner = async (): Promise<LivePromoBanner> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/content/promo-banner`, { cache: 'no-store' });
+    const res = await fetchWithTimeout(`${API_BASE_URL}/content/promo-banner`, { cache: 'no-store' }, 3500);
     if (res.ok) {
       const json = await res.json();
       if (json.data && (json.data.image || json.data.title)) {
@@ -1501,24 +1610,26 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Trigger initial fetch once
-fetchLiveProducts();
-fetchLiveFilters();
-fetchLiveCategories();
-fetchLiveHeroSlides();
-fetchLivePromoBanner();
-fetchLiveReviews();
-
-// Event-driven real-time refresh on window focus
+// Trigger initial fetch non-blockingly during idle time to prevent initial paint contention
 if (typeof window !== 'undefined') {
-  window.addEventListener('focus', () => {
+  const initStoreFetches = () => {
     fetchLiveProducts();
+    fetchLiveFilters();
     fetchLiveCategories();
     fetchLiveHeroSlides();
     fetchLivePromoBanner();
     fetchLiveReviews();
-  });
+  };
+
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(initStoreFetches, { timeout: 2500 });
+  } else {
+    setTimeout(initStoreFetches, 500);
+  }
 }
+
+// Note: Tab focus listeners removed to avoid duplicate API spam on Hostinger.
+// Real-time synchronization is handled via BroadcastChannel and specific events.
 
 
 

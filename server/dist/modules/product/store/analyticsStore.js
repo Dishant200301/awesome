@@ -1,9 +1,10 @@
 import { productStore } from "./productStore.js";
-import { getCategoriesStore, getAttributesStore } from "./taxonomyStore.js";
+import { getCategoriesStore, getSubcategoriesStore, getAttributesStore } from "./taxonomyStore.js";
 import { getContactMessagesSync } from "./contactStore.js";
 export const getDashboardAnalyticsStore = () => {
     const products = productStore.getAll(false);
     const categories = getCategoriesStore();
+    const subcategories = getSubcategoriesStore();
     const attributes = getAttributesStore();
     const messages = getContactMessagesSync();
     const totalProducts = products.length;
@@ -30,9 +31,9 @@ export const getDashboardAnalyticsStore = () => {
         name: p.name,
         category: p.category,
         price: p.price,
-        stock: p.stock !== undefined ? p.stock : 100,
+        stock: p.stock !== undefined ? p.stock : 0,
         status: p.isPublished || p.status === 'Published' ? 'Published' : 'Draft',
-        image: p.image || p.images?.[0]?.url || p.images?.[0] || 'https://images.unsplash.com/photo-1596484552834-6a58f850e0a1'
+        image: p.image || p.mainImage || (Array.isArray(p.images) ? p.images[0] : '') || ''
     }));
     const recentMessages = messages.slice(0, 5);
     const unreadMessagesCount = messages.filter((m) => m.status === 'New').length;
@@ -42,6 +43,7 @@ export const getDashboardAnalyticsStore = () => {
         draftProducts,
         totalVariants,
         totalCategories: categories.length,
+        totalSubcategories: subcategories.length,
         totalAttributes: attributes.length,
         lowStockCount: lowStockProducts.length,
         totalMessages: messages.length,

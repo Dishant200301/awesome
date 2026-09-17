@@ -31,9 +31,9 @@ let blogPosts: BlogPost[] = [];
 let faqItems: FaqItem[] = [];
 let storeSettings: StoreSettings = {
   storeName: "Awesome Handmade",
-  supportEmail: "contact@awesomehandmade.com",
-  supportPhone: "+91 98765 43210",
-  address: "Surat, Gujarat, India",
+  supportEmail: "pinkallakhani123@gmail.com",
+  supportPhone: "+91 70166 64034",
+  address: "429, Ajanta Shopping Complex, Near Kinari Cinema, Ring Road, Surat, Gujarat 395002",
   currency: "INR",
   currencySymbol: "₹",
   freeShippingThreshold: 999,

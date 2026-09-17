@@ -21,11 +21,11 @@ export class ProductController {
             req.query.maxPrice ||
             req.query.dateFilter ||
             req.query.sort);
-        await productStore.refreshFromMySQL();
+        await productStore.ensureLoaded();
         if (hasFilterParams) {
             const result = productStore.queryProducts({
                 page: req.query.page ? Number(req.query.page) : 1,
-                limit: req.query.limit ? Number(req.query.limit) : 10,
+                limit: req.query.limit ? Number(req.query.limit) : 20,
                 search: req.query.search,
                 category: req.query.category,
                 subcategory: req.query.subcategory,
@@ -35,7 +35,8 @@ export class ProductController {
                 minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
                 maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
                 dateFilter: req.query.dateFilter,
-                sort: req.query.sort
+                sort: req.query.sort,
+                lean: req.query.full !== "true"
             });
             res.status(200).json({
                 success: true,
@@ -44,7 +45,8 @@ export class ProductController {
             return;
         }
         const isWebsiteClient = req.query.admin !== "true";
-        const products = productStore.getAll(isWebsiteClient);
+        const lean = req.query.full !== "true";
+        const products = productStore.getAll(isWebsiteClient, lean);
         res.status(200).json({
             success: true,
             count: products.length,
@@ -108,14 +110,14 @@ export class ProductController {
     }
     // GET /api/v1/products/export
     static async exportProducts(_req, res) {
-        await productStore.refreshFromMySQL();
+        await productStore.ensureLoaded();
         const products = productStore.getAll(false);
         res.status(200).json({ success: true, data: products });
     }
     // GET /api/v1/products/:query
     static async getProductByIdOrSlug(req, res) {
         const { query } = req.params;
-        await productStore.refreshFromMySQL();
+        await productStore.ensureLoaded();
         const product = productStore.getByIdOrSlug(query);
         if (!product) {
             res.status(404).json({

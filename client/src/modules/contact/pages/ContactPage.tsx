@@ -161,7 +161,7 @@ export function ContactPage() {
                         type="tel"
                         maxLength={10}
                         pattern="[0-9]*"
-                        placeholder="98243 02072"
+                        placeholder="70166 64034"
                         value={phone}
                         onChange={(e) => {
                           const onlyDigits = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -228,7 +228,7 @@ export function ContactPage() {
                     </p>
                   </div>
                   <p className="text-sm sm:text-base text-zinc-900 font-sans leading-relaxed max-w-xs mx-auto lg:mx-0">
-                    Awesome Handmade, Shop-5, Soham Arcade, Pal Gam, Surat, Gujarat 395009, India
+                    Awesome Handmade, 429, Ajanta Shopping Complex, Near Kinari Cinema, Ring Road, Surat, Gujarat 395002
                   </p>
                 </div>
 
@@ -239,8 +239,8 @@ export function ContactPage() {
                       PHONE & WHATSAPP
                     </p>
                   </div>
-                  <a href="tel:+919824302072" className="text-sm sm:text-base text-brand-maroon font-bold hover:underline">
-                    +91 98243 02072
+                  <a href="tel:+917016664034" className="text-sm sm:text-base text-brand-maroon font-bold hover:underline">
+                    +91 70166 64034
                   </a>
                 </div>
 
@@ -251,8 +251,8 @@ export function ContactPage() {
                       EMAIL ADDRESS
                     </p>
                   </div>
-                  <a href="mailto:hello@awesomehandmade.com" className="text-sm sm:text-base text-zinc-900 hover:text-brand-maroon transition-colors">
-                    hello@awesomehandmade.com
+                  <a href="mailto:pinkallakhani123@gmail.com" className="text-sm sm:text-base text-zinc-900 hover:text-brand-maroon transition-colors">
+                    pinkallakhani123@gmail.com
                   </a>
                 </div>
 
@@ -282,9 +282,9 @@ export function ContactPage() {
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
           <div className="w-full h-[400px] md:h-[480px] bg-zinc-100 overflow-hidden border border-zinc-200 rounded-2xl shadow-xs">
             <iframe
-              title="AOCIND Location Map"
+              title="Awesome Handmade Location Map"
               className="h-full w-full grayscale contrast-125 border-0"
-              src="https://maps.google.com/maps?q=Surat%20Gujarat&t=&z=13&ie=UTF8&iwloc=&output=embed"
+              src="https://maps.google.com/maps?q=Ajanta%20Shopping%20Complex%2C%20Near%20Kinari%20Cinema%2C%20Ring%20Road%2C%20Surat%2C%20Gujarat%20395002&t=&z=16&ie=UTF8&iwloc=&output=embed"
               loading="lazy"
             />
           </div>

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import {
+  ensureTaxonomiesLoaded,
   refreshTaxonomiesFromMySQL,
   getBrandsStore,
   getCollectionsStore,
@@ -25,9 +26,8 @@ const setNoCache = (res: Response) => {
 export const getCategories = async (_req: Request, res: Response) => {
   setNoCache(res);
   try {
-    const { categories, subcategories } = await refreshTaxonomiesFromMySQL();
+    const { categories, subcategories } = await ensureTaxonomiesLoaded();
     res.json({ success: true, data: { categories, subcategories } });
-
   } catch (error) {
     res.status(500).json({ success: false, message: (error as Error).message });
   }

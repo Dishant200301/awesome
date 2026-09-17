@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -12,24 +12,25 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { ProductsPage } from './pages/ProductsPage';
-import { ProductCreatePage } from './pages/ProductCreatePage';
-import { CategoriesPage } from './pages/CategoriesPage';
-import { AttributesPage } from './pages/AttributesPage';
-import { ProductVariantsPage } from './pages/ProductVariantsPage';
-import { InventoryPage } from './pages/InventoryPage';
-import { OrdersPage } from './pages/OrdersPage';
-import { CustomersPage } from './pages/CustomersPage';
-import { ReviewsPage } from './pages/ReviewsPage';
-import { ContentPages } from './pages/ContentPages';
-import { BannersPage } from './pages/BannersPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { SizeGuidesPage } from './pages/SizeGuidesPage';
-import { ContactMessagesPage } from './pages/ContactMessagesPage';
-import { FilterManagementPage } from './pages/FilterManagementPage';
-import { CouponsPage } from './pages/CouponsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
+import { AdminDashboardSkeleton } from './components/skeletons/AdminSkeletons';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage || (m as any).default })));
+const ProductsPage = lazy(() => import('./pages/ProductsPage').then(m => ({ default: m.ProductsPage || (m as any).default })));
+const ProductCreatePage = lazy(() => import('./pages/ProductCreatePage').then(m => ({ default: m.ProductCreatePage || (m as any).default })));
+const CategoriesPage = lazy(() => import('./pages/CategoriesPage').then(m => ({ default: m.CategoriesPage || (m as any).default })));
+const AttributesPage = lazy(() => import('./pages/AttributesPage').then(m => ({ default: m.AttributesPage || (m as any).default })));
+const ProductVariantsPage = lazy(() => import('./pages/ProductVariantsPage').then(m => ({ default: m.ProductVariantsPage || (m as any).default })));
+const InventoryPage = lazy(() => import('./pages/InventoryPage').then(m => ({ default: m.InventoryPage || (m as any).default })));
+const OrdersPage = lazy(() => import('./pages/OrdersPage').then(m => ({ default: m.OrdersPage || (m as any).default })));
+const ReviewsPage = lazy(() => import('./pages/ReviewsPage').then(m => ({ default: m.ReviewsPage || (m as any).default })));
+const ContentPages = lazy(() => import('./pages/ContentPages').then(m => ({ default: m.ContentPages || (m as any).default })));
+const BannersPage = lazy(() => import('./pages/BannersPage').then(m => ({ default: m.BannersPage || (m as any).default })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage || (m as any).default })));
+const SizeGuidesPage = lazy(() => import('./pages/SizeGuidesPage').then(m => ({ default: m.SizeGuidesPage || (m as any).default })));
+const ContactMessagesPage = lazy(() => import('./pages/ContactMessagesPage').then(m => ({ default: m.ContactMessagesPage || (m as any).default })));
+const FilterManagementPage = lazy(() => import('./pages/FilterManagementPage').then(m => ({ default: m.FilterManagementPage || (m as any).default })));
+const CouponsPage = lazy(() => import('./pages/CouponsPage').then(m => ({ default: m.CouponsPage || (m as any).default })));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(m => ({ default: m.AnalyticsPage || (m as any).default })));
 
 function AdminMainContent() {
   const { isAuthenticated } = useAuth();
@@ -264,106 +265,108 @@ function AdminMainContent() {
           onNavigate={handleNavigate}
         />
         <main className="p-4 sm:p-6 md:p-8 overflow-y-auto flex-1 bg-neutral-50/30">
-          <Routes>
-            {/* Dashboard */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage onNavigate={handleNavigate} />} />
-            <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/admin/dashboard" element={<DashboardPage onNavigate={handleNavigate} />} />
+          <Suspense fallback={<AdminDashboardSkeleton />}>
+            <Routes>
+              {/* Dashboard */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage onNavigate={handleNavigate} />} />
+              <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/admin/dashboard" element={<DashboardPage onNavigate={handleNavigate} />} />
 
-            {/* Products & Product Edit / Create */}
-            <Route path="/products" element={<ProductsPage onNavigate={handleNavigate} />} />
-            <Route path="/admin/products" element={<ProductsPage onNavigate={handleNavigate} />} />
-            <Route path="/product" element={<ProductsPage onNavigate={handleNavigate} />} />
-            <Route path="/admin/product" element={<ProductsPage onNavigate={handleNavigate} />} />
-            <Route path="/all-products" element={<ProductsPage onNavigate={handleNavigate} />} />
-            <Route path="/admin/all-products" element={<ProductsPage onNavigate={handleNavigate} />} />
-            
-            <Route path="/products/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/products/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/product/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/product/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/products/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/products/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/product/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/product/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/add-product" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/add-product" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              {/* Products & Product Edit / Create */}
+              <Route path="/products" element={<ProductsPage onNavigate={handleNavigate} />} />
+              <Route path="/admin/products" element={<ProductsPage onNavigate={handleNavigate} />} />
+              <Route path="/product" element={<ProductsPage onNavigate={handleNavigate} />} />
+              <Route path="/admin/product" element={<ProductsPage onNavigate={handleNavigate} />} />
+              <Route path="/all-products" element={<ProductsPage onNavigate={handleNavigate} />} />
+              <Route path="/admin/all-products" element={<ProductsPage onNavigate={handleNavigate} />} />
+              
+              <Route path="/products/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/products/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/product/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/product/new" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/products/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/products/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/product/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/product/create" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/add-product" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/add-product" element={<ProductCreatePage onNavigate={handleNavigate} />} />
 
-            <Route path="/products/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/products/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/product/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/product/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/edit-product/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
-            <Route path="/admin/edit-product/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/products/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/products/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/product/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/product/edit/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/edit-product/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
+              <Route path="/admin/edit-product/:id" element={<ProductCreatePage onNavigate={handleNavigate} />} />
 
-            {/* Categories & Taxonomy */}
-            <Route path="/categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
-            <Route path="/admin/categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
-            <Route path="/category" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
-            <Route path="/admin/category" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
-            <Route path="/all-categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
-            <Route path="/admin/all-categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
-            <Route path="/categories/subcategories" element={<CategoriesPage initialTab="sub-categories" onNavigate={handleNavigate} />} />
-            <Route path="/admin/categories/subcategories" element={<CategoriesPage initialTab="sub-categories" onNavigate={handleNavigate} />} />
+              {/* Categories & Taxonomy */}
+              <Route path="/categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+              <Route path="/admin/categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+              <Route path="/category" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+              <Route path="/admin/category" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+              <Route path="/all-categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+              <Route path="/admin/all-categories" element={<CategoriesPage initialTab="all-categories" onNavigate={handleNavigate} />} />
+              <Route path="/categories/subcategories" element={<CategoriesPage initialTab="sub-categories" onNavigate={handleNavigate} />} />
+              <Route path="/admin/categories/subcategories" element={<CategoriesPage initialTab="sub-categories" onNavigate={handleNavigate} />} />
 
-            {/* Banners & Hero Slider */}
-            <Route path="/banners" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
-            <Route path="/admin/banners" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
-            <Route path="/banner" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
-            <Route path="/hero-slider" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
-            <Route path="/homepage-banners" element={<BannersPage initialTab="homepage-banners" onNavigate={handleNavigate} />} />
+              {/* Banners & Hero Slider */}
+              <Route path="/banners" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
+              <Route path="/admin/banners" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
+              <Route path="/banner" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
+              <Route path="/hero-slider" element={<BannersPage initialTab="hero-slider" onNavigate={handleNavigate} />} />
+              <Route path="/homepage-banners" element={<BannersPage initialTab="homepage-banners" onNavigate={handleNavigate} />} />
 
-            {/* Attributes, Variants & Filters */}
-            <Route path="/attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
-            <Route path="/admin/attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
-            <Route path="/all-attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
-            <Route path="/variants" element={<ProductVariantsPage onNavigate={handleNavigate} />} />
-            <Route path="/admin/variants" element={<ProductVariantsPage onNavigate={handleNavigate} />} />
-            <Route path="/filters" element={<FilterManagementPage />} />
-            <Route path="/admin/filters" element={<FilterManagementPage />} />
+              {/* Attributes, Variants & Filters */}
+              <Route path="/attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
+              <Route path="/admin/attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
+              <Route path="/all-attributes" element={<AttributesPage initialTab="all-attributes" onNavigate={handleNavigate} />} />
+              <Route path="/variants" element={<ProductVariantsPage onNavigate={handleNavigate} />} />
+              <Route path="/admin/variants" element={<ProductVariantsPage onNavigate={handleNavigate} />} />
+              <Route path="/filters" element={<FilterManagementPage />} />
+              <Route path="/admin/filters" element={<FilterManagementPage />} />
 
-            {/* Inventory */}
-            <Route path="/inventory" element={<InventoryPage />} />
-            <Route path="/admin/inventory" element={<InventoryPage />} />
+              {/* Inventory */}
+              <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/admin/inventory" element={<InventoryPage />} />
 
-            {/* Reviews & Feedback (Real-Time Customer Reviews) */}
-            <Route path="/reviews" element={<ReviewsPage />} />
-            <Route path="/admin/reviews" element={<ReviewsPage />} />
-            <Route path="/customer-reviews" element={<ReviewsPage />} />
-            <Route path="/customers" element={<ReviewsPage />} />
-            <Route path="/all-customers" element={<ReviewsPage />} />
+              {/* Reviews & Feedback (Real-Time Customer Reviews) */}
+              <Route path="/reviews" element={<ReviewsPage />} />
+              <Route path="/admin/reviews" element={<ReviewsPage />} />
+              <Route path="/customer-reviews" element={<ReviewsPage />} />
+              <Route path="/customers" element={<ReviewsPage />} />
+              <Route path="/all-customers" element={<ReviewsPage />} />
 
-            {/* Orders */}
-            <Route path="/orders" element={<OrdersPage initialStatusFilter="ALL" />} />
-            <Route path="/admin/orders" element={<OrdersPage initialStatusFilter="ALL" />} />
-            <Route path="/all-orders" element={<OrdersPage initialStatusFilter="ALL" />} />
-            <Route path="/admin/all-orders" element={<OrdersPage initialStatusFilter="ALL" />} />
+              {/* Orders */}
+              <Route path="/orders" element={<OrdersPage initialStatusFilter="ALL" />} />
+              <Route path="/admin/orders" element={<OrdersPage initialStatusFilter="ALL" />} />
+              <Route path="/all-orders" element={<OrdersPage initialStatusFilter="ALL" />} />
+              <Route path="/admin/all-orders" element={<OrdersPage initialStatusFilter="ALL" />} />
 
-            {/* Enquiries & Messages */}
-            <Route path="/enquiries" element={<ContactMessagesPage />} />
-            <Route path="/messages" element={<ContactMessagesPage />} />
-            <Route path="/contact-messages" element={<ContactMessagesPage />} />
+              {/* Enquiries & Messages */}
+              <Route path="/enquiries" element={<ContactMessagesPage />} />
+              <Route path="/messages" element={<ContactMessagesPage />} />
+              <Route path="/contact-messages" element={<ContactMessagesPage />} />
 
-            {/* Size Guides */}
-            <Route path="/size-guides" element={<SizeGuidesPage initialSubTab="all-guides" />} />
-            <Route path="/all-size-guides" element={<SizeGuidesPage initialSubTab="all-guides" />} />
+              {/* Size Guides */}
+              <Route path="/size-guides" element={<SizeGuidesPage initialSubTab="all-guides" />} />
+              <Route path="/all-size-guides" element={<SizeGuidesPage initialSubTab="all-guides" />} />
 
-            {/* Content Pages & Blog */}
-            <Route path="/content-pages" element={<ContentPages initialSubTab="content-pages" />} />
-            <Route path="/website-navigation" element={<ContentPages initialSubTab="content-pages" />} />
+              {/* Content Pages & Blog */}
+              <Route path="/content-pages" element={<ContentPages initialSubTab="content-pages" />} />
+              <Route path="/website-navigation" element={<ContentPages initialSubTab="content-pages" />} />
 
-            {/* Coupons & Analytics */}
-            <Route path="/coupons" element={<CouponsPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/reports" element={<AnalyticsPage />} />
+              {/* Coupons & Analytics */}
+              <Route path="/coupons" element={<CouponsPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/reports" element={<AnalyticsPage />} />
 
-            {/* Settings */}
-            <Route path="/settings" element={<SettingsPage />} />
+              {/* Settings */}
+              <Route path="/settings" element={<SettingsPage />} />
 
-            {/* Catch-all fallback */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+              {/* Catch-all fallback */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>

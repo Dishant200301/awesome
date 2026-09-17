@@ -32,7 +32,7 @@ export default function Footer() {
       id: `msg-${Date.now()}`,
       name: name.trim(),
       email: email.trim(),
-      phone: phone.trim() || '+91 98243 02072',
+      phone: phone.trim() || '+91 70166 64034',
       subject: subject.trim() || 'General Inquiry',
       message: message.trim(),
       date: new Date().toISOString().replace('T', ' ').substring(0, 16),
@@ -90,7 +90,7 @@ export default function Footer() {
               <FaInstagram size={13} />
             </a>
             <a
-              href="https://wa.me/919824302072"
+              href="https://wa.me/917016664034"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="WhatsApp"
@@ -155,15 +155,15 @@ export default function Footer() {
             <p className="font-semibold text-brand-ink">Awesome Handmade</p>
             <p className="flex items-start gap-2">
               <FiMapPin className="text-brand-gold mt-1 shrink-0" size={14} />
-              <span>Shop-5, Soham Arcade, Pal Gam, Surat, Gujarat, India</span>
+              <span>429, Ajanta Shopping Complex, Near Kinari Cinema, Ring Road, Surat, Gujarat 395002</span>
             </p>
             <p className="flex items-center gap-2">
               <FiPhone className="text-brand-gold shrink-0" size={14} />
-              <a href="tel:+919824302072" className="hover:text-brand-maroon font-bold">+91 98243 02072</a>
+              <a href="tel:+917016664034" className="hover:text-brand-maroon font-bold">+91 70166 64034</a>
             </p>
             <p className="flex items-center gap-2">
               <FiMail className="text-brand-gold shrink-0" size={14} />
-              <a href="mailto:hello@awesomehandmade.com" className="hover:text-brand-maroon">hello@awesomehandmade.com</a>
+              <a href="mailto:pinkallakhani123@gmail.com" className="hover:text-brand-maroon">pinkallakhani123@gmail.com</a>
             </p>
           </div>
         </div>
