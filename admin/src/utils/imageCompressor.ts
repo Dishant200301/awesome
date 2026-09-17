@@ -6,9 +6,9 @@
 
 export const compressImage = (
   fileOrDataUrl: File | string,
-  maxWidth = 1600,
-  maxHeight = 1600,
-  quality = 0.82
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.78
 ): Promise<string> => {
   return new Promise((resolve) => {
     // If it's already an external or static URL, skip compression
@@ -93,9 +93,9 @@ export const compressImage = (
  */
 export const compressImages = async (
   files: File[] | FileList,
-  maxWidth = 1600,
-  maxHeight = 1600,
-  quality = 0.82
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.78
 ): Promise<string[]> => {
   const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
   const promises = fileArray.map((file) => compressImage(file, maxWidth, maxHeight, quality));

@@ -290,7 +290,15 @@ class ProductStore {
     });
 
     await syncProductToMySQL(normalized);
-    await this.refreshFromMySQL();
+
+    // Fast in-memory cache update (avoids expensive full database table reload)
+    const existingIndex = this.products.findIndex((p) => p.id === normalized.id);
+    if (existingIndex >= 0) {
+      this.products[existingIndex] = normalized;
+    } else {
+      this.products.unshift(normalized);
+    }
+
     return normalized;
   }
 
@@ -305,14 +313,22 @@ class ProductStore {
 
     const normalized = this.normalizeProduct(merged);
     await syncProductToMySQL(normalized);
-    await this.refreshFromMySQL();
+
+    // Fast in-memory cache update
+    const existingIndex = this.products.findIndex((p) => p.id === id);
+    if (existingIndex >= 0) {
+      this.products[existingIndex] = normalized;
+    } else {
+      this.products.unshift(normalized);
+    }
+
     return normalized;
   }
 
   public async delete(id: string): Promise<boolean> {
     const target = String(id).trim();
     await deleteProductFromMySQL(target);
-    await this.refreshFromMySQL();
+    this.products = this.products.filter((p) => p.id !== target);
     return true;
   }
 
@@ -321,7 +337,8 @@ class ProductStore {
     for (const sid of stringIds) {
       await deleteProductFromMySQL(sid);
     }
-    await this.refreshFromMySQL();
+    const idSet = new Set(stringIds);
+    this.products = this.products.filter((p) => !idSet.has(p.id));
     return stringIds.length;
   }
 
@@ -329,19 +346,19 @@ class ProductStore {
     let count = 0;
     const resolvedStatus = status || (isPublished ? "Active" : "Inactive");
     for (const id of ids) {
-      const p = this.products.find((prod) => prod.id === id);
-      if (p) {
+      const idx = this.products.findIndex((prod) => prod.id === id);
+      if (idx >= 0) {
         const updated = {
-          ...p,
+          ...this.products[idx],
           isPublished,
           status: (resolvedStatus === 'Active' ? 'Published' : resolvedStatus) as any,
           updatedAt: new Date().toISOString()
         };
         await syncProductToMySQL(updated);
+        this.products[idx] = updated;
         count++;
       }
     }
-    await this.refreshFromMySQL();
     return count;
   }
 
@@ -364,7 +381,7 @@ class ProductStore {
     };
 
     await syncProductToMySQL(cloned);
-    await this.refreshFromMySQL();
+    this.products.unshift(cloned);
     return cloned;
   }
 
@@ -388,7 +405,10 @@ class ProductStore {
     };
 
     await syncProductToMySQL(updated);
-    await this.refreshFromMySQL();
+    const idx = this.products.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      this.products[idx] = updated;
+    }
     return updated;
   }
 

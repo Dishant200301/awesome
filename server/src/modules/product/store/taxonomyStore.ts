@@ -148,7 +148,15 @@ export const createCategoryStore = async (data: Partial<Category>): Promise<Cate
   } as any;
 
   await syncCategoryToMySQL(newCat);
-  await refreshTaxonomiesFromMySQL();
+
+  // Fast in-memory update
+  const existingIndex = categories.findIndex((c) => c.id === newCat.id);
+  if (existingIndex >= 0) {
+    categories[existingIndex] = newCat;
+  } else {
+    categories.push(newCat);
+  }
+
   return newCat;
 };
 
@@ -156,13 +164,21 @@ export const updateCategoryStore = async (id: string, data: Partial<Category>): 
   const existing = categories.find((c) => c.id === id);
   const merged = { ...(existing || { id }), ...data };
   await syncCategoryToMySQL(merged);
-  await refreshTaxonomiesFromMySQL();
-  return categories.find((c) => c.id === id) || (merged as Category);
+
+  const idx = categories.findIndex((c) => c.id === id);
+  if (idx >= 0) {
+    categories[idx] = merged as Category;
+  } else {
+    categories.push(merged as Category);
+  }
+
+  return categories[idx] || (merged as Category);
 };
 
 export const deleteCategoryStore = async (id: string): Promise<boolean> => {
   await deleteCategoryFromMySQL(id);
-  await refreshTaxonomiesFromMySQL();
+  categories = categories.filter((c) => c.id !== id);
+  subcategories = subcategories.filter((s) => s.categoryId !== id && (s as any).parentId !== id);
   return true;
 };
 
@@ -184,7 +200,14 @@ export const createSubcategoryStore = async (data: Partial<Subcategory>): Promis
   } as any;
 
   await syncSubcategoryToMySQL(newSub);
-  await refreshTaxonomiesFromMySQL();
+
+  const existingIndex = subcategories.findIndex((s) => s.id === newSub.id);
+  if (existingIndex >= 0) {
+    subcategories[existingIndex] = newSub;
+  } else {
+    subcategories.push(newSub);
+  }
+
   return newSub;
 };
 
@@ -192,13 +215,20 @@ export const updateSubcategoryStore = async (id: string, data: Partial<Subcatego
   const existing = subcategories.find((s) => s.id === id);
   const merged = { ...(existing || { id }), ...data };
   await syncSubcategoryToMySQL(merged);
-  await refreshTaxonomiesFromMySQL();
-  return subcategories.find((s) => s.id === id) || (merged as Subcategory);
+
+  const idx = subcategories.findIndex((s) => s.id === id);
+  if (idx >= 0) {
+    subcategories[idx] = merged as Subcategory;
+  } else {
+    subcategories.push(merged as Subcategory);
+  }
+
+  return subcategories[idx] || (merged as Subcategory);
 };
 
 export const deleteSubcategoryStore = async (id: string): Promise<boolean> => {
   await deleteSubcategoryFromMySQL(id);
-  await refreshTaxonomiesFromMySQL();
+  subcategories = subcategories.filter((s) => s.id !== id);
   return true;
 };
 

@@ -323,57 +323,48 @@ export async function syncProductToMySQL(p) {
         const rawSlug = (p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).trim();
         const rawSku = (p.defaultSku || p.sku || `SKU-${p.id}`).trim();
         const mainImg = p.image || p.mainImage || "";
-        // 1. Resolve category_id if needed
+        // 1. Resolve category_id & subcategory_id in parallel
         let categoryId = null;
-        if (p.category) {
-            try {
-                const [rows] = await sequelize.query(`SELECT id FROM categories WHERE id = ? OR name = ? LIMIT 1`, { replacements: [p.category, p.category] });
-                if (Array.isArray(rows) && rows.length > 0) {
-                    categoryId = rows[0].id;
-                }
-            }
-            catch { }
-        }
-        // 2. Resolve subcategory_id if needed
         let subcategoryId = null;
         const subName = p.subcategory || p.subCategory;
-        if (subName) {
-            try {
-                const [rows] = await sequelize.query(`SELECT id FROM sub_categories WHERE id = ? OR name = ? OR slug = ? LIMIT 1`, { replacements: [subName, subName, subName.toLowerCase().replace(/[^a-z0-9]+/g, "-")] });
-                if (Array.isArray(rows) && rows.length > 0) {
-                    subcategoryId = rows[0].id;
-                }
-            }
-            catch { }
+        const [catRowsRes, subRowsRes] = await Promise.all([
+            p.category
+                ? sequelize.query(`SELECT id FROM categories WHERE id = ? OR name = ? LIMIT 1`, {
+                    replacements: [p.category, p.category]
+                }).catch(() => [[]])
+                : Promise.resolve([[]]),
+            subName
+                ? sequelize.query(`SELECT id FROM sub_categories WHERE id = ? OR name = ? OR slug = ? LIMIT 1`, {
+                    replacements: [subName, subName, subName.toLowerCase().replace(/[^a-z0-9]+/g, "-")]
+                }).catch(() => [[]])
+                : Promise.resolve([[]])
+        ]);
+        if (Array.isArray(catRowsRes[0]) && catRowsRes[0].length > 0) {
+            categoryId = catRowsRes[0][0].id;
         }
-        // 3. Ensure finalSku is strictly unique across all other products
+        if (Array.isArray(subRowsRes[0]) && subRowsRes[0].length > 0) {
+            subcategoryId = subRowsRes[0][0].id;
+        }
+        // 2. Parallelize SKU, Slug uniqueness checks and product existence check
+        const [[existingSkuRows], [existingSlugRows], [existingProdRows]] = await Promise.all([
+            sequelize.query(`SELECT id FROM products WHERE default_sku = ? AND id != ? LIMIT 1`, {
+                replacements: [rawSku, p.id]
+            }),
+            sequelize.query(`SELECT id FROM products WHERE slug = ? AND id != ? LIMIT 1`, {
+                replacements: [rawSlug, p.id]
+            }),
+            sequelize.query(`SELECT id FROM products WHERE id = ? LIMIT 1`, {
+                replacements: [p.id]
+            })
+        ]);
         let finalSku = rawSku;
-        let skuAttempts = 0;
-        while (skuAttempts < 10) {
-            const [existingSkuRows] = await sequelize.query(`SELECT id FROM products WHERE default_sku = ? AND id != ? LIMIT 1`, { replacements: [finalSku, p.id] });
-            if (Array.isArray(existingSkuRows) && existingSkuRows.length > 0) {
-                finalSku = `${rawSku}-${Date.now().toString().slice(-4)}${skuAttempts > 0 ? skuAttempts : ''}`;
-                skuAttempts++;
-            }
-            else {
-                break;
-            }
+        if (Array.isArray(existingSkuRows) && existingSkuRows.length > 0) {
+            finalSku = `${rawSku}-${Date.now().toString().slice(-4)}`;
         }
-        // 4. Ensure finalSlug is strictly unique across all other products
         let finalSlug = rawSlug;
-        let slugAttempts = 0;
-        while (slugAttempts < 10) {
-            const [existingSlugRows] = await sequelize.query(`SELECT id FROM products WHERE slug = ? AND id != ? LIMIT 1`, { replacements: [finalSlug, p.id] });
-            if (Array.isArray(existingSlugRows) && existingSlugRows.length > 0) {
-                finalSlug = `${rawSlug}-${Date.now().toString().slice(-4)}${slugAttempts > 0 ? slugAttempts : ''}`;
-                slugAttempts++;
-            }
-            else {
-                break;
-            }
+        if (Array.isArray(existingSlugRows) && existingSlugRows.length > 0) {
+            finalSlug = `${rawSlug}-${Date.now().toString().slice(-4)}`;
         }
-        // 5. Check if product already exists by ID
-        const [existingProdRows] = await sequelize.query(`SELECT id FROM products WHERE id = ? LIMIT 1`, { replacements: [p.id] });
         const productExists = Array.isArray(existingProdRows) && existingProdRows.length > 0;
         if (productExists) {
             // Direct UPDATE to ensure row with p.id is updated and not another row with duplicate key
@@ -461,13 +452,12 @@ export async function syncProductToMySQL(p) {
             : (Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []);
         if (variations.length > 0) {
             const activeVariantIds = [];
-            for (let i = 0; i < variations.length; i++) {
-                const v = variations[i];
+            const variantQueries = variations.map((v, i) => {
                 const vId = (v.id && !v.id.match(/^var-\d+$/)) ? v.id : `var-${p.id}-${i}`;
                 activeVariantIds.push(vId);
                 const baseVSku = (v.sku && v.sku.trim()) || `${finalSku}-V${i + 1}`;
                 const vSku = baseVSku;
-                await sequelize.query(`INSERT INTO product_variants (
+                return sequelize.query(`INSERT INTO product_variants (
              id, product_id, sku, barcode, color_name, color_hex,
              size_name, price, original_price, cost_price, stock, thumbnail_url, status
            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -497,7 +487,8 @@ export async function syncProductToMySQL(p) {
                         v.status || "Active"
                     ]
                 });
-            }
+            });
+            await Promise.all(variantQueries);
             // Purge old variants for this product not in current set
             if (activeVariantIds.length > 0) {
                 try {
@@ -513,9 +504,10 @@ export async function syncProductToMySQL(p) {
             }
             catch { }
         }
-        // 7. Sync Images
+        // 7. Sync Images in parallel
         const imgList = Array.isArray(p.images) && p.images.length > 0 ? p.images : [mainImg];
         const activeImgIds = [];
+        const imageQueries = [];
         for (let i = 0; i < imgList.length; i++) {
             const url = imgList[i];
             if (!url)
@@ -523,17 +515,16 @@ export async function syncProductToMySQL(p) {
             const imgId = `img-${p.id}-${i}`;
             activeImgIds.push(imgId);
             const safeAlt = `${(p.name || '').slice(0, 180)} image ${i + 1}`;
-            await sequelize.query(`INSERT INTO product_images (id, product_id, variant_id, image_url, alt_text, display_order)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           image_url = VALUES(image_url),
-           alt_text = VALUES(alt_text),
-           display_order = VALUES(display_order)`, {
+            imageQueries.push(sequelize.query(`INSERT INTO product_images (id, product_id, variant_id, image_url, alt_text, display_order)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             image_url = VALUES(image_url),
+             alt_text = VALUES(alt_text),
+             display_order = VALUES(display_order)`, {
                 replacements: [imgId, p.id, null, url, safeAlt, i]
-            });
+            }));
         }
-        // Store each variant's ordered image gallery separately. The storefront
-        // uses this to show the selected colour's main image and thumbnails.
+        // Store each variant's ordered image gallery separately.
         for (let variantIndex = 0; variantIndex < variations.length; variantIndex++) {
             const variant = variations[variantIndex];
             const variantId = (variant.id && !variant.id.match(/^var-\d+$/))
@@ -550,13 +541,13 @@ export async function syncProductToMySQL(p) {
                 const imageUrl = variantUrls[imageIndex];
                 const imageId = `img-${p.id}-var-${variantIndex}-${imageIndex}`;
                 activeImgIds.push(imageId);
-                await sequelize.query(`INSERT INTO product_images (id, product_id, variant_id, image_url, alt_text, display_order)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             variant_id = VALUES(variant_id),
-             image_url = VALUES(image_url),
-             alt_text = VALUES(alt_text),
-             display_order = VALUES(display_order)`, {
+                imageQueries.push(sequelize.query(`INSERT INTO product_images (id, product_id, variant_id, image_url, alt_text, display_order)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+               variant_id = VALUES(variant_id),
+               image_url = VALUES(image_url),
+               alt_text = VALUES(alt_text),
+               display_order = VALUES(display_order)`, {
                     replacements: [
                         imageId,
                         p.id,
@@ -565,8 +556,11 @@ export async function syncProductToMySQL(p) {
                         `${(p.name || '').slice(0, 140)} variant ${variantIndex + 1} image ${imageIndex + 1}`,
                         imageIndex
                     ]
-                });
+                }));
             }
+        }
+        if (imageQueries.length > 0) {
+            await Promise.all(imageQueries);
         }
         if (activeImgIds.length > 0) {
             try {
