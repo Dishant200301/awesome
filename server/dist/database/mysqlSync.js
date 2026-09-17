@@ -6,6 +6,30 @@ export async function fetchCategoriesFromMySQL() {
     try {
         const [catRows] = await sequelize.query(`SELECT * FROM categories ORDER BY created_at ASC`);
         const [subRows] = await sequelize.query(`SELECT * FROM sub_categories ORDER BY created_at ASC`);
+        // Fetch real product counts directly from products table for published/active products
+        const catCountMap = new Map();
+        const subCountMap = new Map();
+        try {
+            const [counts] = await sequelize.query(`
+        SELECT category_id, subcategory_id, COUNT(*) as p_count 
+        FROM products 
+        WHERE is_published = 1 AND (status = 'Published' OR status = 'Active') 
+        GROUP BY category_id, subcategory_id
+      `);
+            if (Array.isArray(counts)) {
+                for (const row of counts) {
+                    if (row.category_id) {
+                        catCountMap.set(row.category_id, (catCountMap.get(row.category_id) || 0) + Number(row.p_count || 0));
+                    }
+                    if (row.subcategory_id) {
+                        subCountMap.set(row.subcategory_id, (subCountMap.get(row.subcategory_id) || 0) + Number(row.p_count || 0));
+                    }
+                }
+            }
+        }
+        catch (err) {
+            console.warn("[MySQL Sync] Error calculating category product counts:", err.message);
+        }
         const categories = (Array.isArray(catRows) ? catRows : []).map((c) => ({
             id: c.id,
             name: c.name,
@@ -17,6 +41,7 @@ export async function fetchCategoriesFromMySQL() {
             metaTitle: c.meta_title || "",
             metaDescription: c.meta_description || "",
             metaKeywords: c.meta_keywords || "",
+            productCount: catCountMap.get(c.id) || 0,
             isActive: c.is_active !== null && c.is_active !== undefined && c.is_active !== 0 && c.is_active !== "0" && Boolean(c.is_active),
             createdAt: c.created_at ? new Date(c.created_at).toISOString().split("T")[0] : "2026-01-15"
         }));
@@ -27,6 +52,7 @@ export async function fetchCategoriesFromMySQL() {
             parentId: s.category_id,
             categoryName: catMap.get(s.category_id) || "",
             parentName: catMap.get(s.category_id) || "",
+            productCount: subCountMap.get(s.id) || 0,
             name: s.name,
             slug: s.slug,
             description: s.description || "",
@@ -271,6 +297,51 @@ export async function fetchProductsFromMySQL(onlyPublished = false) {
             const pImages = imagesMap.get(r.id) || (r.image_url ? [r.image_url] : []);
             const pVariants = variantsMap.get(r.id) || [];
             const mainImg = r.image_url || pImages[0] || "";
+            const isVariable = (r.product_type === "variable" || (r.product_type !== "simple" && pVariants.length > 0)) && pVariants.length > 0;
+            const colorsMap = new Map();
+            if (isVariable) {
+                for (const v of pVariants) {
+                    const cName = (v.colorName || "").trim();
+                    if (!cName)
+                        continue;
+                    const cKey = cName.toLowerCase();
+                    if (!colorsMap.has(cKey)) {
+                        const vImgs = Array.isArray(v.images) ? v.images.map((img) => typeof img === "string" ? img : img.url).filter(Boolean) : [];
+                        const vMain = v.thumbnail || vImgs[0] || mainImg;
+                        colorsMap.set(cKey, {
+                            id: `col-${v.id}`,
+                            colorName: cName,
+                            colorHex: v.colorHex || "#000000",
+                            displayImage: vMain,
+                            mainImage: vMain,
+                            galleryImages: vImgs.length > 0 ? vImgs : (vMain ? [vMain] : []),
+                            sizes: v.sizeName ? [v.sizeName] : []
+                        });
+                    }
+                    else {
+                        const existing = colorsMap.get(cKey);
+                        if (v.sizeName && !existing.sizes.includes(v.sizeName)) {
+                            existing.sizes.push(v.sizeName);
+                        }
+                    }
+                }
+            }
+            else {
+                // Simple product: single color from r.color or first color
+                const singleColorName = (r.color || "").trim();
+                if (singleColorName) {
+                    colorsMap.set(singleColorName.toLowerCase(), {
+                        id: `col-${r.id}`,
+                        colorName: singleColorName,
+                        colorHex: r.color_hex || "#000000",
+                        displayImage: mainImg,
+                        mainImage: mainImg,
+                        galleryImages: pImages,
+                        sizes: []
+                    });
+                }
+            }
+            const pColors = Array.from(colorsMap.values());
             return {
                 id: r.id,
                 name: r.name,
@@ -298,8 +369,13 @@ export async function fetchProductsFromMySQL(onlyPublished = false) {
                 description: r.full_description || r.short_description || "",
                 fullDescription: r.full_description || "",
                 longDescription: r.full_description || "",
-                variations: pVariants,
-                variants: pVariants,
+                productType: isVariable ? "variable" : "simple",
+                type: isVariable ? "Variable" : "Simple",
+                color: !isVariable ? (r.color || "") : "",
+                colorHex: !isVariable ? (r.color_hex || "") : "",
+                colors: pColors,
+                variations: isVariable ? pVariants : [],
+                variants: isVariable ? pVariants : [],
                 rating: r.rating !== undefined && r.rating !== null ? Number(r.rating) : 0,
                 reviewCount: r.review_count !== undefined && r.review_count !== null ? Number(r.review_count) : 0,
                 isFeatured: Boolean(r.is_featured),
@@ -366,10 +442,17 @@ export async function syncProductToMySQL(p) {
             finalSlug = `${rawSlug}-${Date.now().toString().slice(-4)}`;
         }
         const productExists = Array.isArray(existingProdRows) && existingProdRows.length > 0;
+        const variations = Array.isArray(p.variations) && p.variations.length > 0
+            ? p.variations
+            : (Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []);
+        const isVariable = (p.productType === "variable" || p.type === "Variable" || (p.productType !== "simple" && p.type !== "Simple" && variations.length > 0)) && variations.length > 0;
+        const finalProductType = isVariable ? "variable" : "simple";
+        const simpleColor = !isVariable ? (p.color || (p.colors && p.colors[0]?.colorName) || null) : null;
+        const simpleColorHex = !isVariable ? (p.colorHex || (p.colors && p.colors[0]?.colorHex) || null) : null;
         if (productExists) {
             // Direct UPDATE to ensure row with p.id is updated and not another row with duplicate key
             await sequelize.query(`UPDATE products SET
-           name = ?, subtitle = ?, slug = ?, product_type = ?,
+           name = ?, subtitle = ?, slug = ?, product_type = ?, color = ?, color_hex = ?,
            short_description = ?, full_description = ?, price = ?, original_price = ?,
            cost_price = ?, discount_percentage = ?, rating = ?, review_count = ?,
            stock = ?, default_sku = ?, barcode = ?, image_url = ?, is_featured = ?,
@@ -379,7 +462,9 @@ export async function syncProductToMySQL(p) {
                     p.name,
                     p.subtitle || null,
                     finalSlug,
-                    p.variations && p.variations.length > 0 ? "variable" : "simple",
+                    finalProductType,
+                    simpleColor,
+                    simpleColorHex,
                     p.shortDescription || null,
                     p.fullDescription || p.longDescription || null,
                     Number(p.price) || 0,
@@ -404,13 +489,13 @@ export async function syncProductToMySQL(p) {
         else {
             // Direct INSERT guaranteeing p.id is inserted as the primary key
             await sequelize.query(`INSERT INTO products (
-           id, name, subtitle, slug, product_type,
+           id, name, subtitle, slug, product_type, color, color_hex,
            short_description, full_description, price, original_price, cost_price,
            discount_percentage, rating, review_count, stock, default_sku,
            barcode, image_url, is_featured, is_trending, is_new_arrival,
            is_best_seller, is_on_sale, is_published, status, category_id, subcategory_id
          ) VALUES (
-           ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?, ?, ?,
            ?, ?, ?, ?, ?,
            ?, ?, ?, ?, ?,
            ?, ?, ?, ?, ?,
@@ -421,7 +506,9 @@ export async function syncProductToMySQL(p) {
                     p.name,
                     p.subtitle || null,
                     finalSlug,
-                    p.variations && p.variations.length > 0 ? "variable" : "simple",
+                    finalProductType,
+                    simpleColor,
+                    simpleColorHex,
                     p.shortDescription || null,
                     p.fullDescription || p.longDescription || null,
                     Number(p.price) || 0,
@@ -447,10 +534,7 @@ export async function syncProductToMySQL(p) {
             });
         }
         // 6. Sync Variants if variable
-        const variations = Array.isArray(p.variations) && p.variations.length > 0
-            ? p.variations
-            : (Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []);
-        if (variations.length > 0) {
+        if (isVariable && variations.length > 0) {
             const activeVariantIds = [];
             const variantQueries = variations.map((v, i) => {
                 const vId = (v.id && !v.id.match(/^var-\d+$/)) ? v.id : `var-${p.id}-${i}`;

@@ -230,47 +230,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAddresses((prev) => prev.filter((a) => a.id !== addrId));
   };
 
-  // Sync Firebase Auth state reactively with persistent fallback
+  // Sync Firebase Auth state reactively with deferred initialization to prevent blocking initial paint
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setFirebaseUser(currentUser);
-      if (currentUser) {
-        const displayName = currentUser.displayName || currentUser.email?.split("@")[0] || "AOCIND User";
-        const initials = displayName
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase() || "AU";
+    let unsubscribe = () => {};
+    let isCancelled = false;
 
-        const profile: UserProfile = {
-          name: displayName,
-          email: currentUser.email || "",
-          phone: currentUser.phoneNumber || "+91 98000 00000",
-          avatarInitials: initials,
-          memberSince: "Jul 2026",
-          photoURL: currentUser.photoURL || undefined,
-        };
+    const attachAuthListener = () => {
+      if (isCancelled) return;
+      unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setFirebaseUser(currentUser);
+        if (currentUser) {
+          const displayName = currentUser.displayName || currentUser.email?.split("@")[0] || "AOCIND User";
+          const initials = displayName
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase() || "AU";
 
-        setUser(profile);
-        setIsLoggedIn(true);
-        saveSessionUser(profile);
-      } else {
-        const stored = getStoredSessionUser();
-        if (stored) {
-          setUser(stored);
+          const profile: UserProfile = {
+            name: displayName,
+            email: currentUser.email || "",
+            phone: currentUser.phoneNumber || "+91 98000 00000",
+            avatarInitials: initials,
+            memberSince: "Jul 2026",
+            photoURL: currentUser.photoURL || undefined,
+          };
+
+          setUser(profile);
           setIsLoggedIn(true);
+          saveSessionUser(profile);
         } else {
-          setUser(null);
-          setIsLoggedIn(false);
-          saveSessionUser(null);
+          const stored = getStoredSessionUser();
+          if (stored) {
+            setUser(stored);
+            setIsLoggedIn(true);
+          } else {
+            setUser(null);
+            setIsLoggedIn(false);
+            saveSessionUser(null);
+          }
         }
-      }
-      setLoading(false);
-    });
+        setLoading(false);
+      });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    if (isAuthModalOpen) {
+      attachAuthListener();
+    } else if (typeof window !== "undefined") {
+      const scheduleInit = () => {
+        if ("requestIdleCallback" in window) {
+          (window as any).requestIdleCallback(attachAuthListener, { timeout: 6000 });
+        } else {
+          setTimeout(attachAuthListener, 3500);
+        }
+      };
+
+      if (document.readyState === "complete") {
+        scheduleInit();
+      } else {
+        window.addEventListener("load", scheduleInit, { once: true });
+      }
+    }
+
+    return () => {
+      isCancelled = true;
+      unsubscribe();
+    };
+  }, [isAuthModalOpen]);
 
   const openAuthModal = (redirectUrl?: string) => {
     if (redirectUrl) {

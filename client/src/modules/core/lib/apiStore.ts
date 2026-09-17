@@ -1610,21 +1610,42 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Trigger initial fetch non-blockingly during idle time to prevent initial paint contention
+// Trigger initial fetch non-blockingly after window load / idle to prevent network contention
 if (typeof window !== 'undefined') {
   const initStoreFetches = () => {
-    fetchLiveProducts();
-    fetchLiveFilters();
-    fetchLiveCategories();
+    // Stagger critical hero slides first
     fetchLiveHeroSlides();
-    fetchLivePromoBanner();
-    fetchLiveReviews();
+
+    setTimeout(() => {
+      fetchLiveCategories();
+      fetchLivePromoBanner();
+    }, 400);
+
+    // Stagger product store fetch after above-the-fold content is ready
+    setTimeout(() => {
+      fetchLiveProducts();
+    }, 1200);
+
+    // Only fetch shop filters if currently on shop route
+    if (window.location.pathname.startsWith('/shop') || window.location.pathname.startsWith('/collection')) {
+      setTimeout(() => {
+        fetchLiveFilters();
+      }, 1500);
+    }
   };
 
-  if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(initStoreFetches, { timeout: 2500 });
+  const scheduleStoreInit = () => {
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(initStoreFetches, { timeout: 4000 });
+    } else {
+      setTimeout(initStoreFetches, 1000);
+    }
+  };
+
+  if (document.readyState === 'complete') {
+    scheduleStoreInit();
   } else {
-    setTimeout(initStoreFetches, 500);
+    window.addEventListener('load', scheduleStoreInit, { once: true });
   }
 }
 

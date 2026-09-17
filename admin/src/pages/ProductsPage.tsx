@@ -888,11 +888,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ onNavigate }) => {
                                 ) : (
                                   <Package className="w-4 h-4 text-neutral-400" />
                                 )}
-                                {p.images && p.images.length > 1 && (
-                                  <span className="absolute -bottom-1 -right-1 bg-neutral-900 text-white text-[9px] font-bold px-1 rounded-full border border-white">
-                                    +{p.images.length - 1}
-                                  </span>
-                                )}
+                                
                               </div>
                             );
                           })()}

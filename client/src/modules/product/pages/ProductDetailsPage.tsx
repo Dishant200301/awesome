@@ -162,7 +162,7 @@ export const ProductDetailsPage: React.FC = () => {
         const str = typeof u === "string" ? u : u?.url;
         if (str && typeof str === "string" && str.trim()) {
           const clean = str.trim();
-          if (!urls.includes(clean)) {
+          if (!urls.includes(clean) && !otherVariantsImages.has(clean)) {
             urls.push(clean);
           }
         }
@@ -192,19 +192,14 @@ export const ProductDetailsPage: React.FC = () => {
         colorObj.galleryImages.forEach(addUrl);
       }
 
-      // Products saved before variant image associations existed still have a
-      // product gallery. Keep the selected variant's main image first, then
-      // show that gallery until the product is edited and re-saved.
-      const hasVariantGallery = Boolean(
-        (vItem && ((Array.isArray(vItem.images) && vItem.images.length > 0) || (Array.isArray(vItem.galleryImages) && vItem.galleryImages.length > 0))) ||
-        (colorMedia && Array.isArray(colorMedia.gallery) && colorMedia.gallery.length > 0) ||
-        (colorObj && Array.isArray(colorObj.galleryImages) && colorObj.galleryImages.length > 0)
+      // Check if this product has multiple colors or variations
+      const isVariableProduct = Boolean(
+        (Array.isArray(product.variations) && product.variations.length > 1) ||
+        (Array.isArray(product.colors) && product.colors.length > 1) ||
+        (product as any).type === "Variable"
       );
-      if (!hasVariantGallery) {
-        rootGallery.filter((url) => !otherVariantsImages.has(url)).forEach(addUrl);
-      }
 
-      // If variant has its own images, return ONLY them!
+      // If variant has its own image(s), return ONLY them! Never include rootGallery!
       if (urls.length > 0) {
         return urls.map((u, idx) => ({
           id: `img-var-${idx}`,
@@ -213,14 +208,24 @@ export const ProductDetailsPage: React.FC = () => {
         }));
       }
 
-      // Fallback only if this variant has 0 images
-      const filteredRoot = rootGallery.filter((img) => !otherVariantsImages.has(img));
-      if (filteredRoot.length > 0) {
-        return filteredRoot.map((u, idx) => ({
-          id: `img-fallback-${idx}`,
+      // For Simple Product with NO color variants: show the full product gallery
+      if (!isVariableProduct && rootGallery.length > 0) {
+        return rootGallery.map((u, idx) => ({
+          id: `img-product-${idx}`,
           url: u,
           alt: `${product.name} View ${idx + 1}`
         }));
+      }
+
+      // If it IS a Variable Product, but this variant has 0 images configured:
+      // Fall back to ONLY the product mainImage (single image), never dump all mixed images
+      const singleFallback = prodAny.mainImage || prodAny.image || rootGallery[0] || "";
+      if (singleFallback) {
+        return [{
+          id: `img-fallback-0`,
+          url: singleFallback,
+          alt: `${product.name} - ${selectedColor || "View"}`
+        }];
       }
 
       return [];
@@ -279,15 +284,15 @@ export const ProductDetailsPage: React.FC = () => {
       };
     }
 
-    // 3. Synthesize variation matching selectedColor from colorObj/colorMedia/firstVar
+    // 3. Synthesize variation matching selectedColor from colorObj/colorMedia
     const firstVar = product.variations[0] || {};
-    const synthImages = buildVariantImages(firstVar);
+    const synthImages = buildVariantImages();
     return {
       id: `v-${(selectedColor || "std").toLowerCase()}`,
       colorName: selectedColor || "Standard",
       colorHex: colorObj?.colorHex || colorMedia?.colorCode || (firstVar as any).colorHex || "#C89B3C",
       size: selectedSize || (firstVar as any).size || "Standard Pair",
-      thumbnail: synthImages[0]?.url || (firstVar as any).thumbnail || rootGallery[0] || "",
+      thumbnail: synthImages[0]?.url || colorMedia?.mainImage || colorObj?.displayImage || rootGallery[0] || "",
       price: (firstVar as any).price || prodAny.price || 799,
       originalPrice: (firstVar as any).originalPrice || prodAny.originalPrice || 1299,
       discountPercentage: (firstVar as any).discountPercentage || 38,
@@ -378,21 +383,56 @@ export const ProductDetailsPage: React.FC = () => {
     }
   }, [product?.id]);
 
-  // Initialize Lenis smooth scroll
+  // Initialize Lenis smooth scroll and reset to top when product ID changes
   useEffect(() => {
-    const lenis = new Lenis({ duration: 1.2, smoothWheel: true });
+    const resetScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      if (typeof document !== "undefined") {
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+      if (typeof window !== "undefined" && (window as any).__lenis) {
+        try {
+          (window as any).__lenis.scrollTo(0, { immediate: true });
+        } catch (e) {}
+      }
+    };
+
+    resetScroll();
+    const timer = setTimeout(resetScroll, 60);
+
+    // Only initialize Lenis on desktop viewports (>= 768px)
+    const isMobileDevice = typeof window !== "undefined" && (window.innerWidth < 768 || ("ontouchstart" in window && window.innerWidth < 1024));
+    if (isMobileDevice) {
+      return () => clearTimeout(timer);
+    }
+
+    let lenis: any = null;
     let raf = 0;
-    const loop = (t: number) => {
-      lenis.raf(t);
+
+    Promise.all([import("lenis"), import("gsap/ScrollTrigger")]).then(([{ default: Lenis }, { ScrollTrigger }]) => {
+      lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+      (window as any).__lenis = lenis;
+      lenis.scrollTo(0, { immediate: true });
+      const loop = (t: number) => {
+        lenis.raf(t);
+        raf = requestAnimationFrame(loop);
+      };
       raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    lenis.on("scroll", ScrollTrigger.update);
+      lenis.on("scroll", ScrollTrigger.update);
+    });
+
     return () => {
-      cancelAnimationFrame(raf);
-      lenis.destroy();
+      clearTimeout(timer);
+      if (raf) cancelAnimationFrame(raf);
+      if (lenis) {
+        lenis.destroy();
+        if ((window as any).__lenis === lenis) {
+          (window as any).__lenis = null;
+        }
+      }
     };
-  }, []);
+  }, [id]);
 
   if (isLoading && !product) {
     return (
@@ -450,7 +490,7 @@ export const ProductDetailsPage: React.FC = () => {
 
         {/* TOP PRODUCT HERO SECTION */}
         <div className="max-w-[1500px] mx-auto px-4 md:px-8 py-4 md:py-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
             {/* Left Column: Image Gallery (Sticky on Laptop & Desktop) */}
             <div className="w-full lg:sticky lg:top-24 h-fit">
               <VerticalGallery

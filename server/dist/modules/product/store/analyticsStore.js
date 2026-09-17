@@ -1,11 +1,12 @@
 import { productStore } from "./productStore.js";
-import { getCategoriesStore, getSubcategoriesStore, getAttributesStore } from "./taxonomyStore.js";
+import { getCategoriesStore, getSubcategoriesStore } from "./taxonomyStore.js";
+import { attributeStore } from "./attributeStore.js";
 import { getContactMessagesSync } from "./contactStore.js";
 export const getDashboardAnalyticsStore = () => {
     const products = productStore.getAll(false);
     const categories = getCategoriesStore();
     const subcategories = getSubcategoriesStore();
-    const attributes = getAttributesStore();
+    const attributes = attributeStore.getAll();
     const messages = getContactMessagesSync();
     const totalProducts = products.length;
     const publishedProducts = products.filter((p) => p.isPublished || p.status === 'Published').length;

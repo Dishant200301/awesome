@@ -7,9 +7,9 @@ export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) =
 export const AdminDashboardSkeleton: React.FC = () => {
   return (
     <div className="space-y-6 font-sans pb-12">
-      {/* 8 SUMMARY METRIC CARDS SKELETON */}
+      {/* 7 SUMMARY METRIC CARDS SKELETON */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 8 }).map((_, idx) => (
+        {Array.from({ length: 7 }).map((_, idx) => (
           <div key={idx} className="p-4 rounded-xl bg-white border border-neutral-200 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
               <Skeleton className="h-3.5 w-24" />

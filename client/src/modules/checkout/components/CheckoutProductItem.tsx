@@ -24,15 +24,13 @@ export const CheckoutProductItem: React.FC<CheckoutProductItemProps> = ({
   return (
     <div className="py-3.5 flex items-start gap-3 border-b border-zinc-100 font-sans group relative">
       {/* PRODUCT IMAGE THUMBNAIL */}
-      <div className="w-16 h-20 sm:w-20 sm:h-24 rounded-xl bg-zinc-100 overflow-hidden shrink-0 border border-zinc-200/80 relative">
+      <div className="w-16 h-20 sm:w-20 sm:h-24 rounded-lg bg-zinc-100 overflow-hidden shrink-0 border border-zinc-200/80 relative">
         <img
           src={item.image || "https://images.unsplash.com/photo-1571513722275-4b41940f54b8?auto=format&fit=crop&q=80&w=400"}
           alt={item.productName}
           className="w-full h-full object-cover object-top"
         />
-        <span className="absolute top-1 left-1 bg-zinc-900/90 text-white text-[9px] font-bold px-1.5 py-0.2 rounded shadow-2xs">
-          x{item.quantity}
-        </span>
+       
       </div>
 
       {/* PRODUCT DETAILS */}
@@ -53,13 +51,13 @@ export const CheckoutProductItem: React.FC<CheckoutProductItemProps> = ({
 
         {/* VARIANT ATTRIBUTES BADGES */}
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11px] text-zinc-500">
-          {item.colorName && (
+          {item.colorName && !["default", "none"].includes(item.colorName.toLowerCase()) && (
             <span className="bg-zinc-100 text-zinc-800 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-zinc-200/60">
               <span className="w-2 h-2 rounded-full inline-block border border-zinc-300" style={{ backgroundColor: item.colorHex || "#000" }} />
               {item.colorName}
             </span>
           )}
-          {item.size && (
+          {item.size && !["standard pair", "free size", "default", "standard"].includes(item.size.toLowerCase()) && (
             <span className="bg-zinc-100 text-zinc-800 px-2 py-0.5 rounded-md font-bold border border-zinc-200/60">
               {item.size}
             </span>

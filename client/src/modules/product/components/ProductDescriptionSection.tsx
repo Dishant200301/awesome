@@ -352,7 +352,7 @@ export const ProductDescriptionSection: React.FC<ProductDescriptionSectionProps>
   return (
     <section
       id="product-description"
-      className="w-full py-8 md:py-12 px-4 sm:px-6 md:px-8 max-w-[1250px] mx-auto font-sans text-neutral-900 scroll-mt-24"
+      className="w-full py-8 md:py-12 px-4 sm:px-6 md:px-8 max-w-[1300px] mx-auto font-sans text-neutral-900 scroll-mt-24"
     >
       {/* Tabs Navigation - 100% Responsive for Mobile, Tablet, and Desktop */}
       <div className="border-b border-zinc-200">

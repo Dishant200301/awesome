@@ -3,6 +3,9 @@ import React, { useState, useMemo, useEffect } from "react";
 interface ProductHoverSliderProps {
   product: any;
   alt: string;
+  activeImage?: string;
+  activeColor?: string;
+  activeImages?: string[];
   className?: string;
   imageClassName?: string;
   children?: React.ReactNode;
@@ -11,6 +14,9 @@ interface ProductHoverSliderProps {
 export const ProductHoverSlider: React.FC<ProductHoverSliderProps> = ({
   product,
   alt,
+  activeImage,
+  activeColor,
+  activeImages,
   className = "relative aspect-square w-full overflow-hidden rounded-[18px] bg-[#f5f2ee]",
   imageClassName = "w-full h-full object-cover object-center shrink-0",
   children,
@@ -23,7 +29,6 @@ export const ProductHoverSlider: React.FC<ProductHoverSliderProps> = ({
 
   const { firstImage, secondImage } = useMemo(() => {
     const p = product || {};
-    const parent = p.parentProduct || {};
 
     const extractUrl = (val: any): string => {
       if (!val) return "";
@@ -32,29 +37,102 @@ export const ProductHoverSlider: React.FC<ProductHoverSliderProps> = ({
         if (typeof val.url === "string") return val.url.trim();
         if (typeof val.src === "string") return val.src.trim();
         if (typeof val.image === "string") return val.image.trim();
+        if (typeof val.mainImage === "string") return val.mainImage.trim();
+        if (typeof val.thumbnail === "string") return val.thumbnail.trim();
       }
       return "";
     };
 
-    // 1. Primary main image (Admin main image, image, or first available image)
+    const explicitActive = extractUrl(activeImage);
+
+    // 1. If explicit activeImages provided for this color variant, strictly use only them
+    if (Array.isArray(activeImages) && activeImages.length > 0) {
+      const validImages = activeImages.map(extractUrl).filter(Boolean);
+      if (validImages.length > 0) {
+        const primary = explicitActive || validImages[0];
+        const secondary = validImages.find((u) => u && u !== primary) || validImages[1] || primary;
+        return {
+          firstImage: primary || DEFAULT_FALLBACK,
+          secondImage: secondary || primary || DEFAULT_FALLBACK,
+        };
+      }
+    }
+
+    // 2. If activeColor is specified, search across all variant structures strictly for this color
+    const normColor = (activeColor || "").trim().toLowerCase();
+    if (normColor) {
+      const variantImages: string[] = [];
+      const addVUrl = (val: any) => {
+        const u = extractUrl(val);
+        if (u && !variantImages.includes(u)) variantImages.push(u);
+      };
+
+      const allVariantLists = [
+        ...(Array.isArray(p.variations) ? p.variations : []),
+        ...(Array.isArray(p.variantDetails) ? p.variantDetails : []),
+        ...(Array.isArray(p.variants) ? p.variants : [])
+      ];
+
+      const matchedVar = allVariantLists.find((v: any) =>
+        ((v?.colorName || v?.color || v?.title || v?.optionValue || v?.name || "")).trim().toLowerCase() === normColor
+      );
+
+      if (matchedVar) {
+        addVUrl(matchedVar.thumbnail);
+        addVUrl(matchedVar.mainImage);
+        addVUrl(matchedVar.image);
+        if (Array.isArray(matchedVar.images)) matchedVar.images.forEach(addVUrl);
+        if (Array.isArray(matchedVar.galleryImages)) matchedVar.galleryImages.forEach(addVUrl);
+      }
+
+      const colorLists = [
+        ...(Array.isArray(p.colors) ? p.colors : []),
+        ...(Array.isArray(p.colorMediaConfigs) ? p.colorMediaConfigs : [])
+      ];
+      const matchedCol = colorLists.find((c: any) =>
+        ((c?.colorName || c?.name || c?.color || "")).trim().toLowerCase() === normColor
+      );
+      if (matchedCol) {
+        addVUrl(matchedCol.displayImage);
+        addVUrl(matchedCol.mainImage);
+        addVUrl(matchedCol.image);
+        addVUrl(matchedCol.thumbnail);
+        if (Array.isArray(matchedCol.galleryImages)) matchedCol.galleryImages.forEach(addVUrl);
+        if (Array.isArray(matchedCol.images)) matchedCol.images.forEach(addVUrl);
+      }
+
+      if (variantImages.length > 0) {
+        const primary = explicitActive || variantImages[0];
+        const secondary = variantImages.find((u) => u && u !== primary) || variantImages[1] || primary;
+        return {
+          firstImage: primary || DEFAULT_FALLBACK,
+          secondImage: secondary || primary || DEFAULT_FALLBACK,
+        };
+      }
+
+      // If activeColor was specified, NEVER fall back to base images (prevents showing other variant images)
+      const fallback = explicitActive || DEFAULT_FALLBACK;
+      return {
+        firstImage: fallback,
+        secondImage: fallback,
+      };
+    }
+
+    // 3. For simple products without variants, use product's own images
     const primary =
+      explicitActive ||
       extractUrl(p.image) ||
       extractUrl(p.mainImage) ||
       extractUrl(p.img) ||
       (Array.isArray(p.images) && extractUrl(p.images[0])) ||
       (Array.isArray(p.galleryImages) && extractUrl(p.galleryImages[0])) ||
-      (Array.isArray(p.variants) && (extractUrl(p.variants[0]?.mainImage) || extractUrl(p.variants[0]?.image) || extractUrl(p.variants[0]?.thumbnail))) ||
-      (Array.isArray(p.colors) && (extractUrl(p.colors[0]?.mainImage) || extractUrl(p.colors[0]?.displayImage))) ||
-      (Array.isArray(parent.images) && extractUrl(parent.images[0])) ||
-      (Array.isArray(parent.galleryImages) && extractUrl(parent.galleryImages[0])) ||
       "";
 
-    // Collect all candidate gallery images in order
-    const allUrls: string[] = [];
+    const candidateUrls: string[] = [];
     const addUrl = (val: any) => {
       const u = extractUrl(val);
-      if (u && !allUrls.includes(u)) {
-        allUrls.push(u);
+      if (u && !candidateUrls.includes(u)) {
+        candidateUrls.push(u);
       }
     };
 
@@ -63,44 +141,13 @@ export const ProductHoverSlider: React.FC<ProductHoverSliderProps> = ({
     if (p.hoverImage) addUrl(p.hoverImage);
     if (p.hoverImg) addUrl(p.hoverImg);
 
-    if (Array.isArray(p.variants)) {
-      p.variants.forEach((v: any) => {
-        addUrl(v?.mainImage);
-        addUrl(v?.image);
-        if (Array.isArray(v?.galleryImages)) v.galleryImages.forEach(addUrl);
-        if (Array.isArray(v?.images)) v.images.forEach(addUrl);
-      });
-    }
-
-    if (Array.isArray(p.colors)) {
-      p.colors.forEach((c: any) => {
-        addUrl(c?.mainImage);
-        addUrl(c?.displayImage);
-        if (Array.isArray(c?.galleryImages)) c.galleryImages.forEach(addUrl);
-      });
-    }
-
-    // Also check parentProduct (for exploded ShopPage variants)
-    if (parent && typeof parent === "object") {
-      if (Array.isArray(parent.galleryImages)) parent.galleryImages.forEach(addUrl);
-      if (Array.isArray(parent.images)) parent.images.forEach(addUrl);
-      if (parent.hoverImage) addUrl(parent.hoverImage);
-      if (Array.isArray(parent.variants)) {
-        parent.variants.forEach((v: any) => {
-          addUrl(v?.mainImage);
-          addUrl(v?.image);
-        });
-      }
-    }
-
-    // Secondary is the first gallery image distinct from primary
-    const secondary = allUrls.find((u) => u && u !== primary) || null;
+    const secondary = candidateUrls.find((u) => u && u !== primary) || primary;
 
     return {
       firstImage: primary || DEFAULT_FALLBACK,
       secondImage: secondary || primary || DEFAULT_FALLBACK,
     };
-  }, [product]);
+  }, [product, activeImage, activeColor, activeImages]);
 
   // Reset local state when product changes
   useEffect(() => {

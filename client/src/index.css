@@ -4,8 +4,8 @@
 
 @theme {
   --font-sans: "Plus Jakarta Sans", "Montserrat", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
-  --font-heading: "Cinzel", "Playfair Display", Georgia, serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-heading: "Cinzel", Georgia, serif;
   --font-cinzel: "Cinzel", Georgia, serif;
   --font-garamond: "Cormorant Garamond", Georgia, serif;
   --font-cormorant: "Cormorant Garamond", Georgia, serif;
@@ -13,21 +13,21 @@
   --font-allura: "Allura", cursive;
   --font-poppins: "Poppins", sans-serif;
   --font-montserrat: "Montserrat", sans-serif;
-  --font-bodoni: "Bodoni Moda", "Libre Bodoni", "Didot", Georgia, serif;
+  --font-bodoni: "Bodoni Moda", "Didot", Georgia, serif;
   --color-brand-ink: #1A1A1A;
   --color-brand-maroon: #520618;
   --color-brand-gold: #C89B3C;
   --color-brand-cream: #FAF8F4;
 }
 
-.font-heading { font-family: "Cinzel", "Playfair Display", Georgia, serif; }
+.font-heading { font-family: "Cinzel", Georgia, serif; }
 .font-cinzel { font-family: "Cinzel", Georgia, serif; }
 .font-garamond, .font-cormorant { font-family: "Cormorant Garamond", Georgia, serif; }
 .font-dm-serif { font-family: "DM Serif Display", Georgia, serif; }
 .font-allura { font-family: "Allura", cursive; }
 .font-poppins { font-family: "Poppins", sans-serif; }
 .font-montserrat { font-family: "Montserrat", sans-serif; }
-.font-bodoni { font-family: "Bodoni Moda", "Libre Bodoni", "Didot", Georgia, serif; }
+.font-bodoni { font-family: "Bodoni Moda", "Didot", Georgia, serif; }
 
 html, body { font-family: var(--font-sans); background: #fff; color: #000; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

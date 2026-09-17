@@ -27,7 +27,7 @@ export const StickyCartWidget: React.FC = () => {
         type="button"
         onClick={() => setIsCartOpen(true)}
         aria-label={`Open shopping cart with ${totalItemsCount} ${itemText}`}
-        className="flex flex-col items-center justify-center bg-[#212121] text-white pt-2.5 pb-2 px-2 rounded-l-lg border-t border-b border-l border-neutral-700/50 cursor-pointer"
+        className="flex flex-col items-center justify-center bg-[#212121] text-white pt-2.5 pb-2 px-2 rounded-l-sm border-t border-b border-l border-neutral-700/50 cursor-pointer"
       >
         {/* Top: Shopping Bag Icon + Count & Item text */}
         <div className="flex items-center gap-2 px-1">

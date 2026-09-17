@@ -344,11 +344,14 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
     return product.availableSizes || ["Free Size", "Standard Pair"];
   }, [product.colors, product.variations, activeVariation?.colorName, product.availableSizes]);
 
-  const isVariableProduct = product.type === "Variable" ||
-    (product.colors && product.colors.length > 0) ||
-    (product.variations && product.variations.length > 0) ||
-    (product.availableSizes && product.availableSizes.length > 0) ||
-    uniqueColorVariations.length > 0;
+  const isVariableProduct = React.useMemo(() => {
+    if (product.productType === "simple" || product.type === "Simple") return false;
+    if (product.productType === "variable" || product.type === "Variable") return true;
+    const hasVars = (Array.isArray(product.variations) && product.variations.length > 0) ||
+                    (Array.isArray((product as any).variants) && (product as any).variants.length > 0) ||
+                    (Array.isArray((product as any).variantDetails) && (product as any).variantDetails.length > 0);
+    return hasVars;
+  }, [product.productType, product.type, product.variations, (product as any).variants, (product as any).variantDetails]);
   const savings = activeVariation.originalPrice - activeVariation.price;
   const activeColorMedia = ((product as any).colorMediaConfigs || []).find(
     (cm: any) => cm && (cm.colorName || cm.name || "").toLowerCase() === (activeVariation?.colorName || "").toLowerCase()
@@ -399,6 +402,33 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
     }
     return "SELECT COLOR";
   }, [product.category, (product as any).categories]);
+
+  const simpleColorName =
+    activeVariation?.colorName && activeVariation.colorName !== "Standard"
+      ? activeVariation.colorName
+      : (product as any).color ||
+        (product as any).colorName ||
+        (product.colors && product.colors[0]?.colorName) ||
+        activeVariation?.colorName ||
+        "Standard";
+
+  const simpleColorHex =
+    activeVariation?.colorHex ||
+    (product as any).colorHex ||
+    (product.colors && product.colors[0]?.colorHex) ||
+    "#000000";
+
+  const simpleMainImg =
+    (product as any).mainImage ||
+    (product as any).image ||
+    (Array.isArray((product as any).images) && (product as any).images[0] && (typeof (product as any).images[0] === "string" ? (product as any).images[0] : (product as any).images[0]?.url)) ||
+    activeVariation?.thumbnail ||
+    (activeVariation?.images && activeVariation.images[0]?.url) ||
+    "";
+
+  const simplePrice = activeVariation?.price || product.price || 799;
+  const simpleOriginalPrice = activeVariation?.originalPrice || product.originalPrice;
+  const hasSimpleDiscount = Boolean(simpleOriginalPrice && simpleOriginalPrice > simplePrice);
 
   return (
     <div className="w-full flex flex-col gap-5 font-sans">
@@ -515,8 +545,65 @@ export const ProductInfo: React.FC<ProductInfoProps> = ({
         </div>
       )}
 
-      {/* 6. SELECT COLOR & VARIANT CARDS (Shown for both Simple and Variable products) */}
-      {uniqueColorVariations.length > 0 && (
+      {/* 6. COLOR DISPLAY: Single Color Card for Simple Product vs Variant Cards for Variable Product */}
+      {!isVariableProduct && (
+        <div className="space-y-3 font-montserrat pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-montserrat font-600 tracking-wider text-zinc-900">
+              Colour: <span className="font-bold text-black">{simpleColorName}</span>
+            </span>
+          </div>
+
+          {/* Color Card for Simple Product */}
+          <div className="grid grid-cols-2 min-[360px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 py-1">
+            <div className="flex flex-col p-1.5 sm:p-2 rounded-xl sm:rounded-[16px] border-2 border-zinc-900 shadow-md ring-1 ring-zinc-900 text-left bg-white relative group overflow-hidden select-none">
+              <div className="w-full aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-[#FAF8F5] mb-1 sm:mb-1.5 relative flex items-center justify-center">
+                {simpleMainImg ? (
+                  <img
+                    src={simpleMainImg}
+                    alt={simpleColorName}
+                    className="w-full h-full object-cover object-center"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex items-center justify-center font-bold text-xs"
+                    style={{
+                      backgroundColor: simpleColorHex ? `${simpleColorHex}22` : '#FAF8F5',
+                      color: simpleColorHex || '#1A1A1A'
+                    }}
+                  >
+                    {simpleColorName?.slice(0, 2).toUpperCase() || "ST"}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col justify-between text-[11px] sm:text-xs px-0.5 leading-tight gap-0.5">
+                <span className="font-extrabold text-zinc-900 truncate block text-[11px]">
+                  {simpleColorName}
+                </span>
+                <div className="flex items-baseline justify-between w-full">
+                  <span className="font-bold text-zinc-900 text-[10px] sm:text-[11px]">
+                    ₹{simplePrice.toLocaleString("en-IN")}
+                  </span>
+                  {hasSimpleDiscount && (
+                    <span className="text-[9px] text-zinc-400 line-through">
+                      ₹{simpleOriginalPrice.toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Active Checkmark Badge */}
+              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center shadow-xs">
+                <FiCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[2.5]" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Variant Selection Cards (Strictly for Variable Products only) */}
+      {isVariableProduct && uniqueColorVariations.length > 0 && (
         <div className="space-y-4 pt-1">
           {/* Color Selection Cards */}
           <div className="space-y-3 font-montserrat">

@@ -4,7 +4,6 @@ import {
   Package,
   Globe,
   FileText,
-  Layers,
   FolderTree,
   MessageSquare,
   Mail,
@@ -69,7 +68,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const loadStats = React.useCallback(async (showSkeleton = true) => {
     if (showSkeleton) setLoading(true);
     try {
-      const res = await AdminApiService.getDashboardStats();
+      const res = await AdminApiService.getDashboardStats(!showSkeleton);
       if (res) setStats(res);
       const revs = await AdminApiService.getReviews();
       if (Array.isArray(revs)) {
@@ -85,17 +84,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   useEffect(() => {
     loadStats(true);
 
-    // Listen only to explicit real-time mutation events across the admin panel
+    // Listen to explicit real-time mutation events across the admin panel
     const handleRealtimeSync = () => {
       loadStats(false);
     };
 
     window.addEventListener('awesome_product_sync', handleRealtimeSync);
     window.addEventListener('awesome_category_sync', handleRealtimeSync);
+    window.addEventListener('awesome_attribute_sync', handleRealtimeSync);
+
+    let attrBc: BroadcastChannel | null = null;
+    let prodBc: BroadcastChannel | null = null;
+    let catBc: BroadcastChannel | null = null;
+
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        attrBc = new BroadcastChannel('awesome_attribute_sync');
+        attrBc.onmessage = handleRealtimeSync;
+        prodBc = new BroadcastChannel('awesome_product_sync');
+        prodBc.onmessage = handleRealtimeSync;
+        catBc = new BroadcastChannel('awesome_category_sync');
+        catBc.onmessage = handleRealtimeSync;
+      } catch (e) {}
+    }
 
     return () => {
       window.removeEventListener('awesome_product_sync', handleRealtimeSync);
       window.removeEventListener('awesome_category_sync', handleRealtimeSync);
+      window.removeEventListener('awesome_attribute_sync', handleRealtimeSync);
+      if (attrBc) attrBc.close();
+      if (prodBc) prodBc.close();
+      if (catBc) catBc.close();
     };
   }, [loadStats]);
 
@@ -106,7 +125,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const totalProducts = stats?.totalProducts ?? 0;
   const publishedProducts = stats?.publishedProducts ?? 0;
   const draftProducts = stats?.draftProducts ?? 0;
-  const totalVariants = stats?.totalVariants ?? 0;
   const totalAttributes = stats?.totalAttributes ?? 0;
   const totalCategories = stats?.totalCategories ?? 0;
   const totalSubcategories = stats?.totalSubcategories ?? 0;
@@ -201,26 +219,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </Card>
         </motion.div>
 
-        {/* 4. Total Product Variants */}
-        <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
-          <Card
-            onClick={() => onNavigate('attributes')}
-            className="hover:border-neutral-300 transition-all cursor-pointer group rounded-xl bg-white border border-neutral-200 shadow-2xs"
-          >
-            <CardHeader className="p-4 pb-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-700">Product Variants</span>
-                <div className="w-7 h-7 rounded-md bg-neutral-100 text-black flex items-center justify-center border border-neutral-200 group-hover:scale-105 transition-transform">
-                  <Layers className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <CardTitle className="text-2xl font-semibold mt-1">{totalVariants}</CardTitle>
-              <CardDescription className="text-[11px] text-neutral-500 font-medium">Color / Size SKUs</CardDescription>
-            </CardHeader>
-          </Card>
-        </motion.div>
-
-        {/* 5. Total Product Attributes */}
+        {/* 4. Total Product Attributes */}
         <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
           <Card
             onClick={() => onNavigate('attributes')}

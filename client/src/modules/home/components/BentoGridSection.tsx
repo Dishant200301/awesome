@@ -25,8 +25,11 @@ export default function BentoGridSection() {
               <img
                 src="/images/home/Bento Grid/Choli.webp"
                 alt="Handmade Choli"
+                width="750"
+                height="1188"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 rounded-2xl lg:rounded-3xl bg-black/0 group-hover:bg-black/8 transition-colors duration-300 pointer-events-none" />
             </Link>
@@ -39,8 +42,11 @@ export default function BentoGridSection() {
               <img
                 src="/images/home/Bento Grid/Watch.webp"
                 alt="Handmade Watch"
+                width="550"
+                height="553"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 rounded-2xl lg:rounded-3xl bg-black/0 group-hover:bg-black/8 transition-colors duration-300 pointer-events-none" />
             </Link>
@@ -56,8 +62,11 @@ export default function BentoGridSection() {
               <img
                 src="/images/home/Bento Grid/Jewellery.webp"
                 alt="Handmade Jewellery"
+                width="1000"
+                height="479"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 rounded-2xl lg:rounded-3xl bg-black/0 group-hover:bg-black/8 transition-colors duration-300 pointer-events-none" />
             </Link>
@@ -72,8 +81,11 @@ export default function BentoGridSection() {
                 <img
                   src="/images/home/Bento Grid/Latkan.webp"
                   alt="Handmade Latkan"
+                  width="550"
+                  height="552"
                   className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                   loading="lazy"
+                  decoding="async"
                 />
                 <div className="absolute inset-0 rounded-2xl lg:rounded-3xl bg-black/0 group-hover:bg-black/8 transition-colors duration-300 pointer-events-none" />
               </Link>
@@ -86,8 +98,11 @@ export default function BentoGridSection() {
                 <img
                   src="/images/home/Bento Grid/Tassel.webp"
                   alt="Handmade Tassel"
+                  width="550"
+                  height="552"
                   className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                   loading="lazy"
+                  decoding="async"
                 />
                 <div className="absolute inset-0 rounded-2xl lg:rounded-3xl bg-black/0 group-hover:bg-black/8 transition-colors duration-300 pointer-events-none" />
               </Link>
@@ -101,8 +116,11 @@ export default function BentoGridSection() {
               <img
                 src="/images/home/Bento Grid/Hair Accessories.webp"
                 alt="Handmade Hair Accessories"
+                width="1200"
+                height="498"
                 className="w-full h-full object-cover object-center rounded-2xl lg:rounded-3xl group-hover:scale-104 transition-transform duration-700 ease-out will-change-transform pointer-events-none"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 rounded-2xl lg:rounded-3xl bg-black/0 group-hover:bg-black/8 transition-colors duration-300 pointer-events-none" />
             </Link>
@@ -123,8 +141,11 @@ export default function BentoGridSection() {
               <img
                 src="/images/home/Bento Grid/mobile/Choli.webp"
                 alt="Handmade Choli"
+                width="480"
+                height="619"
                 className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
             </Link>
@@ -139,8 +160,11 @@ export default function BentoGridSection() {
                 <img
                   src="/images/home/Bento Grid/mobile/Latkan.webp"
                   alt="Handmade Latkan"
+                  width="300"
+                  height="301"
                   className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                   loading="lazy"
+                  decoding="async"
                 />
                 <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
               </Link>
@@ -153,8 +177,11 @@ export default function BentoGridSection() {
                 <img
                   src="/images/home/Bento Grid/mobile/Tassel.webp"
                   alt="Handmade Tassel"
+                  width="300"
+                  height="301"
                   className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                   loading="lazy"
+                  decoding="async"
                 />
                 <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
               </Link>
@@ -171,8 +198,11 @@ export default function BentoGridSection() {
               <img
                 src="/images/home/Bento Grid/mobile/Watch.webp"
                 alt="Handmade Watch"
+                width="300"
+                height="301"
                 className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
             </Link>
@@ -185,8 +215,11 @@ export default function BentoGridSection() {
               <img
                 src="/images/home/Bento Grid/mobile/Jewellery.webp"
                 alt="Handmade Jewellery"
+                width="480"
+                height="294"
                 className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
             </Link>
@@ -200,8 +233,11 @@ export default function BentoGridSection() {
             <img
               src="/images/home/Bento Grid/mobile/Hair Accessories.webp"
               alt="Handmade Hair Accessories"
+              width="500"
+              height="184"
               className="w-full h-full object-cover object-center rounded-xl sm:rounded-2xl pointer-events-none"
               loading="lazy"
+              decoding="async"
             />
             <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-black/0 active:bg-black/8 transition-colors duration-200 pointer-events-none" />
           </Link>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { FiHeart, FiShoppingBag, FiEye } from "react-icons/fi";
 import { Plus, Minus, Star } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -16,12 +16,69 @@ export type Product = {
   image?: string;
   hoverImg?: string;
   hoverImage?: string;
-  colors?: string[];
+  colors?: any[];
   sizes?: string[];
   category?: string;
   tags?: string[];
   brand?: string;
   defaultSku?: string;
+  sku?: string;
+  slug?: string;
+  productType?: string;
+  type?: string;
+  color?: string;
+  colorHex?: string;
+  variants?: any[];
+  variations?: any[];
+};
+
+interface CardColorVariant {
+  name: string;
+  hex: string;
+  image: string;
+  images: string[];
+  price: number;
+  originalPrice: number;
+  sku: string;
+}
+
+const COLOR_HEX_MAP: Record<string, string> = {
+  maroon: '#800000',
+  red: '#DC2626',
+  crimson: '#991B1B',
+  gold: '#D4AF37',
+  golden: '#D4AF37',
+  yellow: '#EAB308',
+  mustard: '#CA8A04',
+  blue: '#2563EB',
+  royal: '#1D4ED8',
+  navy: '#1E3A8A',
+  green: '#16A34A',
+  emerald: '#059669',
+  bottle: '#064E3B',
+  pink: '#EC4899',
+  rani: '#BE185D',
+  magenta: '#D946EF',
+  orange: '#F97316',
+  peach: '#FDBA74',
+  purple: '#9333EA',
+  violet: '#7E22CE',
+  black: '#171717',
+  white: '#FAFAFA',
+  cream: '#FEF3C7',
+  beige: '#F5F5DC',
+  silver: '#E5E7EB',
+  teal: '#0D9488',
+  copper: '#B45309'
+};
+
+const getColorHex = (name?: string): string => {
+  if (!name) return '#C89B3C';
+  const lower = name.toLowerCase().trim();
+  for (const [k, hex] of Object.entries(COLOR_HEX_MAP)) {
+    if (lower.includes(k)) return hex;
+  }
+  return '#C89B3C';
 };
 
 export default function ProductCard(props: { p?: any; [key: string]: any }) {
@@ -34,19 +91,6 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
   if (!p || p.id == null) return null;
 
   const productId = String(p.id);
-  const cartItem = (cartItems || []).find(
-    (item) => item && (String(item.productId) === productId || String(item.id) === productId)
-  );
-  const itemQuantity = cartItem ? cartItem.quantity : 0;
-
-  const handleImageClick = (e: React.MouseEvent) => {
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      e.preventDefault();
-      openQuickView(p.id);
-    } else {
-      navigate(`/product/${p.id}`);
-    }
-  };
 
   const extractUrl = (val: any): string => {
     if (!val) return "";
@@ -55,6 +99,8 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
       if (typeof val.url === "string") return val.url.trim();
       if (typeof val.src === "string") return val.src.trim();
       if (typeof val.image === "string") return val.image.trim();
+      if (typeof val.mainImage === "string") return val.mainImage.trim();
+      if (typeof val.thumbnail === "string") return val.thumbnail.trim();
     }
     return "";
   };
@@ -65,23 +111,175 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
     extractUrl(p.img) ||
     (Array.isArray(p.images) && extractUrl(p.images[0])) ||
     (Array.isArray(p.galleryImages) && extractUrl(p.galleryImages[0])) ||
-    (Array.isArray(p.variants) && (extractUrl(p.variants[0]?.mainImage) || extractUrl(p.variants[0]?.image) || extractUrl(p.variants[0]?.thumbnail))) ||
-    (Array.isArray(p.variations) && (extractUrl(p.variations[0]?.thumbnail) || extractUrl(p.variations[0]?.mainImage) || extractUrl(p.variations[0]?.image))) ||
-    (Array.isArray(p.colors) && (extractUrl(p.colors[0]?.mainImage) || extractUrl(p.colors[0]?.displayImage))) ||
     "";
 
-  const wishlisted = isWishlisted(productId);
+  const rawVariants = Array.isArray(p.variants) && p.variants.length > 0
+    ? p.variants
+    : (Array.isArray(p.variations) && p.variations.length > 0 ? p.variations : []);
 
-  const regPrice = Number(p.originalPrice || p.regularPrice || p.price || 0);
-  const finalPrice = Number(p.price || 0);
+  const isVariable = (p.productType === "variable" || p.type === "Variable") && rawVariants.length > 0;
+
+  // Extract distinct real color variants from database
+  const colorVariants: CardColorVariant[] = useMemo(() => {
+    if (!isVariable) return [];
+    const map = new Map<string, CardColorVariant>();
+
+    rawVariants.forEach((v: any) => {
+      const rawName = (v.colorName || v.title || v.name || v.optionValue || "").trim();
+      if (!rawName || ["standard", "default", "none", "free size"].includes(rawName.toLowerCase())) return;
+      const key = rawName.toLowerCase();
+
+      const variantImages: string[] = [];
+      const addImg = (val: any) => {
+        const u = extractUrl(val);
+        if (u && !variantImages.includes(u)) {
+          variantImages.push(u);
+        }
+      };
+
+      addImg(v.thumbnail);
+      addImg(v.mainImage);
+      addImg(v.image);
+      if (Array.isArray(v.images)) v.images.forEach(addImg);
+      if (Array.isArray(v.galleryImages)) v.galleryImages.forEach(addImg);
+
+      // Check p.colors or p.colorMediaConfigs for this variant's images
+      if (Array.isArray(p.colors)) {
+        p.colors.forEach((c: any) => {
+          const cName = (typeof c === "string" ? c : (c.colorName || c.name || "")).trim().toLowerCase();
+          if (cName === key) {
+            if (typeof c === "object") {
+              addImg(c.thumbnail);
+              addImg(c.mainImage);
+              addImg(c.image);
+              addImg(c.displayImage);
+              if (Array.isArray(c.images)) c.images.forEach(addImg);
+              if (Array.isArray(c.galleryImages)) c.galleryImages.forEach(addImg);
+            }
+          }
+        });
+      }
+      if (Array.isArray(p.colorMediaConfigs)) {
+        p.colorMediaConfigs.forEach((cm: any) => {
+          const cmName = (cm.colorName || "").trim().toLowerCase();
+          if (cmName === key) {
+            addImg(cm.mainImage);
+            addImg(cm.thumbnail);
+            if (Array.isArray(cm.images)) cm.images.forEach(addImg);
+            if (Array.isArray(cm.galleryImages)) cm.galleryImages.forEach(addImg);
+          }
+        });
+      }
+
+      const vImg = variantImages[0] || mainImg;
+      const vPrice = Number(v.price) || Number(p.price) || 0;
+      const vOrigPrice = Number(v.originalPrice) || Number(p.originalPrice) || Number(p.regularPrice) || vPrice;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          name: rawName,
+          hex: v.colorHex || "#1c1c1e",
+          image: vImg,
+          images: variantImages.length > 0 ? variantImages : (vImg ? [vImg] : []),
+          price: vPrice,
+          originalPrice: vOrigPrice,
+          sku: v.sku || p.sku || p.defaultSku || `AH-${p.id}`,
+        });
+      } else {
+        const existing = map.get(key)!;
+        variantImages.forEach((img) => {
+          if (!existing.images.includes(img)) {
+            existing.images.push(img);
+          }
+        });
+        if ((!existing.image || existing.image === mainImg) && existing.images.length > 0) {
+          existing.image = existing.images[0];
+        }
+      }
+    });
+
+    return Array.from(map.values());
+  }, [isVariable, rawVariants, p, mainImg]);
+
+  const [selectedColor, setSelectedColor] = useState<string>(
+    colorVariants[0]?.name || ""
+  );
+
+  const activeColor = selectedColor || colorVariants[0]?.name || "";
+  const activeVariant = isVariable
+    ? colorVariants.find((v) => v.name.toLowerCase() === activeColor.toLowerCase()) || colorVariants[0]
+    : null;
+
+  // Simple product single color
+  const simpleColorName = (!isVariable && (p.color || p.colorName || (p.colors && p.colors[0]?.colorName) || "Standard")) || "Standard";
+  const simpleColorHex = (!isVariable && (p.colorHex || p.color_hex || (p.colors && p.colors[0]?.colorHex) || (p.colors && p.colors[0]?.hex) || getColorHex(simpleColorName))) || "#C89B3C";
+
+  const regPrice = Number(activeVariant?.originalPrice || p.originalPrice || p.regularPrice || p.price || 0);
+  const finalPrice = Number(activeVariant?.price || p.price || 0);
   const hasDiscount = regPrice > finalPrice;
-  const discountVal = p.discountPercentage !== undefined
+  const discountVal = p.discountPercentage !== undefined && !activeVariant
     ? Number(p.discountPercentage)
     : hasDiscount
     ? Math.round(((regPrice - finalPrice) / regPrice) * 100)
     : 0;
 
-  const badgeTag = p.defaultKey || p.badge || (p.labels?.bestSeller ? "Best Seller" : p.labels?.newArrival ? "New" : "");
+  const currentImg = activeVariant?.image || mainImg;
+  const currentVariantImages = isVariable && activeVariant?.images && activeVariant.images.length > 0
+    ? activeVariant.images
+    : undefined;
+  const currentSku = activeVariant?.sku || p.sku || p.defaultSku || `AH-${p.id}`;
+
+  const currentProductLink = isVariable && activeColor
+    ? `/product/${p.slug || p.id}?color=${encodeURIComponent(activeColor)}`
+    : `/product/${p.slug || p.id}`;
+
+  const wishlisted = isWishlisted(productId);
+
+  // Cart item matching currently active variant or simple product
+  const cartItem = (cartItems || []).find((item) => {
+    if (!item) return false;
+    const sameProduct = String(item.productId) === productId || String(item.id) === productId;
+    if (!sameProduct) return false;
+    if (isVariable && activeColor) {
+      return (item.colorName || "").toLowerCase() === activeColor.toLowerCase();
+    }
+    return true;
+  });
+  const itemQuantity = cartItem ? cartItem.quantity : 0;
+
+  const handleCardNavigation = (e: React.MouseEvent) => {
+    if (props.forceNavigate) {
+      e.preventDefault();
+      navigate(currentProductLink);
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      if (typeof document !== "undefined") {
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+      if (typeof window !== "undefined" && (window as any).__lenis) {
+        try {
+          (window as any).__lenis.scrollTo(0, { immediate: true });
+        } catch (err) {}
+      }
+      return;
+    }
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      e.preventDefault();
+      openQuickView(p.id);
+    } else {
+      navigate(currentProductLink);
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      if (typeof document !== "undefined") {
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+      if (typeof window !== "undefined" && (window as any).__lenis) {
+        try {
+          (window as any).__lenis.scrollTo(0, { immediate: true });
+        } catch (err) {}
+      }
+    }
+  };
 
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -92,28 +290,34 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
     addToCart({
       productId: productId,
       productName: p.name || "Handcrafted Product",
       brand: p.brand || "Awesome Handmade",
-      colorName: (p.colors && p.colors[0]?.colorName) || "Standard",
-      colorHex: (p.colors && p.colors[0]?.colorHex) || "#000000",
+      colorName: isVariable ? (activeVariant?.name || "Standard") : (simpleColorName || "Standard"),
+      colorHex: isVariable ? (activeVariant?.hex || "#000000") : simpleColorHex,
       size: (p.sizes && p.sizes[0]) || (p.availableSizes && p.availableSizes[0]) || "Standard Pair",
       price: finalPrice,
       originalPrice: regPrice > 0 ? regPrice : finalPrice,
-      image: mainImg,
-      sku: p.sku || p.defaultSku || `AH-${p.id}`,
+      image: currentImg,
+      sku: currentSku,
       quantity: 1,
     });
   };
 
+  const badgeTag = p.defaultKey || p.badge || (p.labels?.bestSeller ? "Best Seller" : p.labels?.newArrival ? "New" : "");
+
   return (
     <div className="group flex flex-col bg-transparent cursor-pointer select-none">
-      {/* Image Wrapper with Smooth Right-to-Left Gallery Auto-Slider on Hover */}
-      <div onClick={handleImageClick} className="cursor-pointer">
+      {/* Image Wrapper with Hover Slider */}
+      <div onClick={handleCardNavigation} className="cursor-pointer">
         <ProductHoverSlider
           product={p}
           alt={p.name}
+          activeImage={currentImg}
+          activeImages={currentVariantImages}
+          activeColor={isVariable ? activeColor : undefined}
           className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-[#f5f2ee]"
         >
           {/* Top Badges (Discount % & Custom Tag) */}
@@ -164,7 +368,11 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
 
       {/* Info Content */}
       <div className="flex flex-1 flex-col pt-3 px-0.5">
-        <Link to={`/product/${p.id}`} className="hover:text-[#520618] transition-colors">
+        <Link
+          to={currentProductLink}
+          onClick={handleCardNavigation}
+          className="hover:text-[#520618] transition-colors"
+        >
           {/* Category & Subcategory Tag */}
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-[#798A7A] tracking-wider uppercase">
@@ -200,6 +408,57 @@ export default function ProductCard(props: { p?: any; [key: string]: any }) {
             </span>
           </div>
         </Link>
+
+        {/* Color Section: Swatches for Variant Product vs Single Color Badge for Simple Product */}
+        <div className="mt-2 min-h-[22px] flex items-center">
+          {isVariable && colorVariants.length > 0 ? (
+            <div className="flex items-center gap-1 flex-wrap">
+              {colorVariants.slice(0, 6).map((cv) => {
+                const isSelected = cv.name.toLowerCase() === activeColor.toLowerCase();
+                return (
+                  <button
+                    key={cv.name}
+                    type="button"
+                    title={cv.name}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedColor(cv.name);
+                    }}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                      isSelected
+                        ? "border-2 border-[#520618]"
+                        : "border-2 border-transparent hover:border-black/20 opacity-85 hover:opacity-100"
+                    }`}
+                    aria-label={`Select ${cv.name}`}
+                  >
+                    <span
+                      className="w-4 h-4 rounded-full block border border-black/15 shadow-2xs shrink-0"
+                      style={{ backgroundColor: cv.hex }}
+                    />
+                  </button>
+                );
+              })}
+              {colorVariants.length > 6 && (
+                <span className="text-[10px] font-bold text-zinc-500 pl-0.5">
+                  +{colorVariants.length - 6}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#520618] shrink-0"
+                title={simpleColorName || "Product Color"}
+              >
+                <span
+                  className="w-4 h-4 rounded-full block border border-black/15 shadow-2xs shrink-0"
+                  style={{ backgroundColor: simpleColorHex }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Price & Add To Bag Button / Quantity Stepper */}
         <div className="mt-3 flex items-center justify-between gap-2">

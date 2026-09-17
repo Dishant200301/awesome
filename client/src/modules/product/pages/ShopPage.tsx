@@ -162,6 +162,17 @@ const getColorHex = (name?: string): string => {
   return '#232323';
 };
 
+export interface ProductColorSwatch {
+  colorName: string;
+  colorHex: string;
+  image?: string;
+  galleryImages?: string[];
+  price?: number;
+  originalPrice?: number;
+  sku?: string;
+  stock?: number;
+}
+
 export interface ShopDisplayItem {
   id: string;
   productId: string;
@@ -170,6 +181,7 @@ export interface ShopDisplayItem {
   variantColor?: string;
   variantColorHex?: string;
   variantSize?: string;
+  availableColors?: ProductColorSwatch[];
   price: number;
   originalPrice: number;
   image: string;
@@ -197,6 +209,181 @@ export interface ShopDisplayItem {
   parentProduct: ClientShopProduct;
   isVariantCard: boolean;
 }
+
+export const extractProductColorSwatches = (p: any): ProductColorSwatch[] => {
+  if (!p) return [];
+  const prodAny = p as any;
+  const swatchesMap = new Map<string, ProductColorSwatch>();
+
+  const extractUrl = (val: any): string => {
+    if (!val) return "";
+    if (typeof val === "string") return val.trim();
+    if (typeof val === "object") {
+      return (val.url || val.src || val.image || val.mainImage || val.thumbnail || "").trim();
+    }
+    return "";
+  };
+
+  const defaultImg =
+    extractUrl(p.image) ||
+    extractUrl(prodAny.mainImage) ||
+    (Array.isArray(p.images) ? extractUrl(p.images[0]) : "") ||
+    "";
+
+  const addSwatch = (
+    rawColor: any,
+    hexVal?: string,
+    imgVal?: any,
+    galVal?: any[],
+    priceVal?: any,
+    origPriceVal?: any,
+    skuVal?: string,
+    stockVal?: any
+  ) => {
+    const rawStr = typeof rawColor === "string" ? rawColor : (rawColor?.colorName || rawColor?.name || rawColor?.color || "");
+    const pure = extractPureColor(rawStr);
+    if (!pure || ["standard", "default", "none", "free size"].includes(pure.toLowerCase())) {
+      return;
+    }
+    const key = pure.toLowerCase();
+    const finalHex = hexVal || (typeof rawColor === "object" ? (rawColor?.colorHex || rawColor?.colorCode || rawColor?.hex) : null) || getColorHex(pure);
+    const mainImg = extractUrl(imgVal) || extractUrl(rawColor?.displayImage) || extractUrl(rawColor?.mainImage) || extractUrl(rawColor?.image) || extractUrl(rawColor?.thumbnail) || defaultImg;
+
+    const gals: string[] = [];
+    if (mainImg) gals.push(mainImg);
+    if (Array.isArray(galVal)) {
+      galVal.forEach((g) => {
+        const u = extractUrl(g);
+        if (u && !gals.includes(u)) gals.push(u);
+      });
+    }
+
+    const price = Number(priceVal) || Number(p.price) || 799;
+    const origPrice = Number(origPriceVal) || Number(p.originalPrice) || Math.round(price * 1.5);
+    const stock = stockVal !== undefined && stockVal !== null && !isNaN(Number(stockVal)) ? Number(stockVal) : (Number(p.stock) || 25);
+
+    if (!swatchesMap.has(key)) {
+      swatchesMap.set(key, {
+        colorName: pure,
+        colorHex: finalHex,
+        image: mainImg,
+        galleryImages: gals,
+        price,
+        originalPrice: origPrice,
+        sku: skuVal || `${p.sku || "AOC"}-${pure}`,
+        stock,
+      });
+    } else {
+      const existing = swatchesMap.get(key)!;
+      if ((!existing.image || existing.image === defaultImg) && mainImg && mainImg !== defaultImg) {
+        existing.image = mainImg;
+      }
+      if (Array.isArray(gals)) {
+        if (!existing.galleryImages) {
+          existing.galleryImages = [];
+        }
+        gals.forEach((u) => {
+          if (u && !existing.galleryImages!.includes(u)) {
+            existing.galleryImages!.push(u);
+          }
+        });
+      }
+      if (finalHex && finalHex !== "#232323" && (!existing.colorHex || existing.colorHex === "#232323")) {
+        existing.colorHex = finalHex;
+      }
+    }
+  };
+
+  if (Array.isArray(prodAny.variantDetails)) {
+    prodAny.variantDetails.forEach((vd: any) => {
+      if (vd) {
+        addSwatch(
+          vd.colorName || vd.color || vd.name || vd.optionValue,
+          vd.colorHex,
+          vd.mainImage || vd.image || vd.thumbnail,
+          vd.galleryImages || vd.images,
+          vd.price,
+          vd.originalPrice,
+          vd.sku,
+          vd.quantity ?? vd.stock
+        );
+      }
+    });
+  }
+
+  if (Array.isArray(prodAny.variations)) {
+    prodAny.variations.forEach((v: any) => {
+      if (v) {
+        addSwatch(
+          v.colorName || v.color,
+          v.colorHex,
+          v.thumbnail || v.mainImage || v.image,
+          v.galleryImages || v.images,
+          v.price,
+          v.originalPrice,
+          v.sku,
+          v.stock ?? v.quantity
+        );
+      }
+    });
+  }
+
+  if (Array.isArray(prodAny.colorMediaConfigs)) {
+    prodAny.colorMediaConfigs.forEach((cm: any) => {
+      if (cm) {
+        addSwatch(
+          cm.colorName,
+          cm.colorHex || cm.colorCode,
+          cm.mainImage || cm.thumbnail,
+          cm.images || cm.galleryImages
+        );
+      }
+    });
+  }
+
+  if (Array.isArray(prodAny.colors)) {
+    prodAny.colors.forEach((c: any) => {
+      if (c) {
+        addSwatch(
+          c,
+          typeof c === "object" ? (c.colorHex || c.hex) : undefined,
+          typeof c === "object" ? (c.displayImage || c.mainImage || c.image) : undefined,
+          typeof c === "object" ? (c.galleryImages || c.images) : undefined
+        );
+      }
+    });
+  }
+
+  return Array.from(swatchesMap.values());
+};
+
+export const itemMatchesColor = (item: any, cleanC: string): boolean => {
+  const itemColor = extractPureColor(item.variantColor || "").toLowerCase().trim();
+  if (itemColor && (itemColor === cleanC || itemColor.includes(cleanC) || cleanC.includes(itemColor))) {
+    return true;
+  }
+  if (!item.isVariantCard) {
+    const p = item.parentProduct || {};
+    const hasCol = (p.colors || []).some((col: any) => {
+      const colRaw = extractPureColor(typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().trim();
+      return colRaw === cleanC || colRaw.includes(cleanC) || cleanC.includes(colRaw);
+    });
+    const hasVar = (p.variations || p.variants || p.variantDetails || []).some((v: any) => {
+      const vColor = extractPureColor(v.colorName || v.color || "").toLowerCase().trim();
+      return vColor === cleanC || vColor.includes(cleanC) || cleanC.includes(vColor);
+    });
+    const hasMedia = (p.colorMediaConfigs || []).some((cm: any) => {
+      const cmColor = extractPureColor(cm.colorName || "").toLowerCase().trim();
+      return cmColor === cleanC || cmColor.includes(cmColor) || cleanC.includes(cmColor);
+    });
+    const hasAttr = (p.attributes || p.productOptions || []).some((a: any) =>
+      (a.name || "").toLowerCase().includes("color") &&
+      (a.values || []).some((v: string) => extractPureColor(v).toLowerCase().trim() === cleanC)
+    );
+    return hasCol || hasVar || hasMedia || hasAttr;
+  }
+  return false;
+};
 
 const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
   const prodAny = p as any;
@@ -228,224 +415,34 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
     return "";
   };
 
-  const variantDetails: any[] = Array.isArray(prodAny.variantDetails) ? prodAny.variantDetails : [];
-  const variations: any[] = Array.isArray(prodAny.variations) ? prodAny.variations : [];
-  const colors: any[] = Array.isArray(prodAny.colors) ? prodAny.colors : [];
-  const colorMediaConfigs: any[] = Array.isArray(prodAny.colorMediaConfigs) ? prodAny.colorMediaConfigs : [];
+  const isSimple = prodAny.productType === "simple" || prodAny.type === "Simple";
+  const rawSwatches = !isSimple ? extractProductColorSwatches(p) : [];
+  const availableColors = rawSwatches.length > 0 ? rawSwatches : [];
 
-  const isVariableProduct =
-    prodAny.productType === "variant" ||
-    prodAny.type === "Variable" ||
-    variantDetails.length > 0 ||
-    variations.length > 1 ||
-    colors.length > 1 ||
-    colorMediaConfigs.length > 1;
+  const defaultImg =
+    extractUrl(p.image) ||
+    extractUrl(prodAny.mainImage) ||
+    (Array.isArray(p.images) && extractUrl(p.images[0])) ||
+    (Array.isArray(prodAny.galleryImages) && extractUrl(prodAny.galleryImages[0])) ||
+    (availableColors[0]?.image) ||
+    "";
 
-  const getDynamicVariantShortDesc = (baseShort?: string, colorName?: string) => {
-    const cleanColor = (colorName || "").trim();
-    const cleanShort = (baseShort || "").trim();
-    if (!cleanShort) {
-      return cleanColor ? `Exquisitely handcrafted in an opulent ${cleanColor} tone, blending traditional artistry with premium finishes.` : "";
-    }
-    if (cleanColor && !cleanShort.toLowerCase().includes(cleanColor.toLowerCase())) {
-      return `Featured in an elegant ${cleanColor} palette. ${cleanShort}`;
-    }
-    return cleanShort;
-  };
-
-  if (isVariableProduct) {
-    const variantCardsMap = new Map<string, ShopDisplayItem>();
-
-    // 1. Process from variantDetails
-    if (variantDetails.length > 0) {
-      variantDetails.forEach((vd: any) => {
-        if (!vd) return;
-        const rawColor = vd.colorName || vd.color || vd.name || vd.optionValue || "Standard";
-        const pureColor = rawColor.split("/")[0].trim() || rawColor;
-        const colorKey = pureColor.toLowerCase();
-
-        if (!variantCardsMap.has(colorKey)) {
-          const vdMain = extractUrl(vd.mainImage) || extractUrl(vd.image) || (Array.isArray(vd.images) ? extractUrl(vd.images[0]) : "") || extractUrl(vd.thumbnail) || extractUrl(p.image) || "";
-          const vdGallery: string[] = [vdMain];
-          if (Array.isArray(vd.galleryImages)) vd.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
-          if (Array.isArray(vd.images)) vd.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
-          if (Array.isArray(p.galleryImages)) p.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
-          if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vdGallery.includes(u)) vdGallery.push(u); });
-
-          const vdPrice = Number(vd.price) || Number(p.price) || 799;
-          const vdOrigPrice = Number(vd.originalPrice) || Number(p.originalPrice) || Math.round(vdPrice * 1.5);
-          const vdStock = (vd.quantity !== undefined && vd.quantity !== null && !isNaN(Number(vd.quantity)))
-            ? Number(vd.quantity)
-            : ((vd.stock !== undefined && vd.stock !== null && !isNaN(Number(vd.stock)))
-              ? Number(vd.stock)
-              : (Number(p.stock) || 25));
-
-          variantCardsMap.set(colorKey, {
-            id: `${pId}-${pureColor.replace(/\s+/g, "-")}`,
-            productId: pId,
-            name: `${baseTitle} - ${pureColor}`,
-            baseTitle,
-            variantColor: pureColor,
-            variantColorHex: vd.colorHex || getColorHex(pureColor),
-            variantSize: vd.size || vd.sizeName || "Free Size",
-            price: vdPrice,
-            originalPrice: vdOrigPrice,
-            image: vdMain,
-            images: vdGallery,
-            galleryImages: vdGallery,
-            hoverImage: vdGallery[1] || vdMain,
-            stock: vdStock,
-            rating: pRating,
-            reviewCount: pReviewCount,
-            salesCount: pSales,
-            sku: vd.sku || `${p.sku || "AOC"}-${pureColor}`,
-            slug: pSlug,
-            category: pCategory,
-            categories: p.categories,
-            subcategory: pSubcategory,
-            labels: p.labels,
-            attributes: p.attributes,
-            customAttributes: prodAny.customAttributes,
-            specifications: prodAny.specifications,
-            productOptions: prodAny.productOptions,
-            shortDescription: getDynamicVariantShortDesc(p.shortDescription, pureColor),
-            fullDescription: p.fullDescription,
-            createdAt: prodAny.createdAt,
-            linkUrl: `/product/${pSlug}?color=${encodeURIComponent(pureColor)}`,
-            parentProduct: p,
-            isVariantCard: true,
-          });
-        }
-      });
-    }
-
-    // 2. Process from variations
-    if (variations.length > 0) {
-      variations.forEach((v: any) => {
-        if (!v) return;
-        const rawColor = v.colorName || (v as any).color || "Standard";
-        const pureColor = rawColor.split("/")[0].trim() || rawColor;
-        const colorKey = pureColor.toLowerCase();
-
-        if (!variantCardsMap.has(colorKey)) {
-          const vMain = extractUrl(v.thumbnail) || extractUrl(v.mainImage) || extractUrl(v.image) || (Array.isArray(v.images) ? extractUrl(v.images[0]) : "") || extractUrl(p.image) || "";
-          const vGallery: string[] = [vMain];
-          if (Array.isArray(v.galleryImages)) v.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
-          if (Array.isArray(v.images)) v.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
-          if (Array.isArray(p.galleryImages)) p.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
-          if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !vGallery.includes(u)) vGallery.push(u); });
-
-          const vPrice = Number(v.price) || Number(p.price) || 799;
-          const vOrigPrice = Number(v.originalPrice) || Number(p.originalPrice) || Math.round(vPrice * 1.5);
-          const vStock = (v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)))
-            ? Number(v.stock)
-            : ((v.quantity !== undefined && v.quantity !== null && !isNaN(Number(v.quantity)))
-              ? Number(v.quantity)
-              : (Number(p.stock) || 25));
-
-          variantCardsMap.set(colorKey, {
-            id: `${pId}-${pureColor.replace(/\s+/g, "-")}`,
-            productId: pId,
-            name: `${baseTitle} - ${pureColor}`,
-            baseTitle,
-            variantColor: pureColor,
-            variantColorHex: v.colorHex || getColorHex(pureColor),
-            variantSize: v.size || v.sizeName || "Free Size",
-            price: vPrice,
-            originalPrice: vOrigPrice,
-            image: vMain,
-            images: vGallery,
-            galleryImages: vGallery,
-            hoverImage: vGallery[1] || vMain,
-            stock: vStock,
-            rating: pRating,
-            reviewCount: pReviewCount,
-            salesCount: pSales,
-            sku: v.sku || `${p.sku || "AOC"}-${pureColor}`,
-            slug: pSlug,
-            category: pCategory,
-            categories: p.categories,
-            subcategory: pSubcategory,
-            labels: p.labels,
-            attributes: p.attributes,
-            customAttributes: prodAny.customAttributes,
-            specifications: prodAny.specifications,
-            productOptions: prodAny.productOptions,
-            shortDescription: getDynamicVariantShortDesc(p.shortDescription, pureColor),
-            fullDescription: p.fullDescription,
-            createdAt: prodAny.createdAt,
-            linkUrl: `/product/${pSlug}?color=${encodeURIComponent(pureColor)}`,
-            parentProduct: p,
-            isVariantCard: true,
-          });
-        }
-      });
-    }
-
-    // 3. Process from colors
-    if (colors.length > 0) {
-      colors.forEach((c: any) => {
-        if (!c) return;
-        const rawColor = typeof c === "string" ? c : (c.colorName || c.name || c.color || "Standard");
-        const pureColor = rawColor.split("/")[0].trim() || rawColor;
-        const colorKey = pureColor.toLowerCase();
-
-        if (!variantCardsMap.has(colorKey)) {
-          const cMain = extractUrl(c.displayImage) || extractUrl(c.mainImage) || extractUrl(c.image) || (Array.isArray(c.galleryImages) ? extractUrl(c.galleryImages[0]) : "") || extractUrl(p.image) || "";
-          const cGallery: string[] = [cMain];
-          if (Array.isArray(c.galleryImages)) c.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !cGallery.includes(u)) cGallery.push(u); });
-          if (Array.isArray(p.galleryImages)) p.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !cGallery.includes(u)) cGallery.push(u); });
-          if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !cGallery.includes(u)) cGallery.push(u); });
-
-          variantCardsMap.set(colorKey, {
-            id: `${pId}-${pureColor.replace(/\s+/g, "-")}`,
-            productId: pId,
-            name: `${baseTitle} - ${pureColor}`,
-            baseTitle,
-            variantColor: pureColor,
-            variantColorHex: c.colorHex || getColorHex(pureColor),
-            variantSize: (c.sizes && c.sizes[0]) || "Free Size",
-            price: Number(p.price) || 799,
-            originalPrice: Number(p.originalPrice) || Math.round(Number(p.price) * 1.5),
-            image: cMain,
-            images: cGallery,
-            galleryImages: cGallery,
-            hoverImage: cGallery[1] || cMain,
-            stock: Number(p.stock) || 25,
-            rating: pRating,
-            reviewCount: pReviewCount,
-            salesCount: pSales,
-            sku: `${p.sku || "AOC"}-${pureColor}`,
-            slug: pSlug,
-            category: pCategory,
-            categories: p.categories,
-            subcategory: pSubcategory,
-            labels: p.labels,
-            attributes: p.attributes,
-            customAttributes: prodAny.customAttributes,
-            specifications: prodAny.specifications,
-            productOptions: prodAny.productOptions,
-            shortDescription: getDynamicVariantShortDesc(p.shortDescription, pureColor),
-            fullDescription: p.fullDescription,
-            createdAt: prodAny.createdAt,
-            linkUrl: `/product/${pSlug}?color=${encodeURIComponent(pureColor)}`,
-            parentProduct: p,
-            isVariantCard: true,
-          });
-        }
-      });
-    }
-
-    if (variantCardsMap.size > 0) {
-      return Array.from(variantCardsMap.values());
-    }
-  }
-
-  // Fallback: Simple Product (single card)
-  const defaultImg = extractUrl(p.image) || extractUrl(prodAny.mainImage) || (Array.isArray(p.images) ? extractUrl(p.images[0]) : "") || (Array.isArray(prodAny.galleryImages) ? extractUrl(prodAny.galleryImages[0]) : "") || "";
-  const defaultGals: string[] = [defaultImg];
+  const defaultGals: string[] = defaultImg ? [defaultImg] : [];
   if (Array.isArray(p.images)) p.images.forEach((g: any) => { const u = extractUrl(g); if (u && !defaultGals.includes(u)) defaultGals.push(u); });
   if (Array.isArray(prodAny.galleryImages)) prodAny.galleryImages.forEach((g: any) => { const u = extractUrl(g); if (u && !defaultGals.includes(u)) defaultGals.push(u); });
+
+  const initialVariantColor = availableColors.length > 0
+    ? availableColors[0].colorName
+    : (prodAny.color || prodAny.colorName || (prodAny.colors && prodAny.colors[0]?.colorName) || "Standard");
+  const initialVariantHex = availableColors.length > 0
+    ? availableColors[0].colorHex
+    : (prodAny.colorHex || prodAny.color_hex || (prodAny.colors && prodAny.colors[0]?.colorHex) || (prodAny.colors && prodAny.colors[0]?.hex) || getColorHex(initialVariantColor));
+
+  const firstSwatch = availableColors[0];
+  const initialPrice = firstSwatch ? firstSwatch.price : (Number(p.price) || 799);
+  const initialOrigPrice = firstSwatch ? firstSwatch.originalPrice : (Number(p.originalPrice) || Number(p.regularPrice) || Math.round(initialPrice * 1.5));
+  const initialSku = firstSwatch?.sku || p.sku || prodAny.defaultSku || `AH-${pId}`;
+  const initialStock = firstSwatch?.stock !== undefined ? firstSwatch.stock : ((p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock))) ? Number(p.stock) : 25);
 
   return [
     {
@@ -453,20 +450,21 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
       productId: pId,
       name: baseTitle,
       baseTitle,
-      variantColor: prodAny.colorName || "Standard",
-      variantColorHex: "#232323",
+      variantColor: initialVariantColor,
+      variantColorHex: initialVariantHex,
       variantSize: "Free Size",
-      price: Number(p.price) || 799,
-      originalPrice: Number(p.originalPrice) || Math.round(Number(p.price) * 1.5),
-      image: defaultImg,
+      availableColors: availableColors.length > 0 ? availableColors : undefined,
+      price: initialPrice,
+      originalPrice: initialOrigPrice,
+      image: (firstSwatch?.image) || defaultImg,
       images: defaultGals,
       galleryImages: defaultGals,
       hoverImage: defaultGals[1] || defaultImg,
-      stock: (p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock))) ? Number(p.stock) : 25,
+      stock: initialStock,
       rating: pRating,
       reviewCount: pReviewCount,
       salesCount: pSales,
-      sku: p.sku || `AOC-${pId}`,
+      sku: initialSku,
       slug: pSlug,
       category: pCategory,
       categories: p.categories,
@@ -484,6 +482,593 @@ const explodeProductToShopItems = (p: ClientShopProduct): ShopDisplayItem[] => {
       isVariantCard: false,
     }
   ];
+};
+
+interface ShopProductCardComponentProps {
+  p: ShopDisplayItem;
+  wishlisted: boolean;
+  cartItems: any[];
+  toggleWishlist: (id: string) => void;
+  addToCart: (item: any) => void;
+  updateQuantity: (id: string, qty: number) => void;
+  handleProductClick: (e: React.MouseEvent, productId: string | number) => void;
+}
+
+const ShopGridProductCard: React.FC<ShopProductCardComponentProps> = ({
+  p,
+  wishlisted,
+  cartItems,
+  toggleWishlist,
+  addToCart,
+  updateQuantity,
+  handleProductClick,
+}) => {
+  const [selectedColor, setSelectedColor] = useState<string>(
+    p.variantColor || (p.availableColors && p.availableColors[0]?.colorName) || ""
+  );
+
+  useEffect(() => {
+    setSelectedColor(p.variantColor || (p.availableColors && p.availableColors[0]?.colorName) || "");
+  }, [p.variantColor, p.availableColors]);
+
+  const activeColor = selectedColor;
+
+  const activeSwatch = useMemo(() => {
+    if (!p.availableColors || p.availableColors.length === 0) return null;
+    return (
+      p.availableColors.find(
+        (s) => s.colorName.toLowerCase() === activeColor.toLowerCase()
+      ) || p.availableColors[0]
+    );
+  }, [p.availableColors, activeColor]);
+
+  const currentImg =
+    activeSwatch?.image ||
+    p.image ||
+    p.images?.[0] ||
+    "https://m.media-amazon.com/images/I/71LtEuQjqXL._SL1500_.jpg";
+  const currentPrice = activeSwatch?.price ?? p.price;
+  const currentOrigPrice = activeSwatch?.originalPrice ?? p.originalPrice;
+  const currentSku = activeSwatch?.sku || p.sku;
+  const currentStock = activeSwatch?.stock ?? p.stock;
+  const currentLink =
+    activeColor && activeColor.toLowerCase() !== "standard"
+      ? `/product/${p.slug}?color=${encodeURIComponent(activeColor)}`
+      : p.linkUrl;
+  const discount =
+    currentOrigPrice > currentPrice
+      ? Math.round(((currentOrigPrice - currentPrice) / currentOrigPrice) * 100)
+      : 0;
+
+  const currentVariantImages = useMemo(() => {
+    if (activeSwatch?.galleryImages && activeSwatch.galleryImages.length > 0) {
+      return activeSwatch.galleryImages;
+    }
+    if (activeSwatch?.image) {
+      return [activeSwatch.image];
+    }
+    return undefined;
+  }, [activeSwatch]);
+
+  const sliderProduct = useMemo(
+    () => ({
+      ...p,
+      image: currentImg,
+      mainImage: currentImg,
+      images: currentVariantImages || (p.images && p.images.length > 0 ? p.images : [currentImg]),
+      galleryImages: currentVariantImages || (p.galleryImages && p.galleryImages.length > 0 ? p.galleryImages : [currentImg]),
+    }),
+    [p, currentImg, currentVariantImages]
+  );
+
+  const cartItem = cartItems.find(
+    (item) =>
+      String(item.productId) === String(p.productId) &&
+      (item.colorName || "").toLowerCase() === (activeColor || p.variantColor || "standard").toLowerCase()
+  );
+  const itemQuantity = cartItem ? cartItem.quantity : 0;
+
+  return (
+    <div
+      key={p.id}
+      className="group bg-white rounded-2xl border border-zinc-200/80 p-2 overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between"
+    >
+      <div>
+        {/* Image Frame & Badges with Smooth Right-to-Left Auto Slider on Hover */}
+        <Link
+          to={currentLink}
+          onClick={(e) => handleProductClick(e, p.productId)}
+          className="block cursor-pointer"
+        >
+          <ProductHoverSlider
+            product={sliderProduct}
+            alt={p.name}
+            activeImage={currentImg}
+            activeImages={currentVariantImages}
+            activeColor={activeColor || undefined}
+            className="relative aspect-square bg-zinc-100 rounded-xl overflow-hidden block"
+          >
+            {/* Wishlist Heart Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleWishlist(String(p.productId));
+              }}
+              className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${
+                wishlisted
+                  ? "bg-rose-500 text-white"
+                  : "bg-white/80 text-zinc-700 hover:bg-white"
+              }`}
+              aria-label="Wishlist"
+            >
+              <Heart
+                className={`w-3.5 h-3.5 ${wishlisted ? "fill-white" : ""}`}
+              />
+            </button>
+          </ProductHoverSlider>
+        </Link>
+
+        {/* Card Content Body */}
+        <div className="p-2 pt-3 space-y-1.5">
+          <span className="text-[12px] font-semibold tracking-wider text-[#798A7A] block">
+            {p.category}
+          </span>
+
+          <Link to={currentLink} onClick={(e) => handleProductClick(e, p.productId)}>
+            <h3 className="font-semibold text-zinc-900 text-sm line-clamp-1 group-hover:text-[#520618] transition-colors">
+              {p.name || p.baseTitle}
+            </h3>
+          </Link>
+
+          {/* Color Variants / Swatches on Product Card */}
+          {p.availableColors && p.availableColors.length > 1 ? (
+            <div className="flex items-center gap-1.5 pt-0.5 min-h-[24px]">
+              <div className="flex items-center gap-1 shrink-0 flex-wrap">
+                {p.availableColors.slice(0, 6).map((swatch) => {
+                  const isSelected = activeColor.toLowerCase() === swatch.colorName.toLowerCase();
+                  return (
+                    <button
+                      key={swatch.colorName}
+                      type="button"
+                      title={swatch.colorName}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSelectedColor(swatch.colorName);
+                      }}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                        isSelected
+                          ? "border-2 border-[#520618]"
+                          : "border-2 border-transparent hover:border-black/20 opacity-80 hover:opacity-100"
+                      }`}
+                      aria-label={`Select ${swatch.colorName}`}
+                    >
+                      <span
+                        className="w-4 h-4 rounded-full block border border-black/15 shadow-2xs shrink-0"
+                        style={{ backgroundColor: swatch.colorHex || getColorHex(swatch.colorName) }}
+                      />
+                    </button>
+                  );
+                })}
+                {p.availableColors.length > 6 && (
+                  <span className="text-[10px] font-bold text-zinc-500 pl-0.5">
+                    +{p.availableColors.length - 6}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 pt-0.5 min-h-[24px]">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#520618] shrink-0"
+                title={p.variantColor || "Product Color"}
+              >
+                <span
+                  className="w-4 h-4 rounded-full block border border-black/15 shadow-2xs shrink-0"
+                  style={{ backgroundColor: p.variantColorHex || getColorHex(p.variantColor || "Standard") }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Rating */}
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <div className="flex items-center text-amber-400 gap-0.5">
+              {[...Array(5)].map((_, i) => {
+                const ratingVal = Number(p.rating || 0);
+                const isFilled = i < Math.floor(ratingVal);
+                return (
+                  <Star
+                    key={i}
+                    className={`w-3 h-3 ${
+                      isFilled
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-zinc-200 fill-zinc-200"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+            <span className="font-semibold text-zinc-800 text-[11px]">
+              {Number(p.rating || 0) > 0 ? Number(p.rating).toFixed(1) : "0.0"}
+            </span>
+            <span className="text-zinc-400 font-normal text-[10px]">
+              ({Number(p.reviewCount || 0)})
+            </span>
+          </div>
+
+          {/* Price */}
+          <div className="flex items-baseline gap-2 pt-0.5">
+            <span className="text-base font-semibold text-zinc-900">
+              ₹{currentPrice}
+            </span>
+            {currentOrigPrice > currentPrice && (
+              <span className="text-xs text-zinc-400 line-through font-semibold">
+                ₹{currentOrigPrice}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Add to Bag Button / Quantity Stepper */}
+      <div className="p-2 pt-0">
+        {itemQuantity > 0 ? (
+          <div className="w-full h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-between px-3 shadow-xs">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (cartItem) updateQuantity(cartItem.id, cartItem.quantity - 1);
+              }}
+              className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors font-black text-sm cursor-pointer active:scale-90"
+              aria-label="Decrease quantity"
+            >
+              <Minus className="w-6 h-6 stroke-1" />
+            </button>
+            <span className="text-xs font-semibold px-2">{itemQuantity}</span>
+            <button
+              type="button"
+              disabled={currentStock !== undefined && currentStock !== null && itemQuantity >= Number(currentStock)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const maxS = currentStock !== undefined && currentStock !== null ? Number(currentStock) : 25;
+                if (cartItem && itemQuantity < maxS) {
+                  updateQuantity(cartItem.id, Math.min(maxS, cartItem.quantity + 1));
+                }
+              }}
+              className={`w-6 h-6 flex items-center justify-center rounded-lg transition-colors font-black text-sm ${
+                currentStock !== undefined && itemQuantity >= Number(currentStock)
+                  ? "text-zinc-500 opacity-40 cursor-not-allowed"
+                  : "text-white hover:bg-white/20 cursor-pointer active:scale-90"
+              }`}
+              aria-label="Increase quantity"
+              title={currentStock !== undefined && itemQuantity >= Number(currentStock) ? `Max ${currentStock} in stock` : "Increase quantity"}
+            >
+              <Plus className="w-6 h-6 stroke-1" />
+            </button>
+          </div>
+        ) : (currentStock !== undefined && currentStock <= 0) ? (
+          <button
+            disabled
+            className="w-full h-10 bg-zinc-200 text-zinc-500 text-xs font-semibold rounded-xl cursor-not-allowed select-none"
+          >
+            Out of Stock
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              addToCart({
+                productId: String(p.productId),
+                productName: p.name,
+                brand: p.parentProduct?.brand || "Awesome Handmade",
+                colorName: activeColor || p.variantColor || "Standard",
+                colorHex: activeSwatch?.colorHex || p.variantColorHex || getColorHex(activeColor),
+                size: p.variantSize || "Free Size",
+                price: currentPrice,
+                originalPrice: currentOrigPrice || currentPrice,
+                image: currentImg,
+                sku: currentSku || "AOC-SKU",
+                quantity: 1,
+                stock: currentStock !== undefined ? Number(currentStock) : 25,
+              })
+            }
+            className="w-full h-10 bg-zinc-900 hover:bg-[#520618] text-white text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+          >
+            <ShoppingBag className="w-4 h-4" />
+            <span>Add To Bag</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ShopListProductCard: React.FC<ShopProductCardComponentProps> = ({
+  p,
+  wishlisted,
+  cartItems,
+  toggleWishlist,
+  addToCart,
+  updateQuantity,
+  handleProductClick,
+}) => {
+  const [selectedColor, setSelectedColor] = useState<string>(
+    p.variantColor || (p.availableColors && p.availableColors[0]?.colorName) || ""
+  );
+
+  useEffect(() => {
+    setSelectedColor(p.variantColor || (p.availableColors && p.availableColors[0]?.colorName) || "");
+  }, [p.variantColor, p.availableColors]);
+
+  const activeColor = selectedColor;
+
+  const activeSwatch = useMemo(() => {
+    if (!p.availableColors || p.availableColors.length === 0) return null;
+    return (
+      p.availableColors.find(
+        (s) => s.colorName.toLowerCase() === activeColor.toLowerCase()
+      ) || p.availableColors[0]
+    );
+  }, [p.availableColors, activeColor]);
+
+  const currentImg =
+    activeSwatch?.image ||
+    p.image ||
+    p.images?.[0] ||
+    "https://m.media-amazon.com/images/I/71LtEuQjqXL._SL1500_.jpg";
+  const currentPrice = activeSwatch?.price ?? p.price;
+  const currentOrigPrice = activeSwatch?.originalPrice ?? p.originalPrice;
+  const currentSku = activeSwatch?.sku || p.sku;
+  const currentStock = activeSwatch?.stock ?? p.stock;
+  const currentLink =
+    activeColor && activeColor.toLowerCase() !== "standard"
+      ? `/product/${p.slug}?color=${encodeURIComponent(activeColor)}`
+      : p.linkUrl;
+  const discount =
+    currentOrigPrice > currentPrice
+      ? Math.round(((currentOrigPrice - currentPrice) / currentOrigPrice) * 100)
+      : 0;
+
+  const cartItem = cartItems.find(
+    (item) =>
+      String(item.productId) === String(p.productId) &&
+      (item.colorName || "").toLowerCase() === (activeColor || p.variantColor || "standard").toLowerCase()
+  );
+  const itemQuantity = cartItem ? cartItem.quantity : 0;
+
+  return (
+    <div
+      key={p.id}
+      className="group bg-white border border-zinc-200/80 rounded-2xl p-2 flex flex-row items-start sm:items-center gap-3.5 sm:gap-5 hover:shadow-md transition-all"
+    >
+      {/* Product Image Frame */}
+      <Link
+        to={currentLink}
+        onClick={(e) => handleProductClick(e, p.productId)}
+        className="w-28 sm:w-40 md:w-44 aspect-[3/3.5] sm:aspect-square bg-zinc-100 rounded-xl overflow-hidden shrink-0 relative block cursor-pointer"
+      >
+        <img
+          src={currentImg}
+          alt={p.name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+
+        {/* Badges */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+          {discount > 0 && (
+            <span className="bg-[#520618] text-white text-[8px] sm:text-[9px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full shadow-xs">
+              -{discount}%
+            </span>
+          )}
+        </div>
+
+        {/* Wishlist Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist(String(p.productId));
+          }}
+          className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${
+            wishlisted
+              ? "bg-rose-500 text-white"
+              : "bg-white/80 text-zinc-700 hover:bg-white"
+          }`}
+          aria-label="Wishlist"
+        >
+          <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${wishlisted ? "fill-current" : ""}`} />
+        </button>
+      </Link>
+
+      {/* Content Details */}
+      <div className="flex-1 text-left space-y-1 sm:space-y-1.5 py-0.5 min-w-0">
+        <span className="text-[11px] sm:text-[12px] font-semibold tracking-wider text-[#798A7A] block">
+          {p.category}
+        </span>
+
+        <Link to={currentLink} onClick={(e) => handleProductClick(e, p.productId)}>
+          <h3 className="font-semibold text-zinc-900 text-xs sm:text-base line-clamp-1 group-hover:text-[#520618] transition-colors">
+            {p.name || p.baseTitle}
+          </h3>
+        </Link>
+
+        {/* Color Variants / Swatches on Product Card */}
+        {p.availableColors && p.availableColors.length > 1 ? (
+          <div className="flex items-center gap-1.5 pt-0.5 min-h-[24px]">
+            <div className="flex items-center gap-1 shrink-0 flex-wrap">
+              {p.availableColors.slice(0, 6).map((swatch) => {
+                const isSelected = activeColor.toLowerCase() === swatch.colorName.toLowerCase();
+                return (
+                  <button
+                    key={swatch.colorName}
+                    type="button"
+                    title={swatch.colorName}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedColor(swatch.colorName);
+                    }}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                      isSelected
+                        ? "border-2 border-[#520618]"
+                        : "border-2 border-transparent hover:border-black/20 opacity-80 hover:opacity-100"
+                    }`}
+                    aria-label={`Select ${swatch.colorName}`}
+                  >
+                    <span
+                      className="w-4 h-4 rounded-full block border border-black/15 shadow-2xs shrink-0"
+                      style={{ backgroundColor: swatch.colorHex || getColorHex(swatch.colorName) }}
+                    />
+                  </button>
+                );
+              })}
+              {p.availableColors.length > 6 && (
+                <span className="text-[10px] font-bold text-zinc-500 pl-0.5">
+                  +{p.availableColors.length - 6}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 pt-0.5 min-h-[24px]">
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#520618] shrink-0"
+              title={p.variantColor || "Product Color"}
+            >
+              <span
+                className="w-4 h-4 rounded-full block border border-black/15 shadow-2xs shrink-0"
+                style={{ backgroundColor: p.variantColorHex || getColorHex(p.variantColor || "Standard") }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Rating */}
+        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-medium">
+          <div className="flex items-center text-amber-400 gap-0.5">
+            {[...Array(5)].map((_, i) => {
+              const ratingVal = Number(p.rating || 0);
+              const isFilled = i < Math.floor(ratingVal);
+              return (
+                <Star
+                  key={i}
+                  className={`w-3 h-3 ${
+                    isFilled
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-zinc-200 fill-zinc-200"
+                  }`}
+                />
+              );
+            })}
+          </div>
+          <span className="font-semibold text-zinc-800 text-[11px]">
+            {Number(p.rating || 0) > 0 ? Number(p.rating).toFixed(1) : "0.0"}
+          </span>
+          <span className="text-zinc-400 font-normal text-[10px]">
+            ({Number(p.reviewCount || 0)})
+          </span>
+        </div>
+
+        <p className="text-[11px] sm:text-xs text-zinc-500 line-clamp-1 sm:line-clamp-2 leading-relaxed font-medium">
+          {p.shortDescription || p.fullDescription || p.category || ""}
+        </p>
+
+        {/* Price & Action Area */}
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm sm:text-base font-semibold text-zinc-900">
+              ₹{currentPrice}
+            </span>
+            {currentOrigPrice > currentPrice && (
+              <span className="text-[10px] sm:text-xs text-zinc-400 line-through font-semibold">
+                ₹{currentOrigPrice}
+              </span>
+            )}
+          </div>
+
+          <div>
+            {itemQuantity > 0 ? (
+              <div className="w-[128px] h-[36px] bg-zinc-900 text-white rounded-xl flex items-center justify-between px-2.5 shadow-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (cartItem) updateQuantity(cartItem.id, cartItem.quantity - 1);
+                  }}
+                  className="w-5 h-5 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors font-black cursor-pointer active:scale-90"
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+                <span className="text-xs font-semibold px-1">{itemQuantity}</span>
+                <button
+                  type="button"
+                  disabled={currentStock !== undefined && currentStock !== null && itemQuantity >= Number(currentStock)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const maxS = currentStock !== undefined && currentStock !== null ? Number(currentStock) : 25;
+                    if (cartItem && itemQuantity < maxS) {
+                      updateQuantity(cartItem.id, Math.min(maxS, cartItem.quantity + 1));
+                    }
+                  }}
+                  className={`w-5 h-5 flex items-center justify-center rounded-lg transition-colors font-black ${
+                    currentStock !== undefined && itemQuantity >= Number(currentStock)
+                      ? "text-zinc-500 opacity-40 cursor-not-allowed"
+                      : "text-white hover:bg-white/20 cursor-pointer active:scale-90"
+                  }`}
+                  aria-label="Increase quantity"
+                  title={currentStock !== undefined && itemQuantity >= Number(currentStock) ? `Max ${currentStock} in stock` : "Increase quantity"}
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+              </div>
+            ) : (currentStock !== undefined && currentStock <= 0) ? (
+              <button
+                disabled
+                className="w-[128px] h-[36px] bg-zinc-200 text-zinc-500 text-xs font-semibold rounded-xl cursor-not-allowed select-none shrink-0"
+              >
+                Out of Stock
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addToCart({
+                    productId: String(p.productId),
+                    productName: p.name,
+                    brand: p.parentProduct?.brand || "Awesome Handmade",
+                    colorName: activeColor || p.variantColor || "Standard",
+                    colorHex: activeSwatch?.colorHex || p.variantColorHex || getColorHex(activeColor),
+                    size: p.variantSize || "Free Size",
+                    price: currentPrice,
+                    originalPrice: currentOrigPrice || currentPrice,
+                    image: currentImg,
+                    sku: currentSku || "AOC-SKU",
+                    quantity: 1,
+                    stock: currentStock !== undefined ? Number(currentStock) : 25,
+                  });
+                }}
+                className="w-[128px] h-[36px] bg-zinc-900 hover:bg-[#520618] text-white text-[12px] font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>Add to Cart</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default function ShopPage() {
@@ -788,34 +1373,10 @@ export default function ShopPage() {
         return item.price >= minPrice;
       }
       return item.price >= minPrice && item.price <= maxPrice;
-    });    // Color Filter (Strict card-level matching)
+    });    // Color Filter (Strict card-level matching via itemMatchesColor)
     if (selectedColors.length > 0) {
       list = list.filter((item: any) =>
-        selectedColors.some((c) => {
-          const cleanC = c.toLowerCase().trim();
-          const itemColor = (item.variantColor || "").toLowerCase().trim();
-
-          if (itemColor && (itemColor === cleanC || itemColor.includes(cleanC) || cleanC.includes(itemColor))) {
-            return true;
-          }
-
-          if (!item.isVariantCard) {
-            const p = item.parentProduct || {};
-            const hasColorObj = (p.colors || []).some((col: any) => {
-              const colRaw = (typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().trim();
-              const colParts = colRaw.split("/").map((s: string) => s.trim());
-              return colParts[0] === cleanC || colParts.includes(cleanC) || colRaw === cleanC;
-            });
-            const hasAttrColor = (p.attributes || p.productOptions || []).some(
-              (a: any) =>
-                (a.name || "").toLowerCase().includes("color") &&
-                (a.values || []).some((v: string) => v.toLowerCase().trim() === cleanC)
-            );
-            return hasColorObj || hasAttrColor;
-          }
-
-          return false;
-        })
+        selectedColors.some((c) => itemMatchesColor(item, c.toLowerCase().trim()))
       );
     }
 
@@ -994,11 +1555,11 @@ export default function ShopPage() {
     ];
   }, [categoryScopedItems]);
 
-  // Live Dynamic Colors extracted from relevant category shop products & variants with accurate counts (only pure color names)
+  // Live Dynamic Colors extracted from relevant category shop products & variants with accurate counts (only pure color names, sorted A to Z)
   const availableDynamicColors = useMemo(() => {
     const colorMap = new Map<string, { name: string; hex: string }>();
 
-    // 1. Populate from active category shop items
+    // 1. Populate from active category shop items and their variants
     categoryScopedItems.forEach((item: any) => {
       const pureColor = extractPureColor(item.variantColor || "");
       if (pureColor && !["standard", "default", "none", "free size"].includes(pureColor.toLowerCase())) {
@@ -1011,6 +1572,21 @@ export default function ShopPage() {
         }
       }
 
+      if (Array.isArray(item.availableColors)) {
+        item.availableColors.forEach((swatch: ProductColorSwatch) => {
+          const pure = extractPureColor(swatch.colorName);
+          if (pure && !["standard", "default", "none", "free size"].includes(pure.toLowerCase())) {
+            const key = pure.toLowerCase();
+            if (!colorMap.has(key)) {
+              colorMap.set(key, {
+                name: pure,
+                hex: swatch.colorHex || getColorHex(pure),
+              });
+            }
+          }
+        });
+      }
+
       const p = item.parentProduct;
       if (p && Array.isArray(p.colors)) {
         p.colors.forEach((col: any) => {
@@ -1021,7 +1597,23 @@ export default function ShopPage() {
             if (!colorMap.has(key)) {
               colorMap.set(key, {
                 name: pure,
-                hex: (typeof col === "object" ? col.colorHex : null) || getColorHex(pure),
+                hex: (typeof col === "object" ? (col.colorHex || col.hex) : null) || getColorHex(pure),
+              });
+            }
+          }
+        });
+      }
+
+      if (p && Array.isArray(p.variations)) {
+        p.variations.forEach((v: any) => {
+          const rawColName = (v.colorName || v.color || "").trim();
+          const pure = extractPureColor(rawColName);
+          if (pure && !["standard", "default", "none", "free size"].includes(pure.toLowerCase())) {
+            const key = pure.toLowerCase();
+            if (!colorMap.has(key)) {
+              colorMap.set(key, {
+                name: pure,
+                hex: v.colorHex || getColorHex(pure),
               });
             }
           }
@@ -1029,20 +1621,13 @@ export default function ShopPage() {
       }
     });
 
-    // 2. Compute exact product/variant count for each distinct color in this category
+    // 2. Compute exact real card-level count for each distinct color in this category
     const result: Array<{ name: string; hex: string; count: number }> = [];
     colorMap.forEach((val) => {
       const cleanC = val.name.toLowerCase().trim();
-      const countForColor = categoryScopedItems.filter((item: any) => {
-        const itemColor = extractPureColor(item.variantColor || "").toLowerCase().trim();
-        const p = item.parentProduct || {};
-        if (itemColor && (itemColor === cleanC || itemColor.includes(cleanC) || cleanC.includes(itemColor))) return true;
-        const hasCol = (p.colors || []).some((col: any) => {
-          const colRaw = extractPureColor(typeof col === "string" ? col : col.colorName || col.name || col.color || "").toLowerCase().trim();
-          return colRaw === cleanC || colRaw.includes(cleanC) || cleanC.includes(colRaw);
-        });
-        return hasCol;
-      }).length;
+      const countForColor = categoryScopedItems.filter((item: any) =>
+        itemMatchesColor(item, cleanC)
+      ).length;
 
       if (countForColor > 0) {
         result.push({
@@ -1053,7 +1638,8 @@ export default function ShopPage() {
       }
     });
 
-    return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    // 3. Sort Alphabetically A to Z as requested
+    return result.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   }, [categoryScopedItems]);
 
   // Live Dynamic Sizes extracted STRICTLY from current category products with real counts > 0
@@ -1327,52 +1913,10 @@ export default function ShopPage() {
         )}
       </div>
 
-      {/* 4. Size Filter */}
-      {availableDynamicSizes.length > 0 && (
-        <div className="border-b border-zinc-200 pb-2">
-          <button
-            type="button"
-            onClick={() => toggleSection("size")}
-            className="flex w-full items-center justify-between text-sm font-semibold tracking-wider text-zinc-900 mb-3 cursor-pointer"
-          >
-            <span>Size</span>
-            {openSections.size ? (
-              <Minus className="w-6 h-6 stroke-1 text-zinc-800" />
-            ) : (
-              <Plus className="w-6 h-6 stroke-1 text-zinc-800" />
-            )}
-          </button>
-          {openSections.size && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {availableDynamicSizes.map((s) => {
-                const sizeVal = s.name;
-                const checked = selectedSizes.includes(sizeVal);
-                return (
-                  <button
-                    key={sizeVal}
-                    type="button"
-                    onClick={() => toggleSize(sizeVal)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${checked
-                      ? "bg-[#520618] text-white border-[#520618] shadow-xs"
-                      : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                      }`}
-                  >
-                    <span>{sizeVal}</span>
-                    {s.count > 0 && (
-                      <span className={`text-[10px] ${checked ? "text-white/80" : "text-zinc-400"}`}>
-                        ({s.count})
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 5. Dynamic Custom Attributes Filters (Material, Craft Technique, Occasion, etc.) */}
-      {(filterConfig?.attributes || []).map((attr: any) => {
+      {/* 4. Dynamic Custom Attributes Filters (Material, Craft Technique, Occasion, etc. - Size excluded) */}
+      {(filterConfig?.attributes || [])
+        .filter((attr: any) => attr.name.toLowerCase() !== "size" && attr.name.toLowerCase() !== "color")
+        .map((attr: any) => {
         const attrKey = `attr_${attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
         const isSectionOpen = openSections[attrKey] ?? true;
         const selectedVals = selectedAttributes[attr.name] || [];
@@ -1736,432 +2280,36 @@ export default function ShopPage() {
                 </button>
               </div>
             ) : viewMode === "grid" ? (
-              /* GRID VIEW MODE matching Hervia layout */
+              /* GRID VIEW MODE matching responsive layout */
               <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {displayedProducts.map((p) => {
-                  const mainImg =
-                    p.image ||
-                    p.images?.[0] ||
-                    "https://m.media-amazon.com/images/I/71LtEuQjqXL._SL1500_.jpg";
-                  const wishlisted = isWishlisted(String(p.productId));
-                  const discount = p.originalPrice
-                    ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
-                    : 0;
-
-                  return (
-                    <div
-                      key={p.id}
-                      className="group bg-white rounded-2xl border border-zinc-200/80 p-2 overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between"
-                    >
-                      {(() => {
-                        const cartItem = cartItems.find(
-                          (item) =>
-                            String(item.productId) === String(p.productId) &&
-                            (item.colorName || "").toLowerCase() === (p.variantColor || "standard").toLowerCase()
-                        );
-                        const itemQuantity = cartItem ? cartItem.quantity : 0;
-
-                        return (
-                          <>
-                            <div>
-                              {/* Image Frame & Badges with Smooth Right-to-Left Auto Slider on Hover */}
-                              <Link
-                                to={p.linkUrl}
-                                onClick={(e) => handleProductClick(e, p.productId)}
-                                className="block cursor-pointer"
-                              >
-                                <ProductHoverSlider
-                                  product={p}
-                                  alt={p.name}
-                                  className="relative aspect-square bg-zinc-100 rounded-xl overflow-hidden block"
-                                >
-                                  {/* Badges */}
-                                  <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
-                                    {discount > 0 && (
-                                      <span className="bg-[#520618] text-white text-[9px] font-extrabold font-semibold px-2 py-0.5 rounded-full shadow-xs">
-                                        -{discount}%
-                                      </span>
-                                    )}
-                                    {(p.labels?.bestSeller || p.parentProduct?.labels?.bestSeller) && (
-                                      <span className="bg-amber-500 text-white text-[9px] font-extrabold font-semibold px-2 py-0.5 rounded-full shadow-xs">
-                                        BEST SELLER
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* Wishlist Heart Button */}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      toggleWishlist(String(p.productId));
-                                    }}
-                                    className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${wishlisted
-                                      ? "bg-rose-500 text-white"
-                                      : "bg-white/80 text-zinc-700 hover:bg-white"
-                                      }`}
-                                    aria-label="Wishlist"
-                                  >
-                                    <Heart
-                                      className={`w-3.5 h-3.5 ${wishlisted ? "fill-white" : ""
-                                        }`}
-                                    />
-                                  </button>
-                                </ProductHoverSlider>
-                              </Link>
-
-                              {/* Card Content Body */}
-                              <div className="p-2 pt-3 space-y-1.5">
-                                <span className="text-[12px] font-semibold tracking-wider text-[#798A7A] block">
-                                  {p.category}
-                                </span>
-
-                                <Link to={p.linkUrl} onClick={(e) => handleProductClick(e, p.productId)}>
-                                  <h3 className="font-semibold text-zinc-900 text-sm line-clamp-1 group-hover:text-[#520618] transition-colors">
-                                    {p.name || p.baseTitle}
-                                  </h3>
-                                </Link>
-
-                                {p.isVariantCard && p.variantColor && (
-                                  <div className="flex items-center gap-1.5 pt-0.5">
-                                    <span
-                                      className="w-2.5 h-2.5 rounded-full border border-black/15 shrink-0 inline-block shadow-2xs"
-                                      style={{ backgroundColor: p.variantColorHex || getColorHex(p.variantColor) }}
-                                    />
-                                    <span className="text-[11px] font-semibold text-zinc-600">
-                                      {p.variantColor}
-                                    </span>
-                                  </div>
-                                )}
-
-                                <div className="flex items-center gap-1.5 text-xs font-medium">
-                                  <div className="flex items-center text-amber-400 gap-0.5">
-                                    {[...Array(5)].map((_, i) => {
-                                      const ratingVal = Number(p.rating || 0);
-                                      const isFilled = i < Math.floor(ratingVal);
-                                      return (
-                                        <Star
-                                          key={i}
-                                          className={`w-3 h-3 ${
-                                            isFilled
-                                              ? "fill-amber-400 text-amber-400"
-                                              : "text-zinc-200 fill-zinc-200"
-                                          }`}
-                                        />
-                                      );
-                                    })}
-                                  </div>
-                                  <span className="font-semibold text-zinc-800 text-[11px]">
-                                    {Number(p.rating || 0) > 0 ? Number(p.rating).toFixed(1) : "0.0"}
-                                  </span>
-                                  <span className="text-zinc-400 font-normal text-[10px]">
-                                    ({Number(p.reviewCount || 0)})
-                                  </span>
-                                </div>
-
-                                <div className="flex items-baseline gap-2 pt-0.5">
-                                  <span className="text-base font-semibold text-zinc-900">
-                                    ₹{p.price}
-                                  </span>
-                                  {p.originalPrice && p.originalPrice > p.price && (
-                                    <span className="text-xs text-zinc-400 line-through font-semibold">
-                                      ₹{p.originalPrice}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Add to Bag Button / Green Quantity Stepper */}
-                            <div className="p-2 pt-0">
-                              {itemQuantity > 0 ? (
-                                <div className="w-full h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-between px-3 shadow-xs">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      if (cartItem) updateQuantity(cartItem.id, cartItem.quantity - 1);
-                                    }}
-                                    className="w-6 h-6 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors font-black text-sm cursor-pointer active:scale-90"
-                                    aria-label="Decrease quantity"
-                                  >
-                                    <Minus className="w-6 h-6 stroke-1" />
-                                  </button>
-                                  <span className="text-xs font-semibold px-2">{itemQuantity}</span>
-                                  <button
-                                    type="button"
-                                    disabled={p.stock !== undefined && p.stock !== null && itemQuantity >= Number(p.stock)}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const maxS = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 25;
-                                      if (cartItem && itemQuantity < maxS) {
-                                        updateQuantity(cartItem.id, Math.min(maxS, cartItem.quantity + 1));
-                                      }
-                                    }}
-                                    className={`w-6 h-6 flex items-center justify-center rounded-lg transition-colors font-black text-sm ${
-                                      p.stock !== undefined && itemQuantity >= Number(p.stock)
-                                        ? "text-zinc-500 opacity-40 cursor-not-allowed"
-                                        : "text-white hover:bg-white/20 cursor-pointer active:scale-90"
-                                    }`}
-                                    aria-label="Increase quantity"
-                                    title={p.stock !== undefined && itemQuantity >= Number(p.stock) ? `Max ${p.stock} in stock` : "Increase quantity"}
-                                  >
-                                    <Plus className="w-6 h-6 stroke-1" />
-                                  </button>
-                                </div>
-                              ) : (p.stock !== undefined && p.stock <= 0) ? (
-                                <button
-                                  disabled
-                                  className="w-full h-10 bg-zinc-200 text-zinc-500 text-xs font-semibold rounded-xl cursor-not-allowed select-none"
-                                >
-                                  Out of Stock
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    addToCart({
-                                      productId: String(p.productId),
-                                      productName: p.name,
-                                      brand: p.parentProduct?.brand || "Awesome Handmade",
-                                      colorName: p.variantColor || "Standard",
-                                      colorHex: p.variantColorHex || getColorHex(p.variantColor),
-                                      size: p.variantSize || "Free Size",
-                                      price: p.price,
-                                      originalPrice: p.originalPrice || p.price,
-                                      image: mainImg,
-                                      sku: p.sku || "AOC-SKU",
-                                      quantity: 1,
-                                      stock: p.stock !== undefined ? Number(p.stock) : 25,
-                                    })
-                                  }
-                                  className="w-full h-10 bg-zinc-900 hover:bg-[#520618] text-white text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                                >
-                                  <ShoppingBag className="w-4 h-4" />
-                                  <span>Add To Bag</span>
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
+                {displayedProducts.map((p) => (
+                  <ShopGridProductCard
+                    key={p.id}
+                    p={p}
+                    wishlisted={isWishlisted(String(p.productId))}
+                    cartItems={cartItems}
+                    toggleWishlist={toggleWishlist}
+                    addToCart={addToCart}
+                    updateQuantity={updateQuantity}
+                    handleProductClick={handleProductClick}
+                  />
+                ))}
               </div>
             ) : (
               /* LIST VIEW MODE matching Grid styling & responsive alignment */
               <div className="space-y-4">
-                {displayedProducts.map((p) => {
-                  const mainImg =
-                    p.image ||
-                    p.images?.[0] ||
-                    "https://m.media-amazon.com/images/I/71LtEuQjqXL._SL1500_.jpg";
-                  const wishlisted = isWishlisted(String(p.productId));
-                  const cartItem = cartItems.find(
-                    (item) =>
-                      String(item.productId) === String(p.productId) &&
-                      (item.colorName || "").toLowerCase() === (p.variantColor || "standard").toLowerCase()
-                  );
-                  const itemQuantity = cartItem ? cartItem.quantity : 0;
-                  const discount = p.originalPrice
-                    ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
-                    : 0;
-
-                  return (
-                    <div
-                      key={p.id}
-                      className="group bg-white border border-zinc-200/80 rounded-2xl p-2 flex flex-row items-start sm:items-center gap-3.5 sm:gap-5 hover:shadow-md transition-all"
-                    >
-                      {/* Product Image Frame with Top-Right Heart Icon */}
-                      <Link
-                        to={p.linkUrl}
-                        onClick={(e) => handleProductClick(e, p.productId)}
-                        className="w-28 sm:w-40 md:w-44 aspect-[3/3.5] sm:aspect-square bg-zinc-100 rounded-xl overflow-hidden shrink-0 relative block cursor-pointer"
-                      >
-                        <img
-                          src={mainImg}
-                          alt={p.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-
-                        {/* Badges */}
-                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-                          {discount > 0 && (
-                            <span className="bg-[#520618] text-white text-[8px] sm:text-[9px] font-extrabold font-semibold px-1.5 sm:px-2 py-0.5 rounded-full shadow-xs">
-                              -{discount}%
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Top Right Heart Wishlist Button inside Image */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleWishlist(String(p.productId));
-                          }}
-                          className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full backdrop-blur-md shadow-xs transition-colors z-10 cursor-pointer ${wishlisted
-                            ? "bg-rose-500 text-white"
-                            : "bg-white/80 text-zinc-700 hover:bg-white"
-                            }`}
-                          aria-label="Wishlist"
-                        >
-                          <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${wishlisted ? "fill-current" : ""}`} />
-                        </button>
-                      </Link>
-
-                      {/* Content Details */}
-                      <div className="flex-1 text-left space-y-1 sm:space-y-1.5 py-0.5 min-w-0">
-                        <span className="text-[11px] sm:text-[12px] font-semibold tracking-wider text-[#798A7A] block">
-                          {p.category}
-                        </span>
-
-                        <Link to={p.linkUrl} onClick={(e) => handleProductClick(e, p.productId)}>
-                          <h3 className="font-semibold text-zinc-900 text-xs sm:text-base line-clamp-1 group-hover:text-[#520618] transition-colors">
-                            {p.name || p.baseTitle}
-                          </h3>
-                        </Link>
-
-                        {p.isVariantCard && p.variantColor && (
-                          <div className="flex items-center gap-1.5 pt-0.5">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full border border-black/15 shrink-0 inline-block shadow-2xs"
-                              style={{ backgroundColor: p.variantColorHex || getColorHex(p.variantColor) }}
-                            />
-                            <span className="text-[11px] font-semibold text-zinc-600">
-                              {p.variantColor}
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-medium">
-                          <div className="flex items-center text-amber-400 gap-0.5">
-                            {[...Array(5)].map((_, i) => {
-                              const ratingVal = Number(p.rating || 0);
-                              const isFilled = i < Math.floor(ratingVal);
-                              return (
-                                <Star
-                                  key={i}
-                                  className={`w-3 h-3 ${
-                                    isFilled
-                                      ? "fill-amber-400 text-amber-400"
-                                      : "text-zinc-200 fill-zinc-200"
-                                  }`}
-                                />
-                              );
-                            })}
-                          </div>
-                          <span className="font-semibold text-zinc-800 text-[11px]">
-                            {Number(p.rating || 0) > 0 ? Number(p.rating).toFixed(1) : "0.0"}
-                          </span>
-                          <span className="text-zinc-400 font-normal text-[10px]">
-                            ({Number(p.reviewCount || 0)})
-                          </span>
-                        </div>
-
-                        <p className="text-[11px] sm:text-xs text-zinc-500 line-clamp-1 sm:line-clamp-2 leading-relaxed font-medium">
-                          {p.shortDescription || p.fullDescription || p.category || ""}
-                        </p>
-
-                        <div className="flex items-baseline gap-2 pt-0.5">
-                          <span className="text-sm sm:text-base font-semibold text-zinc-900">
-                            ₹{p.price}
-                          </span>
-                          {p.originalPrice && p.originalPrice > p.price && (
-                            <span className="text-[10px] sm:text-xs text-zinc-400 line-through font-semibold">
-                              ₹{p.originalPrice}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Action Area: Matching Width & Height Add to Cart / Stepper */}
-                        <div className="pt-1.5 flex items-center gap-2">
-                          {itemQuantity > 0 ? (
-                            <div
-                              className="w-[128px] h-[36px] bg-black text-white text-xs font-medium px-2.5 rounded-xl shadow-xs flex items-center justify-between shrink-0"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  if (cartItem) updateQuantity(cartItem.id, cartItem.quantity - 1);
-                                }}
-                                className="w-5 h-5 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors font-black cursor-pointer active:scale-90"
-                                aria-label="Decrease quantity"
-                              >
-                                <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
-                              </button>
-                              <span className="text-xs font-semibold px-1">{itemQuantity}</span>
-                              <button
-                                type="button"
-                                disabled={p.stock !== undefined && p.stock !== null && itemQuantity >= Number(p.stock)}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const maxS = p.stock !== undefined && p.stock !== null ? Number(p.stock) : 25;
-                                  if (cartItem && itemQuantity < maxS) {
-                                    updateQuantity(cartItem.id, Math.min(maxS, cartItem.quantity + 1));
-                                  }
-                                }}
-                                className={`w-5 h-5 flex items-center justify-center rounded-lg transition-colors font-black ${
-                                  p.stock !== undefined && itemQuantity >= Number(p.stock)
-                                    ? "text-zinc-500 opacity-40 cursor-not-allowed"
-                                    : "text-white hover:bg-white/20 cursor-pointer active:scale-90"
-                                }`}
-                                aria-label="Increase quantity"
-                                title={p.stock !== undefined && itemQuantity >= Number(p.stock) ? `Max ${p.stock} in stock` : "Increase quantity"}
-                              >
-                                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                              </button>
-                            </div>
-                          ) : (p.stock !== undefined && p.stock <= 0) ? (
-                            <button
-                              disabled
-                              className="w-[128px] h-[36px] bg-zinc-200 text-zinc-500 text-xs font-semibold rounded-xl cursor-not-allowed select-none shrink-0"
-                            >
-                              Out of Stock
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addToCart({
-                                  productId: String(p.productId),
-                                  productName: p.name,
-                                  brand: p.parentProduct?.brand || "Awesome Handmade",
-                                  colorName: p.variantColor || "Standard",
-                                  colorHex: p.variantColorHex || getColorHex(p.variantColor),
-                                  size: p.variantSize || "Free Size",
-                                  price: p.price,
-                                  originalPrice: p.originalPrice || p.price,
-                                  image: mainImg,
-                                  sku: p.sku || "AOC-SKU",
-                                  quantity: 1,
-                                  stock: p.stock !== undefined ? Number(p.stock) : 25,
-                                });
-                              }}
-                              className="w-[128px] h-[36px] bg-zinc-900 hover:bg-[#520618] text-white text-[12px] font-semibold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
-                            >
-                              <ShoppingBag className="w-4 h-4" />
-                              <span>Add to Cart</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {displayedProducts.map((p) => (
+                  <ShopListProductCard
+                    key={p.id}
+                    p={p}
+                    wishlisted={isWishlisted(String(p.productId))}
+                    cartItems={cartItems}
+                    toggleWishlist={toggleWishlist}
+                    addToCart={addToCart}
+                    updateQuantity={updateQuantity}
+                    handleProductClick={handleProductClick}
+                  />
+                ))}
               </div>
             )}
 

@@ -1,29 +1,39 @@
-import { useEffect, useState } from "react";
-import Lenis from "lenis";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import Navbar from "@/modules/core/components/Navbar";
-import Footer from "@/modules/core/components/Footer";
 import HeroSection from "../components/HeroSection";
 import FeaturedCategoriesSection from "../components/FeaturedCategoriesSection";
-import FeaturedProductsSection from "../components/FeaturedProductsSection";
-import PromoBannerSection from "../components/PromoBannerSection";
-import BestSellingSection from "../components/BestSellingSection";
 import BentoGridSection from "../components/BentoGridSection";
-import WatchShopSection from "../components/WatchShopSection";
-import WhyChooseUsSection from "../components/WhyChooseUsSection";
+import FeaturedProductsSection from "../components/FeaturedProductsSection";
+
+// Lazy load below-the-fold sections to cut initial DOM from 968 nodes to ~320 nodes
+const PromoBannerSection = lazy(() => import("../components/PromoBannerSection"));
+const BestSellingSection = lazy(() => import("../components/BestSellingSection"));
+const WatchShopSection = lazy(() => import("../components/WatchShopSection"));
+const WhyChooseUsSection = lazy(() => import("../components/WhyChooseUsSection"));
+const Footer = lazy(() => import("@/modules/core/components/Footer"));
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
-    const lenis = new Lenis({ duration: 1.2, smoothWheel: true });
+    // Only initialize Lenis on desktop viewports (>= 768px) to eliminate mobile forced reflows
+    const isMobileDevice = typeof window !== "undefined" && (window.innerWidth < 768 || ("ontouchstart" in window && window.innerWidth < 1024));
+    if (isMobileDevice) {
+      return;
+    }
+
+    let lenis: any = null;
     let raf = 0;
-    const loop = (t: number) => {
-      lenis.raf(t);
+
+    Promise.all([import("lenis"), import("gsap/ScrollTrigger")]).then(([{ default: Lenis }, { ScrollTrigger }]) => {
+      lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+      const loop = (t: number) => {
+        lenis.raf(t);
+        raf = requestAnimationFrame(loop);
+      };
       raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    lenis.on("scroll", ScrollTrigger.update);
+      lenis.on("scroll", ScrollTrigger.update);
+    });
 
     // Smooth scroll to target hash section if present in URL
     if (window.location.hash) {
@@ -37,8 +47,8 @@ export default function HomePage() {
     }
 
     return () => {
-      cancelAnimationFrame(raf);
-      lenis.destroy();
+      if (raf) cancelAnimationFrame(raf);
+      if (lenis) lenis.destroy();
     };
   }, []);
 
@@ -49,11 +59,13 @@ export default function HomePage() {
       <FeaturedCategoriesSection onSelectCategory={(cat) => setActiveTab(cat)} />
       <BentoGridSection />
       <FeaturedProductsSection activeTab={activeTab} setActiveTab={setActiveTab} />
-      <PromoBannerSection />
-      <BestSellingSection />
-      <WatchShopSection />
-      <WhyChooseUsSection />
-      <Footer />
+      <Suspense fallback={<div className="min-h-[120px]" />}>
+        <PromoBannerSection />
+        <BestSellingSection />
+        <WatchShopSection />
+        <WhyChooseUsSection />
+        <Footer />
+      </Suspense>
     </main>
   );
 }

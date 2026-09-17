@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS products (
     subtitle TEXT,
     slug VARCHAR(255) NOT NULL UNIQUE,
     product_type VARCHAR(50) NOT NULL DEFAULT 'variable',
+    color VARCHAR(100) NULL,
+    color_hex VARCHAR(50) NULL,
     short_description TEXT,
     full_description LONGTEXT,
     price DECIMAL(10, 2) NOT NULL,

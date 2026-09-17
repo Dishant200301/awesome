@@ -25,7 +25,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Analytics deferred during idle time to avoid blocking initial paint
+// Initialize Analytics deferred after window load during idle time to avoid blocking initial paint
 if (typeof window !== "undefined") {
   const initAnalytics = () => {
     isSupported().then((supported) => {
@@ -35,10 +35,18 @@ if (typeof window !== "undefined") {
     });
   };
 
-  if ("requestIdleCallback" in window) {
-    (window as any).requestIdleCallback(initAnalytics, { timeout: 3000 });
+  const scheduleAnalytics = () => {
+    if ("requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(initAnalytics, { timeout: 8000 });
+    } else {
+      setTimeout(initAnalytics, 5000);
+    }
+  };
+
+  if (document.readyState === "complete") {
+    scheduleAnalytics();
   } else {
-    setTimeout(initAnalytics, 2000);
+    window.addEventListener("load", scheduleAnalytics, { once: true });
   }
 }
 

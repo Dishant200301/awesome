@@ -170,6 +170,9 @@ const CategoryCardItem: React.FC<CategoryCardItemProps> = ({ cat, onClick }) => 
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
             loading="lazy"
+            decoding="async"
+            width="240"
+            height="240"
             draggable={false}
           />
         </div>

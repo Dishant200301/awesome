@@ -117,6 +117,11 @@ export class AttributeService {
     this.memoryAttributes = attributes;
     if (dispatchSync && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('awesome_attribute_sync'));
+      try {
+        const bc = new BroadcastChannel('awesome_attribute_sync');
+        bc.postMessage({ type: 'ATTRIBUTE_SYNC' });
+        bc.close();
+      } catch (e) {}
     }
   }
 

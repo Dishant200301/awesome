@@ -114,14 +114,26 @@ export class AdminApiService {
     });
   }
 
+  public static invalidateDashboardStatsCache() {
+    this.dashboardStatsCache = null;
+    this.dashboardStatsCacheTime = 0;
+    this.dashboardStatsPromise = null;
+  }
+
   // Dashboard Stats
   public static async getDashboardStats(force = false) {
     const now = Date.now();
-    if (!force && this.dashboardStatsCache && now - this.dashboardStatsCacheTime < 15000) {
-      return this.dashboardStatsCache;
-    }
-    if (this.dashboardStatsPromise) {
-      return this.dashboardStatsPromise;
+    if (force) {
+      this.dashboardStatsCache = null;
+      this.dashboardStatsCacheTime = 0;
+      this.dashboardStatsPromise = null;
+    } else {
+      if (this.dashboardStatsCache && now - this.dashboardStatsCacheTime < 15000) {
+        return this.dashboardStatsCache;
+      }
+      if (this.dashboardStatsPromise) {
+        return this.dashboardStatsPromise;
+      }
     }
 
     this.dashboardStatsPromise = (async () => {

@@ -93,7 +93,7 @@ export const RelatedProductsSection: React.FC<RelatedProductsSectionProps> = ({ 
       {/* Section Header */}
       <div className="flex items-end justify-between">
         <div className="space-y-1.5">
-          <span className="text-[11px] font-bold tracking-[0.2em] text-zinc-400 uppercase">
+          <span className="text-[11px] font-bold tracking-[0.2em] text-zinc-400">
             Curated Recommendations
           </span>
           <h2 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
@@ -134,7 +134,7 @@ export const RelatedProductsSection: React.FC<RelatedProductsSectionProps> = ({ 
             key={p.id}
             className="w-[260px] sm:w-[280px] lg:w-[calc(20%-1.2rem)] shrink-0 snap-start"
           >
-            <ProductCard p={p} />
+            <ProductCard p={p} forceNavigate={true} />
           </div>
         ))}
       </div>

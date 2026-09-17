@@ -58,6 +58,31 @@ const DEFAULT_COLOR_PALETTES = [
   { name: 'Green', hex: '#16A34A' }
 ];
 
+const COLOR_SELECT_OPTIONS = [
+  { value: 'Maroon', label: 'Maroon' },
+  { value: 'Red', label: 'Red' },
+  { value: 'Crimson', label: 'Crimson' },
+  { value: 'Gold', label: 'Gold' },
+  { value: 'Yellow', label: 'Yellow' },
+  { value: 'Mustard', label: 'Mustard' },
+  { value: 'Emerald Green', label: 'Emerald Green' },
+  { value: 'Green', label: 'Green' },
+  { value: 'Bottle Green', label: 'Bottle Green' },
+  { value: 'Royal Blue', label: 'Royal Blue' },
+  { value: 'Navy Blue', label: 'Navy Blue' },
+  { value: 'Blue', label: 'Blue' },
+  { value: 'Pink', label: 'Pink' },
+  { value: 'Peach', label: 'Peach' },
+  { value: 'White', label: 'White' },
+  { value: 'Off White', label: 'Off White' },
+  { value: 'Black', label: 'Black' },
+  { value: 'Purple', label: 'Purple' },
+  { value: 'Orange', label: 'Orange' },
+  { value: 'Beige', label: 'Beige' },
+  { value: 'Silver', label: 'Silver' },
+  { value: 'Copper', label: 'Copper' }
+];
+
 const STANDARD_ATTRIBUTES = [
   { name: 'Color', defaultValues: ['Green', 'Black', 'Red', 'Maroon', 'Gold', 'Blue', 'Pink', 'White'] },
   { name: 'Size', defaultValues: ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'] },
@@ -167,6 +192,35 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
   const [tags, setTags] = useState<string>('');
   const [slug, setSlug] = useState<string>('');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [simpleColor, setSimpleColor] = useState<string>('Standard');
+  const [simpleColorHex, setSimpleColorHex] = useState<string>('#C89B3C');
+  const [customColorInput, setCustomColorInput] = useState<string>('');
+
+  const availableColorOptions = useMemo(() => {
+    const list = [...COLOR_SELECT_OPTIONS];
+    const colorAttr = masterAttributes.find((ma) => ma.name.toLowerCase() === 'color');
+    if (colorAttr && Array.isArray(colorAttr.values)) {
+      colorAttr.values.forEach((v: any) => {
+        const valName = typeof v === 'string' ? v : (v?.value || v?.label || '');
+        if (valName && !list.some((item) => item.value.toLowerCase() === valName.toLowerCase())) {
+          list.push({ value: valName, label: valName });
+        }
+      });
+    }
+    return list;
+  }, [masterAttributes]);
+
+  const handleAddSimpleColor = () => {
+    const candidate = customColorInput.trim();
+    if (!candidate) return;
+    setSimpleColor(candidate);
+    const matched = findHexByColorName(candidate);
+    if (matched && matched !== '#D4AF37') {
+      setSimpleColorHex(matched);
+    }
+    setCustomColorInput('');
+    setIsDirty(true);
+  };
 
   // Available subcategories filtered strictly by selected category
   const filteredSubcategories = useMemo(() => {
@@ -424,6 +478,11 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
         setRegularPrice(String(prod.regularPrice || prod.originalPrice || prod.price || 999));
         setSku(prod.sku || prod.defaultSku || 'AH-LAT-001');
         setStock(String(prod.stock !== undefined ? prod.stock : 25));
+
+        const loadedColor = prod.color || (prod.colors && prod.colors[0]?.colorName) || 'Standard';
+        const loadedColorHex = (prod as any).colorHex || (prod.colors && prod.colors[0]?.colorHex) || findHexByColorName(loadedColor);
+        setSimpleColor(loadedColor);
+        setSimpleColorHex(loadedColorHex);
 
         // Descriptions & Content
         setShortDescription(prod.shortDescription || prod.subtitle || '');
@@ -977,6 +1036,9 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
       status: finalStatus,
       isPublished: isLive,
       type: productType,
+      productType: productType === 'Variable' ? 'variable' : 'simple',
+      color: productType === 'Simple' ? (simpleColor.trim() || 'Standard') : '',
+      colorHex: productType === 'Simple' ? (simpleColorHex || '#C89B3C') : '',
       price: finalSellingPrice,
       originalPrice: finalOriginalPrice,
       regularPrice: finalOriginalPrice,
@@ -1044,13 +1106,17 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
               colorHex: (v as any).colorHex || DEFAULT_COLOR_PALETTES[i % DEFAULT_COLOR_PALETTES.length].hex,
               displayImage: v.mainImage || effectiveMainImage,
               mainImage: v.mainImage || effectiveMainImage,
-              galleryImages: v.galleryImages || []
+              galleryImages: (v.images && v.images.length > 0)
+                ? v.images
+                : ((v.galleryImages && v.galleryImages.length > 0)
+                  ? v.galleryImages
+                  : (v.mainImage ? [v.mainImage] : []))
             }))
           : [
               {
                 id: 'col-main',
-                colorName: 'Standard',
-                colorHex: '#C89B3C',
+                colorName: simpleColor.trim() || 'Standard',
+                colorHex: simpleColorHex || '#C89B3C',
                 displayImage: effectiveMainImage,
                 mainImage: effectiveMainImage,
                 galleryImages: effectiveGallery
@@ -1294,65 +1360,160 @@ export const ProductCreatePage: React.FC<ProductCreatePageProps> = ({ onNavigate
 
           {/* Row 2: For Simple vs Variable */}
           {productType === 'Simple' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">SKU</label>
-                <input
-                  type="text"
-                  value={sku}
-                  onChange={(e) => {
-                    setSku(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="e.g. AH-LAT-W"
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-mono"
-                />
+            <div className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700">SKU</label>
+                  <input
+                    type="text"
+                    value={sku}
+                    onChange={(e) => {
+                      setSku(e.target.value);
+                      setIsDirty(true);
+                    }}
+                    placeholder="e.g. AH-LAT-W"
+                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700">
+                    Selling Price (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={sellingPrice}
+                    onChange={(e) => {
+                      setSellingPrice(e.target.value);
+                      setIsDirty(true);
+                    }}
+                    placeholder="e.g. 799"
+                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700">Regular Price (₹)</label>
+                  <input
+                    type="number"
+                    value={regularPrice}
+                    onChange={(e) => {
+                      setRegularPrice(e.target.value);
+                      setIsDirty(true);
+                    }}
+                    placeholder="e.g. 999"
+                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-700">
+                    Stock Quantity <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={stock}
+                    onChange={(e) => {
+                      setStock(e.target.value);
+                      setIsDirty(true);
+                    }}
+                    placeholder="e.g. 25"
+                    className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">
-                  Selling Price (₹) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={sellingPrice}
-                  onChange={(e) => {
-                    setSellingPrice(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="e.g. 799"
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-semibold"
-                />
-              </div>
+              {/* Single Product Color (No variant layout) */}
+              <div className="p-4 rounded-xl bg-neutral-50/70 border border-neutral-200 space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-neutral-900">
+                    Product Color (Single Item Color)
+                  </label>
+                  <p className="text-[11px] text-neutral-500">
+                    Simple products have only one color. No variant table or multiple options will be created.
+                  </p>
+                </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">Regular Price (₹)</label>
-                <input
-                  type="number"
-                  value={regularPrice}
-                  onChange={(e) => {
-                    setRegularPrice(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="e.g. 999"
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                />
-              </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-0.5">
+                  {/* Color Hex Picker */}
+                  <input
+                    type="color"
+                    value={simpleColorHex || '#D4AF37'}
+                    onChange={(e) => {
+                      setSimpleColorHex(e.target.value);
+                      setIsDirty(true);
+                    }}
+                    className="w-9 h-9 p-0.5 rounded-lg border border-neutral-200 cursor-pointer bg-white shrink-0"
+                    title="Choose hex color"
+                  />
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-neutral-700">
-                  Stock Quantity <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={stock}
-                  onChange={(e) => {
-                    setStock(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="e.g. 25"
-                  className="w-full px-3.5 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950"
-                />
+                  {/* Color Select Dropdown */}
+                  <div className="w-48 sm:w-56">
+                    <Select
+                      value={simpleColor}
+                      onValueChange={(val) => {
+                        setSimpleColor(val);
+                        const matched = findHexByColorName(val);
+                        if (matched) setSimpleColorHex(matched);
+                        setIsDirty(true);
+                      }}
+                      placeholder="Select color..."
+                      options={availableColorOptions}
+                    />
+                  </div>
+
+                  {/* Custom color input */}
+                  <input
+                    type="text"
+                    value={customColorInput}
+                    onChange={(e) => setCustomColorInput(e.target.value)}
+                    placeholder="Or type custom color"
+                    className="w-44 sm:w-52 px-3 py-2 text-xs text-neutral-900 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-950 font-medium"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddSimpleColor();
+                      }
+                    }}
+                  />
+
+                  {/* Add Color Button */}
+                  <button
+                    type="button"
+                    onClick={handleAddSimpleColor}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Color</span>
+                  </button>
+                </div>
+
+                {/* Selected Color Display Badge */}
+                {simpleColor && simpleColor.trim() && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="text-xs font-medium text-neutral-500">Selected Color:</span>
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white text-xs font-bold text-neutral-900 border border-neutral-200 shadow-2xs">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0"
+                        style={{ backgroundColor: simpleColorHex || '#D4AF37' }}
+                      />
+                      <span>{simpleColor}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSimpleColor('Standard');
+                          setSimpleColorHex('#C89B3C');
+                          setCustomColorInput('');
+                          setIsDirty(true);
+                        }}
+                        className="text-neutral-400 hover:text-rose-500 p-0.5 ml-0.5 cursor-pointer transition-colors"
+                        title="Reset to default"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

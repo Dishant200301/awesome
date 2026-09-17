@@ -75,7 +75,9 @@ export async function initializeMySQLDatabase() {
             { table: "sub_categories", column: "meta_title", def: "VARCHAR(500)" },
             { table: "sub_categories", column: "meta_description", def: "TEXT" },
             { table: "sub_categories", column: "meta_keywords", def: "TEXT" },
-            { table: "products", column: "subcategory_id", def: "VARCHAR(64) NULL" }
+            { table: "products", column: "subcategory_id", def: "VARCHAR(64) NULL" },
+            { table: "products", column: "color", def: "VARCHAR(100) NULL" },
+            { table: "products", column: "color_hex", def: "VARCHAR(50) NULL" }
         ];
         for (const item of columnChecks) {
             await ensureColumnExists(connection, config.db.name, item.table, item.column, item.def);
