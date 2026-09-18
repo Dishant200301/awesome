@@ -5,8 +5,8 @@
   "description": "Enterprise Admin Dashboard for Awesome Handmade Platform",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "node -e \"if (process.platform === 'linux') { try { require('@rollup/rollup-linux-x64-gnu'); } catch (e) { try { require('child_process').execSync('npm install --no-save @rollup/rollup-linux-x64-gnu', {stdio: 'inherit'}); } catch(err){} } }\" && tsc && vite build",
+    "dev": "node init && vite",
+    "build": "node init && node -e \"if (process.platform === 'linux') { try { require('@rollup/rollup-linux-x64-gnu'); } catch (e) { try { require('child_process').execSync('npm install --no-save @rollup/rollup-linux-x64-gnu', {stdio: 'inherit'}); } catch(err){} } }\" && tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

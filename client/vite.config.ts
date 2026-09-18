@@ -32,15 +32,13 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
+    cssCodeSplit: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-icons': ['lucide-react', 'react-icons'],
-          'vendor-motion': ['framer-motion', 'gsap', 'lenis'],
-          'vendor-swiper': ['swiper'],
-          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/analytics'],
-        },
+        inlineDynamicImports: true,
+        entryFileNames: "assets/index-[hash].js",
+        chunkFileNames: "assets/index-[hash].js",
+        assetFileNames: "assets/index-[hash][extname]",
       },
     },
   },

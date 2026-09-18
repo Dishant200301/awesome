@@ -14,13 +14,13 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
+    cssCodeSplit: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-icons': ['lucide-react'],
-          'vendor-charts': ['recharts'],
-        },
+        inlineDynamicImports: true,
+        entryFileNames: "assets/index-[hash].js",
+        chunkFileNames: "assets/index-[hash].js",
+        assetFileNames: "assets/index-[hash][extname]",
       },
     },
   },
