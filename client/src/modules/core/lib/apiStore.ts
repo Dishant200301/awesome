@@ -3,16 +3,30 @@ import { ProductDetails, ProductColorVariation } from "@/modules/product/types/p
 const rawApiUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://api.awesomehandmade.com" : "http://localhost:5000")).trim().replace(/\/+$/, "");
 export const API_BASE_URL = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
-// Resilient fetch wrapper with strict timeout to prevent slow network hanging
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 3500): Promise<Response> => {
+// Resilient fetch wrapper with safe abort handling and adequate mobile latency buffers
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 12000): Promise<Response> => {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const timeoutId = controller ? setTimeout(() => {
+    try {
+      controller.abort();
+    } catch {}
+  }, timeoutMs) : null;
+
   try {
     const res = await fetch(url, {
       ...options,
       signal: controller ? controller.signal : undefined,
     });
     return res;
+  } catch (err: any) {
+    if (err?.name === 'AbortError' || err?.message?.includes('aborted')) {
+      return new Response(JSON.stringify({ success: false, timeout: true }), {
+        status: 408,
+        statusText: 'Request Timeout',
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    throw err;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
@@ -1564,19 +1578,44 @@ export const getLiveHeroSlides = (): LiveHeroSlide[] => {
   return liveHeroSlides.filter((s) => s.status !== 'Inactive');
 };
 
+let inflightPromoBannerPromise: Promise<LivePromoBanner> | null = null;
+
 export const fetchLivePromoBanner = async (): Promise<LivePromoBanner> => {
-  try {
-    const res = await fetchWithTimeout(`${API_BASE_URL}/content/promo-banner`, { cache: 'no-store' }, 3500);
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data && (json.data.image || json.data.title)) {
-        livePromoBanner = { ...DEFAULT_LIVE_PROMO_BANNER, ...json.data };
-        bannerListeners.forEach(fn => fn());
-        return livePromoBanner;
+  if (inflightPromoBannerPromise) {
+    return inflightPromoBannerPromise;
+  }
+
+  inflightPromoBannerPromise = (async () => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/content/promo-banner`, { cache: 'no-store' }, 10000);
+      if (res.ok) {
+        const json = await res.json();
+        const d = json.data;
+        if (d && (d.image || d.imageUrl || d.title)) {
+          livePromoBanner = {
+            ...DEFAULT_LIVE_PROMO_BANNER,
+            ...d,
+            image: d.image || d.imageUrl || DEFAULT_LIVE_PROMO_BANNER.image,
+            mobileImage: d.mobileImage || d.mobileImageUrl || DEFAULT_LIVE_PROMO_BANNER.mobileImage,
+            link: d.link || d.buttonLink || DEFAULT_LIVE_PROMO_BANNER.link,
+            badge: d.badge || d.badgeText || DEFAULT_LIVE_PROMO_BANNER.badge,
+            buttonText: d.buttonText || DEFAULT_LIVE_PROMO_BANNER.buttonText,
+            title: d.title || DEFAULT_LIVE_PROMO_BANNER.title,
+            subtitle: d.subtitle || DEFAULT_LIVE_PROMO_BANNER.subtitle
+          };
+          bannerListeners.forEach(fn => fn());
+          return livePromoBanner;
+        }
       }
+    } catch (e) {
+      // Safe fallback to default promo banner on network error
+    } finally {
+      inflightPromoBannerPromise = null;
     }
-  } catch (e) {}
-  return getLivePromoBanner();
+    return getLivePromoBanner();
+  })();
+
+  return inflightPromoBannerPromise;
 };
 
 export const getLivePromoBanner = (): LivePromoBanner => {
