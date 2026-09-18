@@ -5,15 +5,23 @@ export default function PromoBannerSection() {
   const [banner, setBanner] = useState<LivePromoBanner>(() => getLivePromoBanner());
 
   useEffect(() => {
-    fetchLivePromoBanner().then((live) => {
-      if (live) setBanner(live);
-    });
+    let isMounted = true;
+    fetchLivePromoBanner()
+      .then((live) => {
+        if (isMounted && live) setBanner(live);
+      })
+      .catch(() => {});
 
     const unsubscribe = subscribeToPromoBanner(() => {
-      setBanner(getLivePromoBanner());
+      if (isMounted) {
+        setBanner(getLivePromoBanner());
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   if (banner.status === 'Inactive' || (!banner.image && !banner.mobileImage && !banner.title)) {
