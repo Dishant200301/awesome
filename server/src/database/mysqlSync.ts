@@ -845,12 +845,17 @@ export async function fetchPromoBannerFromMySQL(): Promise<any | null> {
         title: r.title,
         subtitle: r.subtitle || "",
         badgeText: r.badge_text || "",
+        badge: r.badge_text || "",
         buttonText: r.button_text || "Explore Collection",
         buttonLink: r.button_link || "#collection",
+        link: r.button_link || "#collection",
         imageUrl: r.image_url || "",
+        image: r.image_url || "",
         mobileImageUrl: r.mobile_image_url || "",
+        mobileImage: r.mobile_image_url || "",
         bgColor: r.bg_color || "",
-        isActive: Boolean(r.is_active)
+        isActive: Boolean(r.is_active),
+        status: Boolean(r.is_active) ? "Active" : "Inactive"
       };
     }
     return null;

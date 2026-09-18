@@ -4,7 +4,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --host",
+    "dev": "node api.js && vite dev --host",
     "build": "node -e \"if (process.platform === 'linux') { try { require('@rollup/rollup-linux-x64-gnu'); } catch (e) { try { require('child_process').execSync('npm install --no-save @rollup/rollup-linux-x64-gnu', {stdio: 'inherit'}); } catch(err){} } }\" && vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",

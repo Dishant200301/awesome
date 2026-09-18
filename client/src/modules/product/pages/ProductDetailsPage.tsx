@@ -409,20 +409,26 @@ export const ProductDetailsPage: React.FC = () => {
 
     let lenis: any = null;
     let raf = 0;
+    let isMounted = true;
 
-    Promise.all([import("lenis"), import("gsap/ScrollTrigger")]).then(([{ default: Lenis }, { ScrollTrigger }]) => {
-      lenis = new Lenis({ duration: 1.1, smoothWheel: true });
-      (window as any).__lenis = lenis;
-      lenis.scrollTo(0, { immediate: true });
-      const loop = (t: number) => {
-        lenis.raf(t);
+    Promise.all([import("lenis"), import("gsap/ScrollTrigger")])
+      .then(([{ default: Lenis }, { ScrollTrigger }]) => {
+        if (!isMounted) return;
+        lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+        (window as any).__lenis = lenis;
+        lenis.scrollTo(0, { immediate: true });
+        const loop = (t: number) => {
+          if (!isMounted) return;
+          lenis.raf(t);
+          raf = requestAnimationFrame(loop);
+        };
         raf = requestAnimationFrame(loop);
-      };
-      raf = requestAnimationFrame(loop);
-      lenis.on("scroll", ScrollTrigger.update);
-    });
+        lenis.on("scroll", ScrollTrigger.update);
+      })
+      .catch(() => {});
 
     return () => {
+      isMounted = false;
       clearTimeout(timer);
       if (raf) cancelAnimationFrame(raf);
       if (lenis) {

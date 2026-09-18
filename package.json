@@ -9,17 +9,17 @@
     "admin"
   ],
   "scripts": {
-    "dev:client": "npm --prefix client run dev",
-    "dev:server": "npm --prefix server run dev",
-    "dev:admin": "npm --prefix admin run dev",
+    "dev:client": "node api.js && npm --prefix client run dev",
+    "dev:server": "node api.js && npm --prefix server run dev",
+    "dev:admin": "node api.js && npm --prefix admin run dev",
     "db:init": "npm --prefix server run db:init",
     "build:client": "npm --prefix client run build",
     "build:server": "npm --prefix server run build",
     "build:admin": "npm --prefix admin run build",
     "build:all": "npm run build:client && npm run build:admin && npm run build:server",
-    "build": "npm run build:all",
-    "start": "npm --prefix server start",
-    "start:server": "npm --prefix server start"
+    "build": "node api.js && npm run build:all",
+    "start": "node api.js && npm --prefix server start",
+    "start:server": "node api.js && npm --prefix server start"
   },
   "engines": {
     "node": ">=22.0.0"
